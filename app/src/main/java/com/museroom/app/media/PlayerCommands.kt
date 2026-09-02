@@ -3,12 +3,14 @@ package com.museroom.app.media
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.net.Uri
 import androidx.core.net.toUri
 import com.museroom.app.listener.MediaListenerService
+import kotlinx.coroutines.delay
 
 /** What a player will let us do to it, discovered rather than assumed. */
 data class PlayerCapability(
@@ -34,6 +36,10 @@ data class PlayerCapability(
  */
 object PlayerCommands {
 
+    /** Roughly three seconds, which is long enough for a player to react. */
+    private const val VERIFY_ATTEMPTS = 10
+    private const val VERIFY_INTERVAL_MS = 300L
+
     fun capabilities(context: Context): List<PlayerCapability> {
         val controllers = activeControllers(context)
         return Sources.packages.map { pkg ->
@@ -55,51 +61,95 @@ object PlayerCommands {
     /**
      * Asks [packageName] to play [title] by [artist].
      *
-     * Returns how it went, because the two paths behave differently and the user
-     * should be told which one they got.
+     * The command is verified rather than assumed. A player will happily accept
+     * playFromSearch, advertise that it supports it, and then do nothing, and the
+     * call does not throw when that happens. So we watch its session afterwards
+     * and only claim success once it is actually playing the song. Anything else
+     * falls through to opening the app.
      */
-    fun play(context: Context, packageName: String, title: String, artist: String): PlayOutcome {
+    suspend fun play(
+        context: Context,
+        packageName: String,
+        title: String,
+        artist: String,
+    ): PlayOutcome {
         val query = listOf(title, artist).filter { it.isNotBlank() }.joinToString(" ")
         if (query.isBlank()) return PlayOutcome.Failed("Nothing to play.")
 
-        val controller = activeControllers(context).firstOrNull { it.packageName == packageName }
+        val controller = controllerFor(context, packageName)
         val actions = controller?.playbackState?.actions ?: 0L
 
         if (controller != null && actions and PlaybackState.ACTION_PLAY_FROM_SEARCH != 0L) {
+            val before = controller.currentTitle()
             runCatching { controller.transportControls.playFromSearch(query, null) }
-                .onSuccess { return PlayOutcome.Started }
+            if (startedPlaying(context, packageName, title, before)) return PlayOutcome.Started
         }
 
-        val link = deepLink(packageName, query) ?: return PlayOutcome.Failed("No way to open that player.")
-        val intent = Intent(Intent.ACTION_VIEW, link).apply {
+        for (link in deepLinks(packageName, query)) {
+            if (open(context, link, packageName)) return PlayOutcome.Opened
+        }
+        return PlayOutcome.Failed(
+            "Could not open ${Sources.label(packageName)}. Is it installed?",
+        )
+    }
+
+    /** Watches the player's own session to see whether the command took effect. */
+    private suspend fun startedPlaying(
+        context: Context,
+        packageName: String,
+        wanted: String,
+        before: String?,
+    ): Boolean {
+        val target = Fingerprint.title(wanted)
+        repeat(VERIFY_ATTEMPTS) {
+            delay(VERIFY_INTERVAL_MS)
+            val controller = controllerFor(context, packageName) ?: return@repeat
+            val playing = controller.playbackState?.state == PlaybackState.STATE_PLAYING
+            val nowTitle = controller.currentTitle()
+            if (!playing || nowTitle.isNullOrBlank()) return@repeat
+
+            val matches = Fingerprint.title(nowTitle).let { it == target || it.contains(target) }
+            if (matches || nowTitle != before) return true
+        }
+        return false
+    }
+
+    private fun open(context: Context, link: Uri, packageName: String): Boolean {
+        val scoped = Intent(Intent.ACTION_VIEW, link).apply {
             setPackage(packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        return runCatching { context.startActivity(intent) }
-            .fold(
-                onSuccess = { PlayOutcome.Opened },
-                onFailure = {
-                    // Without the package restriction Android can still find a handler.
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, link).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                        .fold({ PlayOutcome.Opened }, { PlayOutcome.Failed("Could not open that player.") })
-                },
-            )
+        if (runCatching { context.startActivity(scoped) }.isSuccess) return true
+
+        // Without the package restriction Android may still find a handler, which
+        // covers forks whose package differs from the one that owns the link.
+        val open = Intent(Intent.ACTION_VIEW, link).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(open) }.isSuccess
     }
+
+    private fun MediaController.currentTitle(): String? =
+        metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
+
+    private fun controllerFor(context: Context, packageName: String): MediaController? =
+        activeControllers(context).firstOrNull { it.packageName == packageName }
 
     /**
      * A search link rather than a track link. Without a resolved catalogue id
      * there is no way to name one exact song, so this lands the person on it
      * rather than in it.
      */
-    private fun deepLink(packageName: String, query: String): Uri? {
+    private fun deepLinks(packageName: String, query: String): List<Uri> {
         val encoded = Uri.encode(query)
         return when (packageName) {
-            "com.spotify.music" -> "https://open.spotify.com/search/$encoded".toUri()
+            "com.spotify.music" -> listOf(
+                "spotify:search:$encoded".toUri(),
+                "https://open.spotify.com/search/$encoded".toUri(),
+            )
             "com.google.android.apps.youtube.music",
             "app.revanced.android.apps.youtube.music",
             "app.rvx.android.apps.youtube.music",
-            -> "https://music.youtube.com/search?q=$encoded".toUri()
-            else -> null
+            -> listOf("https://music.youtube.com/search?q=$encoded".toUri())
+            else -> emptyList()
         }
     }
 
