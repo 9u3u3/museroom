@@ -1,0 +1,200 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Bangers&family=Space+Mono:wght@400;700&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#7B4BFF;text-decoration:none}
+    a:hover{color:#5A2FE0}
+
+    .screen{
+      /* Surfaces invert between themes. Accents do not: a lime sticker is the
+         same lime on paper or on ink, which is what keeps the two themes
+         recognisably one design rather than a photo negative. */
+      --paper:#FBF6EA; --ink:#14110D; --card:#FFFFFF;
+      --violet:#7B4BFF; --lime:#CDFF3E; --pink:#FF4D8D; --sky:#54D6F5;
+      /* Ink that always sits ON an accent fill, in either theme. */
+      --on:#14110D;
+      width:390px; height:844px; overflow:hidden; position:relative;
+      background:var(--paper); color:var(--ink);
+      font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased;
+    }
+    /* Ben-Day dots: the comic half of the brief, kept faint so it reads as paper. */
+    .screen::before{
+      content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image:radial-gradient(var(--ink) 1.2px, transparent 1.3px);
+      background-size:9px 9px; opacity:.07;
+    }
+    .screen > *{position:relative; z-index:1}
+
+    /* Dark is a real second skin, not an inversion: the paper goes to a warm
+       near-black, the stroke becomes the cream, and every accent stays put. */
+    .screen.dark{
+      --paper:#17140F; --ink:#F6F0E2; --card:#241F18;
+      color:var(--ink);
+    }
+    .screen.dark::before{opacity:.10}
+
+    .ink{border:3px solid var(--ink)}
+    .pop{box-shadow:5px 5px 0 var(--ink)}
+    .pop-sm{box-shadow:3px 3px 0 var(--ink)}
+    .pop-lg{box-shadow:8px 8px 0 var(--ink)}
+
+    .bang{font-family:"Bangers","Impact","Haettenschweiler",sans-serif;
+          letter-spacing:.03em; font-weight:400}
+    .mono{font-family:"Space Mono","Courier New",monospace}
+
+    /* Top bar ------------------------------------------------------------ */
+    .bar{display:flex; align-items:center; justify-content:space-between;
+         gap:12px; padding:52px 20px 14px}
+    .word{font-family:"Bangers","Impact",sans-serif; font-size:30px;
+          line-height:1; letter-spacing:.04em;
+          -webkit-text-stroke:0; color:var(--ink);
+          text-shadow:3px 3px 0 var(--violet)}
+    .crumb{font-size:11px; font-weight:900; letter-spacing:.16em;
+           text-transform:uppercase; opacity:.55}
+
+    /* Buttons ------------------------------------------------------------ */
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      min-height:54px; padding:0 22px; border:3px solid var(--ink);
+      border-radius:999px; background:var(--violet); color:#fff;
+      font-family:"Archivo",sans-serif; font-weight:900; font-size:15px;
+      letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+      box-shadow:5px 5px 0 var(--ink);
+      transition:transform .12s cubic-bezier(.2,.9,.3,1.4), box-shadow .12s ease;
+    }
+    /* The signature neobrutalist press: the object moves onto its own shadow. */
+    .btn:hover{transform:translate(2px,2px); box-shadow:3px 3px 0 var(--ink)}
+    .btn:active{transform:translate(5px,5px); box-shadow:0 0 0 var(--ink)}
+    .btn.lime{background:var(--lime); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.lime:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.lime:active{box-shadow:0 0 0 var(--on)}
+    .btn.paper{background:var(--card); color:var(--ink)}
+    .btn.pink{background:var(--pink); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.pink:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.pink:active{box-shadow:0 0 0 var(--on)}
+    .btn.block{width:100%}
+    .btn.sm{min-height:40px; font-size:12px; padding:0 14px; box-shadow:3px 3px 0 var(--ink)}
+    .btn.sm:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .btn.sm.lime, .btn.sm.pink{box-shadow:3px 3px 0 var(--on)}
+    .btn.sm.lime:hover, .btn.sm.pink:hover{box-shadow:1px 1px 0 var(--on)}
+
+    /* Cards -------------------------------------------------------------- */
+    .card{background:var(--card); border:3px solid var(--ink); border-radius:16px;
+          box-shadow:5px 5px 0 var(--ink)}
+    .pill{display:inline-flex; align-items:center; gap:6px; height:28px;
+          padding:0 11px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); color:var(--ink); font-size:10px; font-weight:900;
+          letter-spacing:.12em; text-transform:uppercase}
+    .pill.acc{color:var(--on); border-color:var(--on)}
+
+    /* Bottom nav --------------------------------------------------------- */
+    .nav{margin-top:auto; display:grid; grid-template-columns:repeat(5,1fr);
+         background:var(--card); border-top:3px solid var(--ink);
+         padding:10px 6px 22px}
+    .nav a{display:flex; flex-direction:column; align-items:center; gap:5px;
+           padding:8px 0; color:var(--ink); border-radius:12px;
+           transition:transform .15s ease}
+    .nav a:hover{transform:translateY(-3px); color:var(--ink)}
+    .nav span{font-size:9px; font-weight:900; letter-spacing:.1em;
+              text-transform:uppercase}
+    /* The active tab is a lime sticker, so it keeps its dark ink in both themes. */
+    .nav .sel{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}
+
+    /* Motion ------------------------------------------------------------- */
+    @keyframes rise{from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)}}
+    @keyframes popin{0%{opacity:0; transform:scale(.82) rotate(-6deg)}
+                     70%{opacity:1; transform:scale(1.05) rotate(1.5deg)}
+                     100%{opacity:1; transform:scale(1) rotate(0)}}
+    @keyframes beat{0%,100%{transform:scale(1)} 50%{transform:scale(1.35)}}
+    @keyframes grow{from{width:0}}
+    @keyframes drift{0%,100%{transform:rotate(-3deg) translateY(0)}
+                     50%{transform:rotate(-3deg) translateY(-5px)}}
+    .r{animation:rise .5s cubic-bezier(.2,.8,.25,1) both}
+    .p{animation:popin .5s cubic-bezier(.2,.8,.25,1) both}
+    .d1{animation-delay:.06s} .d2{animation-delay:.12s} .d3{animation-delay:.18s}
+    .d4{animation-delay:.24s} .d5{animation-delay:.30s} .d6{animation-delay:.36s}
+    .d7{animation-delay:.42s} .d8{animation-delay:.48s}
+
+    .live{width:10px; height:10px; border-radius:999px; background:var(--pink);
+          border:2px solid var(--on); animation:beat 1.4s ease-in-out infinite}
+
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation:none !important; transition:none !important}
+    }
+    .si{padding:0 22px; display:flex; flex-direction:column; height:100%}
+    .mark2{margin:70px 0 0; font-size:46px; line-height:.9;
+           text-shadow:5px 5px 0 var(--pink); transform:rotate(-2deg)}
+    .lede{margin:18px 0 0; font-size:15px; line-height:1.5; font-weight:600; max-width:30ch}
+    .gbtn{margin-top:30px; background:var(--card); color:var(--ink)}
+    .split{display:flex; align-items:center; gap:12px; margin:26px 0 20px}
+    .split hr{flex:1; border:0; border-top:3px solid var(--ink); margin:0}
+    .split span{font-size:10px; font-weight:900; letter-spacing:.18em}
+    .field{width:100%; height:54px; padding:0 16px; border:3px solid var(--ink);
+           border-radius:14px; background:var(--card); font-family:"Archivo",sans-serif;
+           font-size:15px; font-weight:600; color:var(--ink); box-shadow:3px 3px 0 var(--ink);
+           transition:transform .12s ease, box-shadow .12s ease}
+    .field::placeholder{color:currentColor; opacity:.42}
+    .field:focus{outline:none; transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink);
+                 background:#FFFDF5}
+    .stack{display:flex; flex-direction:column; gap:12px}
+    .row{display:flex; gap:12px; align-items:center; margin-top:16px}
+    .ghost{background:none; border:0; font-family:"Archivo",sans-serif; font-weight:900;
+           font-size:13px; letter-spacing:.05em; text-transform:uppercase;
+           text-decoration:underline; text-underline-offset:4px; cursor:pointer; color:var(--ink)}
+    .fine{margin-top:auto; padding-bottom:32px; font-size:11px; line-height:1.5;
+          opacity:.6; text-align:center}
+  </style>
+</helmet>
+<div class="screen {{theme}}">
+  <div class="si">
+    <h1 class="mark2 bang p">SIGN IN<br>TO SYNC</h1>
+    <p class="lede r d2">Your listening stays on this phone until you do. Signing in is
+      what puts you on the board.</p>
+
+    <button class="btn block gbtn r d3">
+      <svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true">
+        <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1a6.2 6.2 0 0 1 0-12.4c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2a10 10 0 0 0 0 20c5.8 0 9.6-4 9.6-9.7 0-.7-.1-1.2-.2-1.7H12z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="split r d4"><hr><span>OR</span><hr></div>
+
+    <div class="stack">
+      <input class="field r d5" type="email" placeholder="Email" aria-label="Email">
+      <input class="field r d6" type="password" placeholder="Password" aria-label="Password">
+    </div>
+
+    <div class="row r d7">
+      <button class="btn">Sign in</button>
+      <button class="ghost">Create account</button>
+    </div>
+
+    <p class="fine">Google gives Museroom your email and name.<br>
+      Not your Gmail, contacts or anything else.</p>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.dark ? "dark" : "light" };
+  }
+}
+</script>
+</body>
+</html>

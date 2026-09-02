@@ -1,3 +1,4 @@
 <resources>
-    <color name="ic_launcher_background">#5B3FD6</color>
+    <!-- The brand violet the mark sits on. -->
+    <color name="ic_launcher_background">#7B4BFF</color>
 </resources>

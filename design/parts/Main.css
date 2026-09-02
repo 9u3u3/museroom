@@ -1,0 +1,33 @@
+    .art{position:relative; margin:4px 20px 0; aspect-ratio:1; border-radius:20px;
+         border:3px solid var(--ink); box-shadow:8px 8px 0 var(--ink); overflow:hidden;
+         background:linear-gradient(158deg,#7B4BFF 0%,#FF4D8D 58%,#FF9E2B 100%)}
+    .art .rings{position:absolute; inset:0; opacity:.5}
+    .art .halftone{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.1px, transparent 2.2px);
+      background-size:11px 11px; opacity:.2; mix-blend-mode:multiply}
+    .src{position:absolute; left:14px; top:14px; background:var(--lime);
+         color:var(--on); border-color:var(--on);
+         transform:rotate(-4deg); animation:popin .55s cubic-bezier(.2,.8,.25,1) both;
+         animation-delay:.25s}
+    .track{padding:22px 20px 0}
+    .title{margin:0; font-size:29px; line-height:1.06; font-weight:900; letter-spacing:-.03em}
+    .by{margin:7px 0 0; font-size:15px; font-weight:700; opacity:.7}
+    .prog{margin:18px 20px 0}
+    .rail{height:16px; border:3px solid var(--ink); border-radius:999px;
+          background:var(--card); overflow:hidden; box-shadow:3px 3px 0 var(--ink)}
+    .fill{height:100%; width:19%; background:var(--violet);
+          border-right:3px solid var(--on);
+          background-image:repeating-linear-gradient(115deg,rgba(255,255,255,.32) 0 6px,transparent 6px 13px);
+          animation:grow 1s cubic-bezier(.2,.8,.25,1) both; animation-delay:.35s}
+    .clock{display:flex; justify-content:space-between; margin-top:9px;
+           font-size:12px; font-weight:700; letter-spacing:.06em}
+    .stat{margin:22px 20px 0; padding:16px 18px; display:flex; align-items:center;
+          justify-content:space-between; gap:14px; background:var(--lime);
+          color:var(--on); border:3px solid var(--on); border-radius:18px;
+          box-shadow:5px 5px 0 var(--on)}
+    .stat .k{font-size:10px; font-weight:900; letter-spacing:.16em; text-transform:uppercase}
+    .stat .v{font-family:"Bangers","Impact",sans-serif; font-size:48px; line-height:.84;
+             margin-top:2px}
+    .stat .note{font-size:11px; line-height:1.35; max-width:14ch; opacity:.72; font-weight:700}
+    .nav .NOW{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}

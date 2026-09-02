@@ -1,0 +1,28 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Screens" },
+    { "id": "page-2", "name": "Brand" }
+  ],
+  "artboards": [
+    { "file": "Onboarding.dc.html",  "title": "1 · Permission",  "page": "page-1", "x": 0,    "y": 0,    "w": 390, "h": 844 },
+    { "file": "SignIn.dc.html",      "title": "2 · Sign in",     "page": "page-1", "x": 470,  "y": 0,    "w": 390, "h": 844 },
+    { "file": "Main.dc.html",        "title": "3 · Now playing", "page": "page-1", "x": 940,  "y": 0,    "w": 390, "h": 844 },
+    { "file": "History.dc.html",     "title": "4 · The tally",   "page": "page-1", "x": 1410, "y": 0,    "w": 390, "h": 844 },
+    { "file": "Friends.dc.html",     "title": "5 · Friends",     "page": "page-1", "x": 1880, "y": 0,    "w": 390, "h": 844 },
+    { "file": "Nearby.dc.html",      "title": "6 · Nearby",      "page": "page-1", "x": 0,    "y": 1000, "w": 390, "h": 844 },
+    { "file": "Leaderboard.dc.html", "title": "7 · Top 100",     "page": "page-1", "x": 470,  "y": 1000, "w": 390, "h": 844 },
+    { "file": "Settings.dc.html",    "title": "8 · You",         "page": "page-1", "x": 940,  "y": 1000, "w": 390, "h": 844 },
+    { "file": "Modals.dc.html",      "title": "9 · Sheets",      "page": "page-1", "x": 1410, "y": 1000, "w": 390, "h": 844 },
+    { "file": "Logo.dc.html",        "title": "The mark",        "page": "page-2", "x": 0,    "y": 0,    "w": 900, "h": 844 },
+    { "file": "System.dc.html",      "title": "The kit",         "page": "page-2", "x": 980,  "y": 0,    "w": 900, "h": 844 }
+  ],
+  "annotations": [
+    { "id": "flow-note", "page": "page-1", "x": 0, "y": -170, "w": 720,
+      "text": "MUSEROOM — comic / neobrutalist UI\nTop row: first run and the daily loop. Bottom row: the social half.\nEvery screen carries a Dark switch in the chips above it. Three ship dark so both skins are on screen at once." },
+    { "id": "press-note", "page": "page-1", "x": 1880, "y": 1000, "w": 340,
+      "text": "Press behaviour: buttons move onto their own shadow instead of dimming. Hover one to see it." },
+    { "id": "brand-note", "page": "page-2", "x": 0, "y": -140, "w": 720,
+      "text": "The mark and the kit.\nSurfaces invert between the two themes. Accents never do, which is what keeps dark reading as the same design rather than a photo negative." }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

@@ -1,0 +1,33 @@
+    .body{flex:1; overflow:hidden; padding:0 20px}
+    .h2{margin:0; font-size:32px; line-height:.92; text-shadow:4px 4px 0 var(--violet)}
+    .big{margin-top:14px; padding:18px; background:var(--lime); color:var(--on);
+         border:3px solid var(--on); border-radius:20px; box-shadow:6px 6px 0 var(--on);
+         position:relative; overflow:hidden}
+    .big .k{font-size:10px; font-weight:900; letter-spacing:.16em; text-transform:uppercase}
+    .big .v{font-family:"Bangers","Impact",sans-serif; font-size:74px; line-height:.78;
+            margin-top:4px}
+    .big .s{font-size:12px; font-weight:700; opacity:.72; margin-top:6px}
+    .big .dots{position:absolute; right:-16px; top:-16px; width:120px; height:120px;
+      background-image:radial-gradient(#14110D 2.4px, transparent 2.5px);
+      background-size:12px 12px; opacity:.22; border-radius:999px}
+    .seg{display:flex; gap:7px; margin-top:14px}
+    .seg button{flex:1; height:38px; border:3px solid var(--ink); border-radius:999px;
+      background:var(--card); font-family:"Archivo",sans-serif; font-weight:900; font-size:11px;
+      letter-spacing:.1em; text-transform:uppercase; cursor:pointer; color:var(--ink);
+      box-shadow:3px 3px 0 var(--ink); transition:transform .12s ease, box-shadow .12s ease}
+    .seg button:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .seg button.sel{background:var(--ink); color:var(--paper)}
+    .hint{margin:14px 0 0; font-size:11px; font-weight:700; letter-spacing:.04em; opacity:.6}
+    .it{display:flex; align-items:center; gap:11px; padding:10px 12px; margin-top:9px;
+        background:var(--card); border:3px solid var(--ink); border-radius:14px;
+        box-shadow:3px 3px 0 var(--ink);
+        transition:transform .12s ease, box-shadow .12s ease}
+    .it:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .it .cv{flex:none; width:44px; height:44px; border-radius:10px; border:2.5px solid var(--ink)}
+    .it .m{flex:1; min-width:0}
+    .it .m b{display:block; font-size:13px; font-weight:800; white-space:nowrap;
+             overflow:hidden; text-overflow:ellipsis}
+    .it .m span{display:block; font-size:11px; opacity:.62; font-weight:600}
+    .it .t{font-family:"Space Mono",monospace; font-size:12px; font-weight:700}
+    .nav .NOW{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}

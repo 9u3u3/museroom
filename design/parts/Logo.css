@@ -1,0 +1,32 @@
+    .screen.wide{width:900px; height:844px; padding:34px; overflow:hidden}
+    .lg h1{margin:0; font-family:"Bangers","Impact",sans-serif; font-size:52px;
+           line-height:.86; letter-spacing:.03em; text-shadow:5px 5px 0 var(--violet)}
+    .lg > p{margin:8px 0 0; font-size:13px; font-weight:600; opacity:.68; max-width:62ch;
+            line-height:1.5}
+    .lock{display:flex; align-items:center; gap:26px; margin-top:26px; padding:26px 30px;
+          background:var(--card); border:3px solid var(--ink); border-radius:20px;
+          box-shadow:6px 6px 0 var(--ink)}
+    .lock .wm{font-family:"Bangers","Impact",sans-serif; font-size:62px; line-height:.84;
+              letter-spacing:.035em; text-shadow:5px 5px 0 var(--violet)}
+    .lock .sub{font-size:12px; font-weight:800; letter-spacing:.22em; text-transform:uppercase;
+               opacity:.55; margin-top:9px}
+    .grid{display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-top:20px}
+    .tile{aspect-ratio:1; border:3px solid var(--ink); border-radius:18px;
+          display:grid; place-items:center; box-shadow:4px 4px 0 var(--ink); overflow:hidden}
+    .cap{font-family:"Space Mono",monospace; font-size:9px; letter-spacing:.08em;
+         text-align:center; margin-top:6px; opacity:.6}
+    .bottom{display:grid; grid-template-columns:1.15fr 1fr; gap:20px; margin-top:22px}
+    .panel{background:var(--card); border:3px solid var(--ink); border-radius:16px;
+           padding:16px 18px; box-shadow:5px 5px 0 var(--ink)}
+    .panel h4{margin:0 0 12px; font-size:10px; font-weight:900; letter-spacing:.18em;
+              text-transform:uppercase; opacity:.6}
+    .sizes{display:flex; align-items:flex-end; gap:22px}
+    .sizes div{text-align:center}
+    .rules li{font-size:12.5px; line-height:1.5; font-weight:600; margin-bottom:8px}
+    .rules b{font-weight:900}
+    .adapt{position:relative; width:132px; height:132px; border:3px solid var(--ink);
+           border-radius:18px; background:var(--violet); display:grid; place-items:center;
+           box-shadow:4px 4px 0 var(--ink)}
+    .adapt::after{content:""; position:absolute; width:88px; height:88px; border-radius:999px;
+                  border:2px dashed rgba(251,246,234,.85)}
+    .wave{animation:popin .6s cubic-bezier(.2,.8,.25,1) both}

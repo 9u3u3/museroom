@@ -1,0 +1,372 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Bangers&family=Space+Mono:wght@400;700&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#7B4BFF;text-decoration:none}
+    a:hover{color:#5A2FE0}
+
+    .screen{
+      /* Surfaces invert between themes. Accents do not: a lime sticker is the
+         same lime on paper or on ink, which is what keeps the two themes
+         recognisably one design rather than a photo negative. */
+      --paper:#FBF6EA; --ink:#14110D; --card:#FFFFFF;
+      --violet:#7B4BFF; --lime:#CDFF3E; --pink:#FF4D8D; --sky:#54D6F5;
+      /* Ink that always sits ON an accent fill, in either theme. */
+      --on:#14110D;
+      width:390px; height:844px; overflow:hidden; position:relative;
+      background:var(--paper); color:var(--ink);
+      font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased;
+    }
+    /* Ben-Day dots: the comic half of the brief, kept faint so it reads as paper. */
+    .screen::before{
+      content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image:radial-gradient(var(--ink) 1.2px, transparent 1.3px);
+      background-size:9px 9px; opacity:.07;
+    }
+    .screen > *{position:relative; z-index:1}
+
+    /* Dark is a real second skin, not an inversion: the paper goes to a warm
+       near-black, the stroke becomes the cream, and every accent stays put. */
+    .screen.dark{
+      --paper:#17140F; --ink:#F6F0E2; --card:#241F18;
+      color:var(--ink);
+    }
+    .screen.dark::before{opacity:.10}
+
+    .ink{border:3px solid var(--ink)}
+    .pop{box-shadow:5px 5px 0 var(--ink)}
+    .pop-sm{box-shadow:3px 3px 0 var(--ink)}
+    .pop-lg{box-shadow:8px 8px 0 var(--ink)}
+
+    .bang{font-family:"Bangers","Impact","Haettenschweiler",sans-serif;
+          letter-spacing:.03em; font-weight:400}
+    .mono{font-family:"Space Mono","Courier New",monospace}
+
+    /* Top bar ------------------------------------------------------------ */
+    .bar{display:flex; align-items:center; justify-content:space-between;
+         gap:12px; padding:52px 20px 14px}
+    .word{font-family:"Bangers","Impact",sans-serif; font-size:30px;
+          line-height:1; letter-spacing:.04em;
+          -webkit-text-stroke:0; color:var(--ink);
+          text-shadow:3px 3px 0 var(--violet)}
+    .crumb{font-size:11px; font-weight:900; letter-spacing:.16em;
+           text-transform:uppercase; opacity:.55}
+
+    /* Buttons ------------------------------------------------------------ */
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      min-height:54px; padding:0 22px; border:3px solid var(--ink);
+      border-radius:999px; background:var(--violet); color:#fff;
+      font-family:"Archivo",sans-serif; font-weight:900; font-size:15px;
+      letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+      box-shadow:5px 5px 0 var(--ink);
+      transition:transform .12s cubic-bezier(.2,.9,.3,1.4), box-shadow .12s ease;
+    }
+    /* The signature neobrutalist press: the object moves onto its own shadow. */
+    .btn:hover{transform:translate(2px,2px); box-shadow:3px 3px 0 var(--ink)}
+    .btn:active{transform:translate(5px,5px); box-shadow:0 0 0 var(--ink)}
+    .btn.lime{background:var(--lime); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.lime:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.lime:active{box-shadow:0 0 0 var(--on)}
+    .btn.paper{background:var(--card); color:var(--ink)}
+    .btn.pink{background:var(--pink); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.pink:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.pink:active{box-shadow:0 0 0 var(--on)}
+    .btn.block{width:100%}
+    .btn.sm{min-height:40px; font-size:12px; padding:0 14px; box-shadow:3px 3px 0 var(--ink)}
+    .btn.sm:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .btn.sm.lime, .btn.sm.pink{box-shadow:3px 3px 0 var(--on)}
+    .btn.sm.lime:hover, .btn.sm.pink:hover{box-shadow:1px 1px 0 var(--on)}
+
+    /* Cards -------------------------------------------------------------- */
+    .card{background:var(--card); border:3px solid var(--ink); border-radius:16px;
+          box-shadow:5px 5px 0 var(--ink)}
+    .pill{display:inline-flex; align-items:center; gap:6px; height:28px;
+          padding:0 11px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); color:var(--ink); font-size:10px; font-weight:900;
+          letter-spacing:.12em; text-transform:uppercase}
+    .pill.acc{color:var(--on); border-color:var(--on)}
+
+    /* Bottom nav --------------------------------------------------------- */
+    .nav{margin-top:auto; display:grid; grid-template-columns:repeat(5,1fr);
+         background:var(--card); border-top:3px solid var(--ink);
+         padding:10px 6px 22px}
+    .nav a{display:flex; flex-direction:column; align-items:center; gap:5px;
+           padding:8px 0; color:var(--ink); border-radius:12px;
+           transition:transform .15s ease}
+    .nav a:hover{transform:translateY(-3px); color:var(--ink)}
+    .nav span{font-size:9px; font-weight:900; letter-spacing:.1em;
+              text-transform:uppercase}
+    /* The active tab is a lime sticker, so it keeps its dark ink in both themes. */
+    .nav .sel{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}
+
+    /* Motion ------------------------------------------------------------- */
+    @keyframes rise{from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)}}
+    @keyframes popin{0%{opacity:0; transform:scale(.82) rotate(-6deg)}
+                     70%{opacity:1; transform:scale(1.05) rotate(1.5deg)}
+                     100%{opacity:1; transform:scale(1) rotate(0)}}
+    @keyframes beat{0%,100%{transform:scale(1)} 50%{transform:scale(1.35)}}
+    @keyframes grow{from{width:0}}
+    @keyframes drift{0%,100%{transform:rotate(-3deg) translateY(0)}
+                     50%{transform:rotate(-3deg) translateY(-5px)}}
+    .r{animation:rise .5s cubic-bezier(.2,.8,.25,1) both}
+    .p{animation:popin .5s cubic-bezier(.2,.8,.25,1) both}
+    .d1{animation-delay:.06s} .d2{animation-delay:.12s} .d3{animation-delay:.18s}
+    .d4{animation-delay:.24s} .d5{animation-delay:.30s} .d6{animation-delay:.36s}
+    .d7{animation-delay:.42s} .d8{animation-delay:.48s}
+
+    .live{width:10px; height:10px; border-radius:999px; background:var(--pink);
+          border:2px solid var(--on); animation:beat 1.4s ease-in-out infinite}
+
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation:none !important; transition:none !important}
+    }
+    .screen.wide{width:900px; height:844px; padding:34px; overflow:hidden}
+    .lg h1{margin:0; font-family:"Bangers","Impact",sans-serif; font-size:52px;
+           line-height:.86; letter-spacing:.03em; text-shadow:5px 5px 0 var(--violet)}
+    .lg > p{margin:8px 0 0; font-size:13px; font-weight:600; opacity:.68; max-width:62ch;
+            line-height:1.5}
+    .lock{display:flex; align-items:center; gap:26px; margin-top:26px; padding:26px 30px;
+          background:var(--card); border:3px solid var(--ink); border-radius:20px;
+          box-shadow:6px 6px 0 var(--ink)}
+    .lock .wm{font-family:"Bangers","Impact",sans-serif; font-size:62px; line-height:.84;
+              letter-spacing:.035em; text-shadow:5px 5px 0 var(--violet)}
+    .lock .sub{font-size:12px; font-weight:800; letter-spacing:.22em; text-transform:uppercase;
+               opacity:.55; margin-top:9px}
+    .grid{display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-top:20px}
+    .tile{aspect-ratio:1; border:3px solid var(--ink); border-radius:18px;
+          display:grid; place-items:center; box-shadow:4px 4px 0 var(--ink); overflow:hidden}
+    .cap{font-family:"Space Mono",monospace; font-size:9px; letter-spacing:.08em;
+         text-align:center; margin-top:6px; opacity:.6}
+    .bottom{display:grid; grid-template-columns:1.15fr 1fr; gap:20px; margin-top:22px}
+    .panel{background:var(--card); border:3px solid var(--ink); border-radius:16px;
+           padding:16px 18px; box-shadow:5px 5px 0 var(--ink)}
+    .panel h4{margin:0 0 12px; font-size:10px; font-weight:900; letter-spacing:.18em;
+              text-transform:uppercase; opacity:.6}
+    .sizes{display:flex; align-items:flex-end; gap:22px}
+    .sizes div{text-align:center}
+    .rules li{font-size:12.5px; line-height:1.5; font-weight:600; margin-bottom:8px}
+    .rules b{font-weight:900}
+    .adapt{position:relative; width:132px; height:132px; border:3px solid var(--ink);
+           border-radius:18px; background:var(--violet); display:grid; place-items:center;
+           box-shadow:4px 4px 0 var(--ink)}
+    .adapt::after{content:""; position:absolute; width:88px; height:88px; border-radius:999px;
+                  border:2px dashed rgba(251,246,234,.85)}
+    .wave{animation:popin .6s cubic-bezier(.2,.8,.25,1) both}
+  </style>
+</helmet>
+<div class="screen {{theme}} wide">
+  <div class="lg">
+    <h1>THE MARK</h1>
+    <p>A speech bubble with a level meter inside. The bubble is the social half,
+       somebody saying what they are on; the bars are the half that reads the music.
+       Four bars, uneven, because a meter that is level is not moving.</p>
+
+    <div class="lock r d1">
+      <svg class="wave" width="112" height="112" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg>
+      <div>
+        <div class="wm">MUSEROOM</div>
+        <div class="sub">Hear what they hear</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="tile p d2" style="background:#FBF6EA"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg></div>
+        <div class="cap">on paper</div>
+      </div>
+      <div>
+        <div class="tile p d3" style="background:#17140F"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg></div>
+        <div class="cap">on ink</div>
+      </div>
+      <div>
+        <div class="tile p d4" style="background:#7B4BFF"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#FBF6EA" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg></div>
+        <div class="cap">on violet</div>
+      </div>
+      <div>
+        <div class="tile p d5" style="background:#FF4D8D"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#FBF6EA" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg></div>
+        <div class="cap">on pink</div>
+      </div>
+      <div>
+        <div class="tile p d6" style="background:#FBF6EA"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="none" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg></div>
+        <div class="cap">mono ink</div>
+      </div>
+      <div>
+        <div class="tile p d7" style="background:#14110D"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="none" stroke="#F6F0E2" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#F6F0E2">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg></div>
+        <div class="cap">mono cream</div>
+      </div>
+    </div>
+
+    <div class="bottom">
+      <div class="panel r d6">
+        <h4>Holds up small</h4>
+        <div class="sizes">
+          <div><svg class="" width="72" height="72" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg><div class="cap">72</div></div>
+          <div><svg class="" width="48" height="48" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg><div class="cap">48</div></div>
+          <div><svg class="" width="32" height="32" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg><div class="cap">32</div></div>
+          <div><svg class="" width="22" height="22" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg><div class="cap">22</div></div>
+          <div><svg class="" width="16" height="16" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg><div class="cap">16</div></div>
+        </div>
+        <ul class="rules" style="margin:16px 0 0; padding-left:17px">
+          <li><b>Clear space</b> is one bar width on every side.</li>
+          <li><b>Never</b> flip the tail to the right or rotate the mark.</li>
+          <li>Below 16px drop the bubble and keep the four bars.</li>
+        </ul>
+      </div>
+
+      <div class="panel r d7">
+        <h4>Android launcher</h4>
+        <div style="display:flex; align-items:center; gap:20px">
+          <div class="adapt"><svg class="" width="72" height="72" viewBox="0 0 128 128" aria-label="Museroom">
+  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
+        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
+  <g fill="#14110D">
+    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
+    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
+    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
+    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
+  </g>
+</svg></div>
+          <ul class="rules" style="margin:0; padding-left:17px">
+            <li>Violet background layer, mark on the foreground.</li>
+            <li>Dashed ring is the <b>66dp safe zone</b>; the mark sits inside it,
+                so it survives a circle, a squircle or a rounded square.</li>
+            <li>Monochrome layer uses the ink-only version.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.dark ? "dark" : "light" };
+  }
+}
+</script>
+</body>
+</html>

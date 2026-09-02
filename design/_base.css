@@ -1,0 +1,126 @@
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#7B4BFF;text-decoration:none}
+    a:hover{color:#5A2FE0}
+
+    .screen{
+      /* Surfaces invert between themes. Accents do not: a lime sticker is the
+         same lime on paper or on ink, which is what keeps the two themes
+         recognisably one design rather than a photo negative. */
+      --paper:#FBF6EA; --ink:#14110D; --card:#FFFFFF;
+      --violet:#7B4BFF; --lime:#CDFF3E; --pink:#FF4D8D; --sky:#54D6F5;
+      /* Ink that always sits ON an accent fill, in either theme. */
+      --on:#14110D;
+      width:390px; height:844px; overflow:hidden; position:relative;
+      background:var(--paper); color:var(--ink);
+      font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased;
+    }
+    /* Ben-Day dots: the comic half of the brief, kept faint so it reads as paper. */
+    .screen::before{
+      content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image:radial-gradient(var(--ink) 1.2px, transparent 1.3px);
+      background-size:9px 9px; opacity:.07;
+    }
+    .screen > *{position:relative; z-index:1}
+
+    /* Dark is a real second skin, not an inversion: the paper goes to a warm
+       near-black, the stroke becomes the cream, and every accent stays put. */
+    .screen.dark{
+      --paper:#17140F; --ink:#F6F0E2; --card:#241F18;
+      color:var(--ink);
+    }
+    .screen.dark::before{opacity:.10}
+
+    .ink{border:3px solid var(--ink)}
+    .pop{box-shadow:5px 5px 0 var(--ink)}
+    .pop-sm{box-shadow:3px 3px 0 var(--ink)}
+    .pop-lg{box-shadow:8px 8px 0 var(--ink)}
+
+    .bang{font-family:"Bangers","Impact","Haettenschweiler",sans-serif;
+          letter-spacing:.03em; font-weight:400}
+    .mono{font-family:"Space Mono","Courier New",monospace}
+
+    /* Top bar ------------------------------------------------------------ */
+    .bar{display:flex; align-items:center; justify-content:space-between;
+         gap:12px; padding:52px 20px 14px}
+    .word{font-family:"Bangers","Impact",sans-serif; font-size:30px;
+          line-height:1; letter-spacing:.04em;
+          -webkit-text-stroke:0; color:var(--ink);
+          text-shadow:3px 3px 0 var(--violet)}
+    .crumb{font-size:11px; font-weight:900; letter-spacing:.16em;
+           text-transform:uppercase; opacity:.55}
+
+    /* Buttons ------------------------------------------------------------ */
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      min-height:54px; padding:0 22px; border:3px solid var(--ink);
+      border-radius:999px; background:var(--violet); color:#fff;
+      font-family:"Archivo",sans-serif; font-weight:900; font-size:15px;
+      letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+      box-shadow:5px 5px 0 var(--ink);
+      transition:transform .12s cubic-bezier(.2,.9,.3,1.4), box-shadow .12s ease;
+    }
+    /* The signature neobrutalist press: the object moves onto its own shadow. */
+    .btn:hover{transform:translate(2px,2px); box-shadow:3px 3px 0 var(--ink)}
+    .btn:active{transform:translate(5px,5px); box-shadow:0 0 0 var(--ink)}
+    .btn.lime{background:var(--lime); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.lime:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.lime:active{box-shadow:0 0 0 var(--on)}
+    .btn.paper{background:var(--card); color:var(--ink)}
+    .btn.pink{background:var(--pink); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.pink:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.pink:active{box-shadow:0 0 0 var(--on)}
+    .btn.block{width:100%}
+    .btn.sm{min-height:40px; font-size:12px; padding:0 14px; box-shadow:3px 3px 0 var(--ink)}
+    .btn.sm:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .btn.sm.lime, .btn.sm.pink{box-shadow:3px 3px 0 var(--on)}
+    .btn.sm.lime:hover, .btn.sm.pink:hover{box-shadow:1px 1px 0 var(--on)}
+
+    /* Cards -------------------------------------------------------------- */
+    .card{background:var(--card); border:3px solid var(--ink); border-radius:16px;
+          box-shadow:5px 5px 0 var(--ink)}
+    .pill{display:inline-flex; align-items:center; gap:6px; height:28px;
+          padding:0 11px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); color:var(--ink); font-size:10px; font-weight:900;
+          letter-spacing:.12em; text-transform:uppercase}
+    .pill.acc{color:var(--on); border-color:var(--on)}
+
+    /* Bottom nav --------------------------------------------------------- */
+    .nav{margin-top:auto; display:grid; grid-template-columns:repeat(5,1fr);
+         background:var(--card); border-top:3px solid var(--ink);
+         padding:10px 6px 22px}
+    .nav a{display:flex; flex-direction:column; align-items:center; gap:5px;
+           padding:8px 0; color:var(--ink); border-radius:12px;
+           transition:transform .15s ease}
+    .nav a:hover{transform:translateY(-3px); color:var(--ink)}
+    .nav span{font-size:9px; font-weight:900; letter-spacing:.1em;
+              text-transform:uppercase}
+    /* The active tab is a lime sticker, so it keeps its dark ink in both themes. */
+    .nav .sel{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}
+
+    /* Motion ------------------------------------------------------------- */
+    @keyframes rise{from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)}}
+    @keyframes popin{0%{opacity:0; transform:scale(.82) rotate(-6deg)}
+                     70%{opacity:1; transform:scale(1.05) rotate(1.5deg)}
+                     100%{opacity:1; transform:scale(1) rotate(0)}}
+    @keyframes beat{0%,100%{transform:scale(1)} 50%{transform:scale(1.35)}}
+    @keyframes grow{from{width:0}}
+    @keyframes drift{0%,100%{transform:rotate(-3deg) translateY(0)}
+                     50%{transform:rotate(-3deg) translateY(-5px)}}
+    .r{animation:rise .5s cubic-bezier(.2,.8,.25,1) both}
+    .p{animation:popin .5s cubic-bezier(.2,.8,.25,1) both}
+    .d1{animation-delay:.06s} .d2{animation-delay:.12s} .d3{animation-delay:.18s}
+    .d4{animation-delay:.24s} .d5{animation-delay:.30s} .d6{animation-delay:.36s}
+    .d7{animation-delay:.42s} .d8{animation-delay:.48s}
+
+    .live{width:10px; height:10px; border-radius:999px; background:var(--pink);
+          border:2px solid var(--on); animation:beat 1.4s ease-in-out infinite}
+
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation:none !important; transition:none !important}
+    }

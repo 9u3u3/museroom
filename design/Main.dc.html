@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Bangers&family=Space+Mono:wght@400;700&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#7B4BFF;text-decoration:none}
+    a:hover{color:#5A2FE0}
+
+    .screen{
+      /* Surfaces invert between themes. Accents do not: a lime sticker is the
+         same lime on paper or on ink, which is what keeps the two themes
+         recognisably one design rather than a photo negative. */
+      --paper:#FBF6EA; --ink:#14110D; --card:#FFFFFF;
+      --violet:#7B4BFF; --lime:#CDFF3E; --pink:#FF4D8D; --sky:#54D6F5;
+      /* Ink that always sits ON an accent fill, in either theme. */
+      --on:#14110D;
+      width:390px; height:844px; overflow:hidden; position:relative;
+      background:var(--paper); color:var(--ink);
+      font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased;
+    }
+    /* Ben-Day dots: the comic half of the brief, kept faint so it reads as paper. */
+    .screen::before{
+      content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image:radial-gradient(var(--ink) 1.2px, transparent 1.3px);
+      background-size:9px 9px; opacity:.07;
+    }
+    .screen > *{position:relative; z-index:1}
+
+    /* Dark is a real second skin, not an inversion: the paper goes to a warm
+       near-black, the stroke becomes the cream, and every accent stays put. */
+    .screen.dark{
+      --paper:#17140F; --ink:#F6F0E2; --card:#241F18;
+      color:var(--ink);
+    }
+    .screen.dark::before{opacity:.10}
+
+    .ink{border:3px solid var(--ink)}
+    .pop{box-shadow:5px 5px 0 var(--ink)}
+    .pop-sm{box-shadow:3px 3px 0 var(--ink)}
+    .pop-lg{box-shadow:8px 8px 0 var(--ink)}
+
+    .bang{font-family:"Bangers","Impact","Haettenschweiler",sans-serif;
+          letter-spacing:.03em; font-weight:400}
+    .mono{font-family:"Space Mono","Courier New",monospace}
+
+    /* Top bar ------------------------------------------------------------ */
+    .bar{display:flex; align-items:center; justify-content:space-between;
+         gap:12px; padding:52px 20px 14px}
+    .word{font-family:"Bangers","Impact",sans-serif; font-size:30px;
+          line-height:1; letter-spacing:.04em;
+          -webkit-text-stroke:0; color:var(--ink);
+          text-shadow:3px 3px 0 var(--violet)}
+    .crumb{font-size:11px; font-weight:900; letter-spacing:.16em;
+           text-transform:uppercase; opacity:.55}
+
+    /* Buttons ------------------------------------------------------------ */
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      min-height:54px; padding:0 22px; border:3px solid var(--ink);
+      border-radius:999px; background:var(--violet); color:#fff;
+      font-family:"Archivo",sans-serif; font-weight:900; font-size:15px;
+      letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+      box-shadow:5px 5px 0 var(--ink);
+      transition:transform .12s cubic-bezier(.2,.9,.3,1.4), box-shadow .12s ease;
+    }
+    /* The signature neobrutalist press: the object moves onto its own shadow. */
+    .btn:hover{transform:translate(2px,2px); box-shadow:3px 3px 0 var(--ink)}
+    .btn:active{transform:translate(5px,5px); box-shadow:0 0 0 var(--ink)}
+    .btn.lime{background:var(--lime); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.lime:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.lime:active{box-shadow:0 0 0 var(--on)}
+    .btn.paper{background:var(--card); color:var(--ink)}
+    .btn.pink{background:var(--pink); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.pink:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.pink:active{box-shadow:0 0 0 var(--on)}
+    .btn.block{width:100%}
+    .btn.sm{min-height:40px; font-size:12px; padding:0 14px; box-shadow:3px 3px 0 var(--ink)}
+    .btn.sm:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .btn.sm.lime, .btn.sm.pink{box-shadow:3px 3px 0 var(--on)}
+    .btn.sm.lime:hover, .btn.sm.pink:hover{box-shadow:1px 1px 0 var(--on)}
+
+    /* Cards -------------------------------------------------------------- */
+    .card{background:var(--card); border:3px solid var(--ink); border-radius:16px;
+          box-shadow:5px 5px 0 var(--ink)}
+    .pill{display:inline-flex; align-items:center; gap:6px; height:28px;
+          padding:0 11px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); color:var(--ink); font-size:10px; font-weight:900;
+          letter-spacing:.12em; text-transform:uppercase}
+    .pill.acc{color:var(--on); border-color:var(--on)}
+
+    /* Bottom nav --------------------------------------------------------- */
+    .nav{margin-top:auto; display:grid; grid-template-columns:repeat(5,1fr);
+         background:var(--card); border-top:3px solid var(--ink);
+         padding:10px 6px 22px}
+    .nav a{display:flex; flex-direction:column; align-items:center; gap:5px;
+           padding:8px 0; color:var(--ink); border-radius:12px;
+           transition:transform .15s ease}
+    .nav a:hover{transform:translateY(-3px); color:var(--ink)}
+    .nav span{font-size:9px; font-weight:900; letter-spacing:.1em;
+              text-transform:uppercase}
+    /* The active tab is a lime sticker, so it keeps its dark ink in both themes. */
+    .nav .sel{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}
+
+    /* Motion ------------------------------------------------------------- */
+    @keyframes rise{from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)}}
+    @keyframes popin{0%{opacity:0; transform:scale(.82) rotate(-6deg)}
+                     70%{opacity:1; transform:scale(1.05) rotate(1.5deg)}
+                     100%{opacity:1; transform:scale(1) rotate(0)}}
+    @keyframes beat{0%,100%{transform:scale(1)} 50%{transform:scale(1.35)}}
+    @keyframes grow{from{width:0}}
+    @keyframes drift{0%,100%{transform:rotate(-3deg) translateY(0)}
+                     50%{transform:rotate(-3deg) translateY(-5px)}}
+    .r{animation:rise .5s cubic-bezier(.2,.8,.25,1) both}
+    .p{animation:popin .5s cubic-bezier(.2,.8,.25,1) both}
+    .d1{animation-delay:.06s} .d2{animation-delay:.12s} .d3{animation-delay:.18s}
+    .d4{animation-delay:.24s} .d5{animation-delay:.30s} .d6{animation-delay:.36s}
+    .d7{animation-delay:.42s} .d8{animation-delay:.48s}
+
+    .live{width:10px; height:10px; border-radius:999px; background:var(--pink);
+          border:2px solid var(--on); animation:beat 1.4s ease-in-out infinite}
+
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation:none !important; transition:none !important}
+    }
+    .art{position:relative; margin:4px 20px 0; aspect-ratio:1; border-radius:20px;
+         border:3px solid var(--ink); box-shadow:8px 8px 0 var(--ink); overflow:hidden;
+         background:linear-gradient(158deg,#7B4BFF 0%,#FF4D8D 58%,#FF9E2B 100%)}
+    .art .rings{position:absolute; inset:0; opacity:.5}
+    .art .halftone{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.1px, transparent 2.2px);
+      background-size:11px 11px; opacity:.2; mix-blend-mode:multiply}
+    .src{position:absolute; left:14px; top:14px; background:var(--lime);
+         color:var(--on); border-color:var(--on);
+         transform:rotate(-4deg); animation:popin .55s cubic-bezier(.2,.8,.25,1) both;
+         animation-delay:.25s}
+    .track{padding:22px 20px 0}
+    .title{margin:0; font-size:29px; line-height:1.06; font-weight:900; letter-spacing:-.03em}
+    .by{margin:7px 0 0; font-size:15px; font-weight:700; opacity:.7}
+    .prog{margin:18px 20px 0}
+    .rail{height:16px; border:3px solid var(--ink); border-radius:999px;
+          background:var(--card); overflow:hidden; box-shadow:3px 3px 0 var(--ink)}
+    .fill{height:100%; width:19%; background:var(--violet);
+          border-right:3px solid var(--on);
+          background-image:repeating-linear-gradient(115deg,rgba(255,255,255,.32) 0 6px,transparent 6px 13px);
+          animation:grow 1s cubic-bezier(.2,.8,.25,1) both; animation-delay:.35s}
+    .clock{display:flex; justify-content:space-between; margin-top:9px;
+           font-size:12px; font-weight:700; letter-spacing:.06em}
+    .stat{margin:22px 20px 0; padding:16px 18px; display:flex; align-items:center;
+          justify-content:space-between; gap:14px; background:var(--lime);
+          color:var(--on); border:3px solid var(--on); border-radius:18px;
+          box-shadow:5px 5px 0 var(--on)}
+    .stat .k{font-size:10px; font-weight:900; letter-spacing:.16em; text-transform:uppercase}
+    .stat .v{font-family:"Bangers","Impact",sans-serif; font-size:48px; line-height:.84;
+             margin-top:2px}
+    .stat .note{font-size:11px; line-height:1.35; max-width:14ch; opacity:.72; font-weight:700}
+    .nav .NOW{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}
+  </style>
+</helmet>
+<div class="screen {{theme}}">
+  <div class="bar">
+    <span class="word bang">MUSEROOM</span>
+    <span class="pill acc" style="background:var(--pink)"><i class="live"></i>Live</span>
+  </div>
+
+  <div class="art p d1">
+    <svg class="rings" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <g fill="none" stroke="#14110D" stroke-width="1.1" opacity=".55">
+        <circle cx="50" cy="50" r="14"/><circle cx="50" cy="50" r="24"/>
+        <circle cx="50" cy="50" r="34"/><circle cx="50" cy="50" r="44"/>
+      </g>
+      <circle cx="50" cy="50" r="5" fill="#FBF6EA" stroke="#14110D" stroke-width="2"/>
+    </svg>
+    <span class="halftone"></span>
+    <span class="pill src">YouTube Music</span>
+  </div>
+
+  <div class="track">
+    <h1 class="title r d3">Teenage Fever</h1>
+    <p class="by r d4">Drake &middot; More Life</p>
+  </div>
+
+  <div class="prog r d5">
+    <div class="rail"><div class="fill"></div></div>
+    <div class="clock mono"><span>0:42</span><span>3:40</span></div>
+  </div>
+
+  <div class="stat r d6">
+    <div>
+      <div class="k">Listening today</div>
+      <div class="v bang">47m</div>
+    </div>
+    <p class="note">Counted when a track finishes.</p>
+  </div>
+
+  <nav class="nav">
+    <a href="#" class="NOW">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 14v-4M8.5 18V6M13 15V9M17.5 20V4M21.5 13v-2"/></svg></span>
+      <span>Now</span>
+    </a>
+    <a href="#" class="FRIENDS">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M2.5 20c0-3.3 2.9-5.4 6.5-5.4s6.5 2.1 6.5 5.4"/><path d="M16.5 5.2a3.4 3.4 0 0 1 0 6.4M18 14.9c2.1.6 3.5 2.3 3.5 5.1"/></svg></span>
+      <span>Friends</span>
+    </a>
+    <a href="#" class="NEARBY">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 16.2a6 6 0 0 0 0-8.4"/><path d="M4.6 4.6a10.4 10.4 0 0 0 0 14.8M19.4 19.4a10.4 10.4 0 0 0 0-14.8"/></svg></span>
+      <span>Nearby</span>
+    </a>
+    <a href="#" class="BOARD">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4.2v1.6A3.4 3.4 0 0 0 7 10.4M17 5.5h2.8v1.6a3.4 3.4 0 0 1-2.8 3.3"/><path d="M12 14v3.5M8.5 20.5h7"/></svg></span>
+      <span>Board</span>
+    </a>
+    <a href="#" class="YOU">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c0-3.9 3.4-6.3 7.5-6.3s7.5 2.4 7.5 6.3"/></svg></span>
+      <span>You</span>
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.dark ? "dark" : "light" };
+  }
+}
+</script>
+</body>
+</html>

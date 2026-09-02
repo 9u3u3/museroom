@@ -1,0 +1,273 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Bangers&family=Space+Mono:wght@400;700&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#7B4BFF;text-decoration:none}
+    a:hover{color:#5A2FE0}
+
+    .screen{
+      /* Surfaces invert between themes. Accents do not: a lime sticker is the
+         same lime on paper or on ink, which is what keeps the two themes
+         recognisably one design rather than a photo negative. */
+      --paper:#FBF6EA; --ink:#14110D; --card:#FFFFFF;
+      --violet:#7B4BFF; --lime:#CDFF3E; --pink:#FF4D8D; --sky:#54D6F5;
+      /* Ink that always sits ON an accent fill, in either theme. */
+      --on:#14110D;
+      width:390px; height:844px; overflow:hidden; position:relative;
+      background:var(--paper); color:var(--ink);
+      font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+      display:flex; flex-direction:column;
+      -webkit-font-smoothing:antialiased;
+    }
+    /* Ben-Day dots: the comic half of the brief, kept faint so it reads as paper. */
+    .screen::before{
+      content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+      background-image:radial-gradient(var(--ink) 1.2px, transparent 1.3px);
+      background-size:9px 9px; opacity:.07;
+    }
+    .screen > *{position:relative; z-index:1}
+
+    /* Dark is a real second skin, not an inversion: the paper goes to a warm
+       near-black, the stroke becomes the cream, and every accent stays put. */
+    .screen.dark{
+      --paper:#17140F; --ink:#F6F0E2; --card:#241F18;
+      color:var(--ink);
+    }
+    .screen.dark::before{opacity:.10}
+
+    .ink{border:3px solid var(--ink)}
+    .pop{box-shadow:5px 5px 0 var(--ink)}
+    .pop-sm{box-shadow:3px 3px 0 var(--ink)}
+    .pop-lg{box-shadow:8px 8px 0 var(--ink)}
+
+    .bang{font-family:"Bangers","Impact","Haettenschweiler",sans-serif;
+          letter-spacing:.03em; font-weight:400}
+    .mono{font-family:"Space Mono","Courier New",monospace}
+
+    /* Top bar ------------------------------------------------------------ */
+    .bar{display:flex; align-items:center; justify-content:space-between;
+         gap:12px; padding:52px 20px 14px}
+    .word{font-family:"Bangers","Impact",sans-serif; font-size:30px;
+          line-height:1; letter-spacing:.04em;
+          -webkit-text-stroke:0; color:var(--ink);
+          text-shadow:3px 3px 0 var(--violet)}
+    .crumb{font-size:11px; font-weight:900; letter-spacing:.16em;
+           text-transform:uppercase; opacity:.55}
+
+    /* Buttons ------------------------------------------------------------ */
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:10px;
+      min-height:54px; padding:0 22px; border:3px solid var(--ink);
+      border-radius:999px; background:var(--violet); color:#fff;
+      font-family:"Archivo",sans-serif; font-weight:900; font-size:15px;
+      letter-spacing:.06em; text-transform:uppercase; cursor:pointer;
+      box-shadow:5px 5px 0 var(--ink);
+      transition:transform .12s cubic-bezier(.2,.9,.3,1.4), box-shadow .12s ease;
+    }
+    /* The signature neobrutalist press: the object moves onto its own shadow. */
+    .btn:hover{transform:translate(2px,2px); box-shadow:3px 3px 0 var(--ink)}
+    .btn:active{transform:translate(5px,5px); box-shadow:0 0 0 var(--ink)}
+    .btn.lime{background:var(--lime); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.lime:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.lime:active{box-shadow:0 0 0 var(--on)}
+    .btn.paper{background:var(--card); color:var(--ink)}
+    .btn.pink{background:var(--pink); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .btn.pink:hover{box-shadow:3px 3px 0 var(--on)}
+    .btn.pink:active{box-shadow:0 0 0 var(--on)}
+    .btn.block{width:100%}
+    .btn.sm{min-height:40px; font-size:12px; padding:0 14px; box-shadow:3px 3px 0 var(--ink)}
+    .btn.sm:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .btn.sm.lime, .btn.sm.pink{box-shadow:3px 3px 0 var(--on)}
+    .btn.sm.lime:hover, .btn.sm.pink:hover{box-shadow:1px 1px 0 var(--on)}
+
+    /* Cards -------------------------------------------------------------- */
+    .card{background:var(--card); border:3px solid var(--ink); border-radius:16px;
+          box-shadow:5px 5px 0 var(--ink)}
+    .pill{display:inline-flex; align-items:center; gap:6px; height:28px;
+          padding:0 11px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); color:var(--ink); font-size:10px; font-weight:900;
+          letter-spacing:.12em; text-transform:uppercase}
+    .pill.acc{color:var(--on); border-color:var(--on)}
+
+    /* Bottom nav --------------------------------------------------------- */
+    .nav{margin-top:auto; display:grid; grid-template-columns:repeat(5,1fr);
+         background:var(--card); border-top:3px solid var(--ink);
+         padding:10px 6px 22px}
+    .nav a{display:flex; flex-direction:column; align-items:center; gap:5px;
+           padding:8px 0; color:var(--ink); border-radius:12px;
+           transition:transform .15s ease}
+    .nav a:hover{transform:translateY(-3px); color:var(--ink)}
+    .nav span{font-size:9px; font-weight:900; letter-spacing:.1em;
+              text-transform:uppercase}
+    /* The active tab is a lime sticker, so it keeps its dark ink in both themes. */
+    .nav .sel{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}
+
+    /* Motion ------------------------------------------------------------- */
+    @keyframes rise{from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)}}
+    @keyframes popin{0%{opacity:0; transform:scale(.82) rotate(-6deg)}
+                     70%{opacity:1; transform:scale(1.05) rotate(1.5deg)}
+                     100%{opacity:1; transform:scale(1) rotate(0)}}
+    @keyframes beat{0%,100%{transform:scale(1)} 50%{transform:scale(1.35)}}
+    @keyframes grow{from{width:0}}
+    @keyframes drift{0%,100%{transform:rotate(-3deg) translateY(0)}
+                     50%{transform:rotate(-3deg) translateY(-5px)}}
+    .r{animation:rise .5s cubic-bezier(.2,.8,.25,1) both}
+    .p{animation:popin .5s cubic-bezier(.2,.8,.25,1) both}
+    .d1{animation-delay:.06s} .d2{animation-delay:.12s} .d3{animation-delay:.18s}
+    .d4{animation-delay:.24s} .d5{animation-delay:.30s} .d6{animation-delay:.36s}
+    .d7{animation-delay:.42s} .d8{animation-delay:.48s}
+
+    .live{width:10px; height:10px; border-radius:999px; background:var(--pink);
+          border:2px solid var(--on); animation:beat 1.4s ease-in-out infinite}
+
+    @media (prefers-reduced-motion: reduce){
+      *,*::before,*::after{animation:none !important; transition:none !important}
+    }
+    .body{flex:1; overflow:hidden; padding:0 20px}
+    .me{display:flex; align-items:center; gap:13px; margin-top:2px}
+    .av{flex:none; width:64px; height:64px; border-radius:16px; border:3px solid var(--ink);
+        background:var(--violet); color:#fff; display:grid; place-items:center;
+        font-family:"Bangers","Impact",sans-serif; font-size:30px;
+        box-shadow:4px 4px 0 var(--ink)}
+    .me b{display:block; font-size:19px; font-weight:900}
+    .me span{display:block; font-size:12px; opacity:.62; font-weight:700; margin-top:2px}
+    .priv{margin-top:18px; padding:16px; background:var(--pink); color:var(--on);
+          border:3px solid var(--on); border-radius:18px; box-shadow:6px 6px 0 var(--on);
+          display:flex;
+          align-items:center; gap:14px}
+    .priv .t{flex:1}
+    .priv .t b{display:block; font-size:17px; font-weight:900}
+    .priv .t span{display:block; font-size:11px; line-height:1.4; margin-top:2px; opacity:.8}
+    .sw{flex:none; width:62px; height:34px; border-radius:999px; border:3px solid var(--on);
+        background:#fff; position:relative; cursor:pointer; box-shadow:3px 3px 0 var(--on)}
+    .sw::after{content:""; position:absolute; top:2px; left:2px; width:24px; height:24px;
+      border-radius:999px; background:#FBF6EA; border:2.5px solid var(--on);
+      transition:left .18s cubic-bezier(.2,.9,.3,1.4)}
+    .sw.on{background:var(--lime)} .sw.on::after{left:30px}
+    .sec{margin-top:20px}
+    .lab{font-size:10px; font-weight:900; letter-spacing:.16em; text-transform:uppercase;
+         opacity:.55; margin-bottom:8px}
+    .seg3{display:flex; gap:7px}
+    .seg3 button{flex:1; height:44px; border:3px solid var(--ink); border-radius:12px;
+      background:var(--card); font-family:"Archivo",sans-serif; font-weight:900; font-size:11px;
+      letter-spacing:.08em; text-transform:uppercase; cursor:pointer; color:var(--ink);
+      box-shadow:3px 3px 0 var(--ink); transition:transform .12s ease, box-shadow .12s ease}
+    .seg3 button:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .seg3 button.sel{background:var(--ink); color:var(--paper)}
+    .line{display:flex; align-items:center; gap:12px; padding:13px 14px; margin-top:9px;
+          background:var(--card); border:3px solid var(--ink); border-radius:14px;
+          box-shadow:3px 3px 0 var(--ink)}
+    .line b{flex:1; font-size:14px; font-weight:800}
+    .srcs{display:flex; gap:8px; flex-wrap:wrap; margin-top:2px}
+    .danger{margin-top:22px; width:100%; background:var(--card); color:var(--ink);
+            border-color:var(--ink)}
+    .out{display:block; margin:12px auto 0; background:none; border:0; cursor:pointer;
+         font-family:"Archivo",sans-serif; font-weight:900; font-size:12px; letter-spacing:.1em;
+         text-transform:uppercase; text-decoration:underline; text-underline-offset:4px;
+         color:var(--ink); opacity:.65}
+    .nav .YOU{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+              box-shadow:3px 3px 0 var(--on)}
+  </style>
+</helmet>
+<div class="screen {{theme}}">
+  <div class="bar">
+    <span class="word bang" style="font-size:24px">YOU</span>
+    <span class="pill">On the board</span>
+  </div>
+
+  <div class="body">
+    <div class="me r d1">
+      <span class="av bang">H</span>
+      <div>
+        <b>@harshgaonkar57</b>
+        <span>Joined 2 September</span>
+      </div>
+    </div>
+
+    <div class="priv r d2">
+      <div class="t">
+        <b>Private session</b>
+        <span>Stops recording entirely. No minutes, no history, nothing shared.</span>
+      </div>
+      <span class="sw" role="switch" aria-checked="false" aria-label="Private session"></span>
+    </div>
+
+    <div class="sec r d3">
+      <div class="lab">Who sees what you play</div>
+      <div class="seg3">
+        <button>Everyone</button>
+        <button class="sel">Friends</button>
+        <button>Nobody</button>
+      </div>
+    </div>
+
+    <div class="sec r d4">
+      <div class="lab">Counted</div>
+      <div class="srcs">
+        <span class="pill acc" style="background:var(--lime)">Spotify</span>
+        <span class="pill acc" style="background:var(--lime)">YouTube Music</span>
+        <span class="pill" style="opacity:.5">Everything else &mdash; ignored</span>
+      </div>
+    </div>
+
+    <div class="sec r d5">
+      <div class="lab">Sharing</div>
+      <div class="line">
+        <b>Show me on the global board</b>
+        <span class="sw on" role="switch" aria-checked="true" aria-label="Global board"></span>
+      </div>
+      <div class="line">
+        <b>Findable nearby</b>
+        <span class="sw on" role="switch" aria-checked="true" aria-label="Nearby"></span>
+      </div>
+    </div>
+
+    <button class="btn danger r d6">Delete all history</button>
+    <button class="out">Sign out</button>
+  </div>
+
+  <nav class="nav">
+    <a href="#" class="NOW">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 14v-4M8.5 18V6M13 15V9M17.5 20V4M21.5 13v-2"/></svg></span>
+      <span>Now</span>
+    </a>
+    <a href="#" class="FRIENDS">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M2.5 20c0-3.3 2.9-5.4 6.5-5.4s6.5 2.1 6.5 5.4"/><path d="M16.5 5.2a3.4 3.4 0 0 1 0 6.4M18 14.9c2.1.6 3.5 2.3 3.5 5.1"/></svg></span>
+      <span>Friends</span>
+    </a>
+    <a href="#" class="NEARBY">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 16.2a6 6 0 0 0 0-8.4"/><path d="M4.6 4.6a10.4 10.4 0 0 0 0 14.8M19.4 19.4a10.4 10.4 0 0 0 0-14.8"/></svg></span>
+      <span>Nearby</span>
+    </a>
+    <a href="#" class="BOARD">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4.2v1.6A3.4 3.4 0 0 0 7 10.4M17 5.5h2.8v1.6a3.4 3.4 0 0 1-2.8 3.3"/><path d="M12 14v3.5M8.5 20.5h7"/></svg></span>
+      <span>Board</span>
+    </a>
+    <a href="#" class="YOU">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c0-3.9 3.4-6.3 7.5-6.3s7.5 2.4 7.5 6.3"/></svg></span>
+      <span>You</span>
+    </a>
+  </nav>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { theme: this.props.dark ? "dark" : "light" };
+  }
+}
+</script>
+</body>
+</html>

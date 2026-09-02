@@ -1,0 +1,31 @@
+    .screen{justify-content:flex-end}
+    .dim{position:absolute; inset:0; background:rgba(20,17,13,.55); z-index:2}
+    .dim::after{content:""; position:absolute; inset:0;
+      background-image:radial-gradient(#FBF6EA 1.4px, transparent 1.5px);
+      background-size:10px 10px; opacity:.14}
+    .sheet{position:relative; z-index:3; margin:0 16px 18px; background:var(--card);
+           border:3px solid var(--ink); border-radius:22px; box-shadow:8px 8px 0 var(--ink);
+           padding:20px; animation:up .42s cubic-bezier(.2,.9,.3,1.25) both}
+    @keyframes up{from{opacity:0; transform:translateY(46px)}}
+    .sheet + .sheet{margin-bottom:14px}
+    .sheet h3{margin:0 0 3px; font-family:"Bangers","Impact",sans-serif; font-size:27px;
+              letter-spacing:.03em}
+    .sheet p{margin:0; font-size:13px; line-height:1.45; opacity:.75}
+    .opt{display:flex; align-items:center; gap:12px; width:100%; margin-top:11px;
+         padding:13px 14px; background:var(--paper); border:3px solid var(--ink);
+         border-radius:14px; box-shadow:3px 3px 0 var(--ink); cursor:pointer;
+         font-family:"Archivo",sans-serif; font-size:15px; font-weight:900; color:var(--ink);
+         transition:transform .12s ease, box-shadow .12s ease}
+    .opt:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--on);
+               background:var(--lime); color:var(--on); border-color:var(--on)}
+    .opt .dot{flex:none; width:34px; height:34px; border-radius:9px; border:2.5px solid var(--ink)}
+    .check{display:flex; align-items:center; gap:10px; margin-top:14px;
+           font-size:12px; font-weight:700}
+    .box{width:26px; height:26px; border:3px solid var(--on); border-radius:7px;
+         background:var(--lime); color:var(--on); display:grid; place-items:center; flex:none}
+    .acts{display:flex; gap:10px; margin-top:16px}
+    .acts .btn{flex:1}
+    .song{margin-top:12px; padding:12px; background:var(--paper); border:3px solid var(--ink);
+          border-radius:13px}
+    .song b{display:block; font-size:15px; font-weight:900}
+    .song span{display:block; font-size:12px; opacity:.65; font-weight:700}

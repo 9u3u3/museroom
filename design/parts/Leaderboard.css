@@ -1,0 +1,30 @@
+    .body{flex:1; overflow:hidden; padding:0 20px}
+    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--lime)}
+    .tabs{display:flex; gap:8px; margin-top:12px}
+    .tab{flex:1; height:42px; border:3px solid var(--ink); border-radius:999px;
+         background:var(--card); font-family:"Archivo",sans-serif; font-weight:900;
+         font-size:12px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer;
+         box-shadow:3px 3px 0 var(--ink); color:var(--ink);
+         transition:transform .12s ease, box-shadow .12s ease}
+    .tab:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .tab.sel{background:var(--ink); color:var(--paper)}
+    .podium{display:grid; grid-template-columns:1fr 1.15fr 1fr; gap:9px;
+            align-items:end; margin-top:16px}
+    .col{border:3px solid var(--on); color:var(--on); border-radius:14px 14px 0 0;
+         padding:10px 6px 8px; text-align:center; box-shadow:4px 4px 0 var(--on)}
+    .col .rk{font-family:"Bangers","Impact",sans-serif; font-size:30px; line-height:.8}
+    .col .hd{font-size:11px; font-weight:900; margin-top:5px; white-space:nowrap;
+             overflow:hidden; text-overflow:ellipsis}
+    .col .mn{font-size:11px; font-weight:700; opacity:.72; margin-top:1px}
+    .row{display:flex; align-items:center; gap:11px; padding:11px 12px; margin-top:9px;
+         background:var(--card); border:3px solid var(--ink); border-radius:14px;
+         box-shadow:3px 3px 0 var(--ink)}
+    .row .n{width:26px; font-family:"Space Mono",monospace; font-weight:700; font-size:13px}
+    .row .h{flex:1; font-size:14px; font-weight:800; min-width:0;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .row .m{font-size:13px; font-weight:900}
+    .you{margin-top:14px; background:var(--violet); color:#fff; border-color:var(--ink);
+         box-shadow:5px 5px 0 var(--ink)}
+    .you .h{color:#fff}
+    .nav .BOARD{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+                box-shadow:3px 3px 0 var(--on)}

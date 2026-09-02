@@ -1,0 +1,26 @@
+    .ob{padding:0 22px; display:flex; flex-direction:column; height:100%}
+    .mark{margin:74px 0 0; font-size:62px; line-height:.86; letter-spacing:.02em;
+          text-shadow:6px 6px 0 var(--violet); transform:rotate(-3deg)}
+    .burst{position:absolute; top:112px; right:8px; width:118px; height:118px;
+           display:grid; place-items:center; animation:drift 4.5s ease-in-out infinite}
+    .burst span{font-family:"Bangers","Impact",sans-serif; font-size:15px;
+                line-height:.94; text-align:center; color:var(--ink); transform:rotate(9deg)}
+    .bubble{position:relative; margin-top:38px; background:var(--card);
+            border:3px solid var(--ink); border-radius:20px; padding:20px;
+            box-shadow:6px 6px 0 var(--ink)}
+    .bubble::after{content:""; position:absolute; left:34px; bottom:-19px; width:0; height:0;
+                   border:10px solid transparent; border-top:18px solid var(--ink)}
+    .bubble::before{content:""; position:absolute; left:38px; bottom:-13px; width:0; height:0;
+                    border:7px solid transparent; border-top:13px solid var(--card); z-index:2}
+    .bubble h1{margin:0 0 8px; font-size:23px; font-weight:900; line-height:1.15;
+               letter-spacing:-.02em}
+    .bubble p{margin:0; font-size:14px; line-height:1.5; opacity:.82}
+    .promise{display:flex; flex-direction:column; gap:9px; margin-top:34px}
+    .promise div{display:flex; align-items:center; gap:11px; font-size:13px;
+                 font-weight:700; background:var(--card); border:2.5px solid var(--ink);
+                 border-radius:12px; padding:11px 13px; box-shadow:3px 3px 0 var(--ink)}
+    .tick{flex:none; width:24px; height:24px; border-radius:999px; background:var(--lime);
+          border:2.5px solid var(--on); color:var(--on); display:grid; place-items:center}
+    .foot{margin-top:auto; padding-bottom:34px}
+    .foot p{margin:12px 0 0; text-align:center; font-size:11px; opacity:.6;
+            letter-spacing:.04em}
