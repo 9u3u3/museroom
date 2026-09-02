@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.proximity.ProximityManager
 import com.museroom.app.proximity.ProximityStatus
+import com.museroom.app.util.formatAgo
 
 /**
  * People in the room.
@@ -53,6 +54,7 @@ fun ProximityCard() {
 
     val status by manager.state.collectAsStateWithLifecycle()
     val nearby by manager.nearby.collectAsStateWithLifecycle()
+    val diag by manager.diagnostics.collectAsStateWithLifecycle()
     var wanted by remember { mutableStateOf(status != ProximityStatus.Off) }
 
     val askPermissions = rememberLauncherForActivityResult(
@@ -112,6 +114,31 @@ fun ProximityCard() {
                 is ProximityStatus.Failed -> s.reason
             },
         )
+
+        // Six different things can produce an empty list, and they want different
+        // answers. Say which one it is rather than leaving the user guessing.
+        Spacer(Modifier.size(10.dp))
+        Small(if (diag.advertising) "broadcasting: yes" else "broadcasting: no")
+        Small(if (diag.scanning) "listening: yes" else "listening: no")
+        Small(
+            "beacons heard: ${diag.beaconsHeard}" +
+                if (diag.lastHeardAtMs > 0) "  (${formatAgo(diag.lastHeardAtMs)})" else "",
+        )
+        Small(
+            when {
+                diag.lastResolveError != null -> "lookup failed: ${diag.lastResolveError}"
+                diag.lastResolveAtMs == 0L -> "lookup: not run yet"
+                else -> "lookup: ${diag.lastResolveCount} matched, ${formatAgo(diag.lastResolveAtMs)}"
+            },
+        )
+
+        if (diag.beaconsHeard > 0 && nearby.isEmpty() && diag.lastResolveAtMs > 0) {
+            Spacer(Modifier.size(8.dp))
+            Small(
+                "A phone is in range but not showing. They need to be signed in, " +
+                    "have this switched on, and be playing something right now.",
+            )
+        }
 
         if (nearby.isNotEmpty()) {
             Spacer(Modifier.size(12.dp))

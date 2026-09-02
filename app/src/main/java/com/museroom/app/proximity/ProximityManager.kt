@@ -51,6 +51,14 @@ class ProximityManager private constructor(private val context: Context) {
     private val _state = MutableStateFlow<ProximityStatus>(ProximityStatus.Off)
     val state: StateFlow<ProximityStatus> = _state.asStateFlow()
 
+    /**
+     * Enough to tell the six different failures apart. "Nothing found" can mean
+     * the radio never started, nobody is in range, or the people in range are not
+     * playing anything, and those want different answers.
+     */
+    private val _diagnostics = MutableStateFlow(ProximityDiagnostics())
+    val diagnostics: StateFlow<ProximityDiagnostics> = _diagnostics.asStateFlow()
+
     private val seen = mutableMapOf<String, Long>()
     private var scope: CoroutineScope? = null
     private var advertising = false
@@ -61,7 +69,12 @@ class ProximityManager private constructor(private val context: Context) {
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartFailure(errorCode: Int) {
             Log.w(TAG, "advertise failed: $errorCode")
-            _state.value = ProximityStatus.Failed("Could not broadcast (code $errorCode).")
+            _diagnostics.value = _diagnostics.value.copy(advertising = false)
+            _state.value = ProximityStatus.Failed(describeAdvertiseError(errorCode))
+        }
+
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+            _diagnostics.value = _diagnostics.value.copy(advertising = true)
         }
     }
 
@@ -70,10 +83,15 @@ class ProximityManager private constructor(private val context: Context) {
             val payload = result?.scanRecord?.getManufacturerSpecificData(Beacon.MANUFACTURER_ID)
             val token = Beacon.tokenFrom(payload) ?: return
             synchronized(seen) { seen[token] = SystemClock.elapsedRealtime() }
+            _diagnostics.value = _diagnostics.value.copy(
+                beaconsHeard = synchronized(seen) { seen.size },
+                lastHeardAtMs = System.currentTimeMillis(),
+            )
         }
 
         override fun onScanFailed(errorCode: Int) {
             Log.w(TAG, "scan failed: $errorCode")
+            _diagnostics.value = _diagnostics.value.copy(scanning = false)
             _state.value = ProximityStatus.Failed("Could not scan (code $errorCode).")
         }
     }
@@ -124,6 +142,7 @@ class ProximityManager private constructor(private val context: Context) {
         stopScanning()
         synchronized(seen) { seen.clear() }
         _nearby.value = emptyList()
+        _diagnostics.value = ProximityDiagnostics()
         _state.value = ProximityStatus.Off
 
         // Withdrawing matters: leaving a live beacon behind would keep answering
@@ -164,16 +183,35 @@ class ProximityManager private constructor(private val context: Context) {
                 seen.entries.removeAll { it.value < cutoff }
                 seen.keys.toList()
             }
-            api.resolve(fresh).onSuccess { _nearby.value = it }
+            api.resolve(fresh)
+                .onSuccess {
+                    _nearby.value = it
+                    _diagnostics.value = _diagnostics.value.copy(
+                        lastResolveAtMs = System.currentTimeMillis(),
+                        lastResolveCount = it.size,
+                        lastResolveError = null,
+                    )
+                }
+                .onFailure {
+                    _diagnostics.value = _diagnostics.value.copy(lastResolveError = it.message)
+                }
         }
     }
 
     private fun startAdvertising(token: String) {
-        val advertiser = adapter?.bluetoothLeAdvertiser ?: return
+        val advertiser = adapter?.bluetoothLeAdvertiser
+        if (advertiser == null) {
+            _diagnostics.value = _diagnostics.value.copy(advertising = false, canAdvertise = false)
+            _state.value = ProximityStatus.Failed(
+                "This phone cannot broadcast over Bluetooth, so others will not see you. " +
+                    "You can still see them.",
+            )
+            return
+        }
         stopAdvertising()
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_LOW)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
             .setConnectable(false)
             .build()
         val data = AdvertiseData.Builder()
@@ -181,7 +219,13 @@ class ProximityManager private constructor(private val context: Context) {
             .addManufacturerData(Beacon.MANUFACTURER_ID, Beacon.payload(token))
             .build()
         runCatching { advertiser.startAdvertising(settings, data, advertiseCallback) }
-            .onSuccess { advertising = true }
+            .onSuccess {
+                advertising = true
+                _diagnostics.value = _diagnostics.value.copy(tokenPublished = true)
+            }
+            .onFailure {
+                _diagnostics.value = _diagnostics.value.copy(advertising = false)
+            }
     }
 
     private fun stopAdvertising() {
@@ -200,9 +244,11 @@ class ProximityManager private constructor(private val context: Context) {
             )
             .build()
         val settings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
             .build()
         runCatching { scanner.startScan(listOf(filter), settings, scanCallback) }
+            .onSuccess { _diagnostics.value = _diagnostics.value.copy(scanning = true) }
+            .onFailure { _diagnostics.value = _diagnostics.value.copy(scanning = false) }
     }
 
     private fun stopScanning() {
@@ -223,6 +269,34 @@ class ProximityManager private constructor(private val context: Context) {
                 instance ?: ProximityManager(context.applicationContext).also { instance = it }
             }
     }
+}
+
+/** Why nothing is showing up. */
+data class ProximityDiagnostics(
+    /** Our own token is on the air. */
+    val advertising: Boolean = false,
+    /** The radio is listening. */
+    val scanning: Boolean = false,
+    /** Some phones cannot act as a peripheral at all. */
+    val canAdvertise: Boolean = true,
+    val tokenPublished: Boolean = false,
+    /** Beacons overheard, before the server says who they belong to. */
+    val beaconsHeard: Int = 0,
+    val lastHeardAtMs: Long = 0,
+    val lastResolveAtMs: Long = 0,
+    val lastResolveCount: Int = 0,
+    val lastResolveError: String? = null,
+)
+
+private fun describeAdvertiseError(code: Int): String = when (code) {
+    AdvertiseCallback.ADVERTISE_FAILED_FEATURE_UNSUPPORTED ->
+        "This phone cannot broadcast over Bluetooth. You will still see others."
+    AdvertiseCallback.ADVERTISE_FAILED_TOO_MANY_ADVERTISERS ->
+        "Bluetooth is busy with other apps. Try again in a moment."
+    AdvertiseCallback.ADVERTISE_FAILED_DATA_TOO_LARGE ->
+        "Broadcast rejected as too large."
+    AdvertiseCallback.ADVERTISE_FAILED_ALREADY_STARTED -> "Already broadcasting."
+    else -> "Could not broadcast (code $code)."
 }
 
 sealed interface ProximityStatus {
