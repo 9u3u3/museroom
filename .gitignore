@@ -1,0 +1,13 @@
+*.iml
+.gradle/
+local.properties
+.idea/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local credentials, never committed
+.env.local
+supabase/.temp/
+keystore/

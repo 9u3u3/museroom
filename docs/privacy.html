@@ -1,0 +1,75 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Museroom Privacy Policy</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    max-width: 44rem; margin: 0 auto; padding: 3rem 1.25rem 6rem;
+    font: 17px/1.65 Georgia, "Times New Roman", serif;
+  }
+  h1 { font-family: system-ui, sans-serif; font-size: 2rem; letter-spacing: -0.02em; }
+  h2 { font-family: system-ui, sans-serif; font-size: 1.1rem; margin-top: 2.5rem; }
+  .date { opacity: 0.6; font-size: 0.9rem; }
+  ul { padding-left: 1.2rem; }
+  li { margin-bottom: 0.5rem; }
+  code { font: 0.85em ui-monospace, monospace; }
+</style>
+
+<h1>Museroom Privacy Policy</h1>
+<p class="date">Last updated 2 September 2026</p>
+
+<p>Museroom shows what you are listening to, shares it with friends you add, and
+counts your listening minutes for a leaderboard. This page describes exactly what
+it reads, what it keeps, and what other people can see.</p>
+
+<h2>What the app reads on your phone</h2>
+<p>Android publishes a media session for whichever app is playing audio. Museroom
+reads that session to learn the track title, artist, album, artwork, duration and
+playback position.</p>
+<p>Reading it requires notification access. Museroom does not read the contents of
+your notifications. It filters to music players before anything is inspected, and
+you choose which players count from within the app.</p>
+
+<h2>What is stored on your phone</h2>
+<ul>
+  <li>Playback events: play, pause, seek, track change, and a periodic heartbeat.</li>
+  <li>Reconstructed listening sessions and the minutes credited to each.</li>
+  <li>Your sign-in tokens, if you sign in.</li>
+</ul>
+<p>If you never sign in, none of this leaves your device.</p>
+
+<h2>What is sent to the server</h2>
+<p>Once you sign in, the app uploads your playback events, your listening sessions
+and what you are currently playing. This is what makes friends and the leaderboard
+work. Data is stored in Supabase, hosted on Amazon Web Services.</p>
+<p>Signing in with Google gives Museroom your email address and basic profile
+information. It does not give access to your Gmail, contacts, Drive or any other
+Google service.</p>
+
+<h2>Who can see your listening</h2>
+<ul>
+  <li><strong>What you are playing right now</strong> is visible according to your
+      visibility setting: everyone, friends only, or nobody. The default is friends
+      only.</li>
+  <li><strong>Your handle and total minutes</strong> appear on the public leaderboard
+      if you are opted in. You can opt out and keep using everything else.</li>
+  <li><strong>Your detailed history and event log</strong> are visible only to you.
+      This is enforced by database policy, not only by the app.</li>
+</ul>
+
+<h2>Deleting your data</h2>
+<p>You can clear your local history from within the app. To delete your account and
+everything associated with it on the server, email the address below and it will be
+removed. Deleting the app from your phone removes everything stored locally.</p>
+
+<h2>Children</h2>
+<p>Museroom is not directed at children under 13 and does not knowingly collect
+their data.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes materially, the date at the top will change and the
+updated version will be published here.</p>
+
+<h2>Contact</h2>
+<p>Questions or deletion requests: <a href="mailto:harshgaonkar57@gmail.com">harshgaonkar57@gmail.com</a></p>
