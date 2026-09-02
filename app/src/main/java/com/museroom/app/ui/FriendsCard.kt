@@ -203,88 +203,15 @@ fun FriendsCard() {
 @Composable
 private fun FriendRow(friend: Friend) {
     val playing = friend.nowPlaying
-
-    // Ticks locally so the bar keeps moving between server refreshes.
-    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(playing?.updatedAt) {
-        while (true) {
-            nowMs = System.currentTimeMillis()
-            delay(500)
-        }
-    }
-
-    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = "@${friend.profile.handle}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Small(if (playing?.isPlaying == true) "listening" else "quiet")
-        }
-
-        if (playing == null || playing.title.isBlank()) {
-            Small("Nothing shared right now")
-            return@Column
-        }
-
-        Text(
-            text = playing.title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = playing.artist.ifBlank { "Unknown artist" },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-
-        val position = livePosition(playing.positionMs, playing.updatedAt, playing.isPlaying, nowMs)
-            .coerceIn(0L, if (playing.durationMs > 0) playing.durationMs else Long.MAX_VALUE)
-
-        if (playing.durationMs > 0) {
-            Spacer(Modifier.size(6.dp))
-            LinearProgressIndicator(
-                progress = { (position.toFloat() / playing.durationMs).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(3.dp)),
-            )
-            Spacer(Modifier.size(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Small(formatClock(position))
-                Small(formatClock(playing.durationMs))
-            }
-        }
-    }
-}
-
-/**
- * The same arithmetic the listener's own phone runs, applied to the snapshot the
- * server holds. A stale snapshot simply stops advancing rather than drifting.
- */
-private fun livePosition(
-    positionMs: Long,
-    updatedAt: String,
-    isPlaying: Boolean,
-    nowMs: Long,
-): Long {
-    if (!isPlaying) return positionMs
-    val takenAt = runCatching { Instant.parse(updatedAt).toEpochMilli() }.getOrNull()
-        ?: return positionMs
-    val elapsed = (nowMs - takenAt).coerceAtLeast(0)
-    return positionMs + elapsed
+    ListenerRow(
+        handle = friend.profile.handle,
+        title = playing?.title.orEmpty(),
+        artist = playing?.artist.orEmpty(),
+        durationMs = playing?.durationMs ?: 0,
+        positionMs = playing?.positionMs ?: 0,
+        isPlaying = playing?.isPlaying == true,
+        updatedAt = playing?.updatedAt.orEmpty(),
+    )
 }
 
 @Composable

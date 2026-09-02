@@ -143,28 +143,15 @@ fun ProximityCard() {
         if (nearby.isNotEmpty()) {
             Spacer(Modifier.size(12.dp))
             nearby.forEach { person ->
-                Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                    Text(
-                        text = "@${person.handle}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = person.title.ifBlank { "Something" },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = person.artist.ifBlank { "Unknown artist" },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                ListenerRow(
+                    handle = person.handle,
+                    title = person.title,
+                    artist = person.artist,
+                    durationMs = person.durationMs,
+                    positionMs = person.positionMs,
+                    isPlaying = person.isPlaying,
+                    updatedAt = person.updatedAt,
+                )
             }
         }
     }

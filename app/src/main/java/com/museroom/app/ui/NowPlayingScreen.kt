@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.data.MuseroomDatabase
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
+import com.museroom.app.media.PlayerCommands
 import com.museroom.app.media.Sources
 import com.museroom.app.tracking.PlaybackTracker
 import com.museroom.app.media.pickActive
@@ -548,6 +549,10 @@ private fun SelfCheck(sessions: List<NowPlaying>, lastEventAt: Long, error: Stri
         KeyValue("Last event", formatAgo(lastEventAt))
         KeyValue("Sessions seen", sessions.size.toString())
         Spacer(Modifier.size(8.dp))
+        Spacer(Modifier.size(10.dp))
+        PlayerCapabilities()
+        Spacer(Modifier.size(10.dp))
+
         if (sessions.isEmpty()) {
             Mono("no active media sessions", size = 12.sp)
         } else {
@@ -583,6 +588,38 @@ private fun SourceRow(session: NowPlaying) {
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/**
+ * What each player will let us do to it.
+ *
+ * The notification listener access is two-way: the controller that reports what
+ * is playing also carries transport controls. If a player advertises
+ * play-from-search we can start a specific song in it with no account linking at
+ * all, which is what would make following somebody automatic. Whether it does is
+ * a fact about the player, so it is measured here rather than assumed.
+ */
+@Composable
+private fun PlayerCapabilities() {
+    val context = LocalContext.current
+    val caps = remember(NowPlayingRepository.lastEventAt.value) {
+        PlayerCommands.capabilities(context).filter { it.installed }
+    }
+
+    Label("Player control")
+    Spacer(Modifier.size(4.dp))
+    if (caps.isEmpty()) {
+        Mono("no supported player installed", size = 11.sp)
+        return
+    }
+    caps.forEach { cap ->
+        val verdict = when {
+            cap.canPlayFromSearch -> "can start a song"
+            cap.hasLiveSession -> "no play-from-search"
+            else -> "idle, unknown until it plays"
+        }
+        Mono("${Sources.label(cap.packageName)}: $verdict", size = 11.sp)
     }
 }
 
