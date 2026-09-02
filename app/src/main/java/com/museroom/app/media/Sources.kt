@@ -7,46 +7,75 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** Where a source stands with the user. */
+enum class Consent { ALLOWED, BLOCKED, UNDECIDED }
+
 /**
- * Which players count as music.
+ * Consent, asked before anything is recorded.
  *
- * A fixed list of package names looked reasonable until a real device turned up
- * running a YouTube Music fork under its own package. Forks, regional builds and
- * the dozen other players people actually use will never all be in a list we
- * wrote in advance.
+ * The earlier design tracked recognised players by default and let people delete
+ * mistakes afterwards. That is the wrong way round. Someone playing something
+ * they would not want on a leaderboard needs it to never have been written, not
+ * to remember to go and remove it. So nothing is recorded from a source until
+ * the user has said yes to that source.
  *
- * So: recognised players are tracked on sight, anything else that publishes a
- * media session is surfaced to the user as a choice. That is more robust than
- * guessing, and it makes the privacy promise concrete rather than a claim.
+ * Browsers are decided per site, because one verdict covering every page someone
+ * visits is no use. A browser session whose site cannot be identified stays
+ * blocked, since there is nothing meaningful to consent to.
  */
 class SourceRegistry private constructor(
     private val prefs: SharedPreferences,
     private val packageManager: PackageManager,
 ) {
 
-    private val _tracked = MutableStateFlow(currentlyTracked())
-    val tracked: StateFlow<Set<String>> = _tracked.asStateFlow()
+    private val _decisions = MutableStateFlow(snapshot())
+    val decisions: StateFlow<Map<String, Consent>> = _decisions.asStateFlow()
 
-    fun isTracked(packageName: String): Boolean =
-        packageName in optedIn() || (packageName in RECOGNISED && packageName !in optedOut())
+    init {
+        migrateImplicitConsent()
+    }
 
-    fun setTracked(packageName: String, tracked: Boolean) {
-        val on = optedIn().toMutableSet()
-        val off = optedOut().toMutableSet()
-        if (tracked) {
-            on += packageName
-            off -= packageName
+    fun consentFor(key: SourceKey): Consent = when {
+        key.id in allowed() -> Consent.ALLOWED
+        key.id in blocked() -> Consent.BLOCKED
+        // A browser with no identifiable site can never be consented to, so it is
+        // not a question worth asking. It simply does not count.
+        key.isBrowser && key.site == null -> Consent.BLOCKED
+        else -> Consent.UNDECIDED
+    }
+
+    fun isAllowed(key: SourceKey): Boolean = consentFor(key) == Consent.ALLOWED
+
+    fun allow(key: SourceKey) = record(key, Consent.ALLOWED)
+
+    fun block(key: SourceKey) = record(key, Consent.BLOCKED)
+
+    /** Puts a source back to being asked about again. */
+    fun forget(key: SourceKey) {
+        prefs.edit()
+            .putStringSet(KEY_ALLOWED, allowed() - key.id)
+            .putStringSet(KEY_BLOCKED, blocked() - key.id)
+            .apply()
+        _decisions.value = snapshot()
+    }
+
+    private fun record(key: SourceKey, consent: Consent) {
+        val allow = allowed().toMutableSet()
+        val block = blocked().toMutableSet()
+        if (consent == Consent.ALLOWED) {
+            allow += key.id
+            block -= key.id
         } else {
-            on -= packageName
-            off += packageName
+            allow -= key.id
+            block += key.id
         }
-        prefs.edit().putStringSet(KEY_ON, on).putStringSet(KEY_OFF, off).apply()
-        _tracked.value = currentlyTracked()
+        prefs.edit().putStringSet(KEY_ALLOWED, allow).putStringSet(KEY_BLOCKED, block).apply()
+        _decisions.value = snapshot()
     }
 
     /** The player's own name where the system will tell us, its package otherwise. */
     fun label(packageName: String): String {
-        RECOGNISED[packageName]?.let { return it }
+        KNOWN_NAMES[packageName]?.let { return it }
         return runCatching {
             packageManager.getApplicationLabel(
                 packageManager.getApplicationInfo(packageName, 0),
@@ -55,43 +84,57 @@ class SourceRegistry private constructor(
             ?: packageName.substringAfterLast('.').replaceFirstChar { it.uppercase() }
     }
 
-    fun isRecognised(packageName: String): Boolean = packageName in RECOGNISED
+    /**
+     * Anyone upgrading from a build where recognised players counted automatically
+     * keeps those players. Re-asking about Spotify on upgrade would be noise, and
+     * silently switching them off would look like the app had broken.
+     */
+    private fun migrateImplicitConsent() {
+        if (prefs.getBoolean(KEY_MIGRATED, false)) return
+        val previouslyOptedOut = prefs.getStringSet(LEGACY_OFF, emptySet()).orEmpty()
+        val previouslyOptedIn = prefs.getStringSet(LEGACY_ON, emptySet()).orEmpty()
+        val carriedOver = (KNOWN_NAMES.keys - previouslyOptedOut) + previouslyOptedIn
 
-    private fun optedIn(): Set<String> = prefs.getStringSet(KEY_ON, emptySet()).orEmpty()
-    private fun optedOut(): Set<String> = prefs.getStringSet(KEY_OFF, emptySet()).orEmpty()
-    private fun currentlyTracked(): Set<String> = (RECOGNISED.keys - optedOut()) + optedIn()
+        prefs.edit()
+            .putStringSet(KEY_ALLOWED, allowed() + carriedOver)
+            .putStringSet(KEY_BLOCKED, blocked() + previouslyOptedOut)
+            .putBoolean(KEY_MIGRATED, true)
+            .apply()
+        _decisions.value = snapshot()
+    }
+
+    private fun allowed(): Set<String> = prefs.getStringSet(KEY_ALLOWED, emptySet()).orEmpty()
+    private fun blocked(): Set<String> = prefs.getStringSet(KEY_BLOCKED, emptySet()).orEmpty()
+
+    private fun snapshot(): Map<String, Consent> =
+        allowed().associateWith { Consent.ALLOWED } + blocked().associateWith { Consent.BLOCKED }
 
     companion object {
         private const val PREFS = "museroom.sources"
-        private const val KEY_ON = "opted_in"
-        private const val KEY_OFF = "opted_out"
+        private const val KEY_ALLOWED = "allowed"
+        private const val KEY_BLOCKED = "blocked"
+        private const val KEY_MIGRATED = "migrated_to_consent"
+        private const val LEGACY_ON = "opted_in"
+        private const val LEGACY_OFF = "opted_out"
 
-        /**
-         * Players we enable without asking. Forks are listed explicitly because
-         * their package differs while the metadata behaves the same.
-         */
-        private val RECOGNISED = linkedMapOf(
+        /** Names for players Android may not label helpfully. */
+        private val KNOWN_NAMES = linkedMapOf(
             "com.spotify.music" to "Spotify",
             "com.google.android.apps.youtube.music" to "YouTube Music",
             "app.revanced.android.apps.youtube.music" to "YouTube Music",
             "app.rvx.android.apps.youtube.music" to "YouTube Music",
-            "com.google.android.apps.youtube.music.pwa" to "YouTube Music",
             "com.apple.android.music" to "Apple Music",
             "com.soundcloud.android" to "SoundCloud",
             "com.amazon.mp3" to "Amazon Music",
             "deezer.android.app" to "Deezer",
             "com.aspiro.wamp" to "Tidal",
             "com.maxmpz.audioplayer" to "Poweramp",
-            "com.shazam.android" to "Shazam",
-            "org.videolan.vlc" to "VLC",
-            "com.bandcamp.android" to "Bandcamp",
             "com.jio.media.jiobeats" to "JioSaavn",
             "com.gaana" to "Gaana",
             "com.bsbportal.music" to "Wynk Music",
         )
 
-        @Volatile
-        private var instance: SourceRegistry? = null
+        @Volatile private var instance: SourceRegistry? = null
 
         fun get(context: Context): SourceRegistry =
             instance ?: synchronized(this) {

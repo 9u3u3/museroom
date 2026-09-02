@@ -34,10 +34,23 @@ internal fun MediaController.toNowPlaying(sources: SourceRegistry): NowPlaying? 
     val reportedAt = state?.lastPositionUpdateTime?.takeIf { it > 0L } ?: SystemClock.elapsedRealtime()
     val speed = state?.playbackSpeed?.takeIf { it > 0f } ?: 1f
 
+    // A browser's origin has to come out of whatever fields it happened to fill.
+    val site = if (packageName in Browsers.PACKAGES) {
+        Browsers.siteFrom(
+            metadata.getString(MediaMetadata.METADATA_KEY_ARTIST),
+            metadata.getString(MediaMetadata.METADATA_KEY_ALBUM),
+            metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
+            metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
+        )
+    } else {
+        null
+    }
+
     return NowPlaying(
         packageName = packageName,
+        site = site,
         sourceLabel = sources.label(packageName),
-        isTracked = sources.isTracked(packageName),
+        isTracked = sources.isAllowed(SourceKey(packageName, site)),
         title = title,
         artist = artist,
         album = album,

@@ -93,7 +93,7 @@ private fun NowPlaying.event(
     artist = artist,
     album = album,
     durationMs = durationMs,
-    sourcePackage = packageName,
+    sourcePackage = sourceKey.id,
     positionMs = positionMs,
     clockMs = clockMs,
     elapsedMs = elapsedMs,
