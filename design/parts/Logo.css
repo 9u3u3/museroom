@@ -3,6 +3,10 @@
            line-height:.86; letter-spacing:.03em; text-shadow:5px 5px 0 var(--violet)}
     .lg > p{margin:8px 0 0; font-size:13px; font-weight:600; opacity:.68; max-width:62ch;
             line-height:1.5}
+    .badge{display:grid; place-items:center; width:128px; height:128px; border-radius:28px;
+            border:3px solid var(--on); box-shadow:5px 5px 0 var(--on)}
+    .mini{display:grid; place-items:center; width:72px; height:72px; border-radius:16px;
+          border:2.5px solid var(--on); box-shadow:3px 3px 0 var(--on)}
     .lock{display:flex; align-items:center; gap:26px; margin-top:26px; padding:26px 30px;
           background:var(--card); border:3px solid var(--ink); border-radius:20px;
           box-shadow:6px 6px 0 var(--ink)}
@@ -27,6 +31,6 @@
     .adapt{position:relative; width:132px; height:132px; border:3px solid var(--ink);
            border-radius:18px; background:var(--violet); display:grid; place-items:center;
            box-shadow:4px 4px 0 var(--ink)}
-    .adapt::after{content:""; position:absolute; width:88px; height:88px; border-radius:999px;
+    .adapt::after{content:""; position:absolute; width:81px; height:81px; border-radius:999px;
                   border:2px dashed rgba(251,246,234,.85)}
     .wave{animation:popin .6s cubic-bezier(.2,.8,.25,1) both}

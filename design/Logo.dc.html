@@ -140,6 +140,10 @@
            line-height:.86; letter-spacing:.03em; text-shadow:5px 5px 0 var(--violet)}
     .lg > p{margin:8px 0 0; font-size:13px; font-weight:600; opacity:.68; max-width:62ch;
             line-height:1.5}
+    .badge{display:grid; place-items:center; width:128px; height:128px; border-radius:28px;
+            border:3px solid var(--on); box-shadow:5px 5px 0 var(--on)}
+    .mini{display:grid; place-items:center; width:72px; height:72px; border-radius:16px;
+          border:2.5px solid var(--on); box-shadow:3px 3px 0 var(--on)}
     .lock{display:flex; align-items:center; gap:26px; margin-top:26px; padding:26px 30px;
           background:var(--card); border:3px solid var(--ink); border-radius:20px;
           box-shadow:6px 6px 0 var(--ink)}
@@ -164,7 +168,7 @@
     .adapt{position:relative; width:132px; height:132px; border:3px solid var(--ink);
            border-radius:18px; background:var(--violet); display:grid; place-items:center;
            box-shadow:4px 4px 0 var(--ink)}
-    .adapt::after{content:""; position:absolute; width:88px; height:88px; border-radius:999px;
+    .adapt::after{content:""; position:absolute; width:81px; height:81px; border-radius:999px;
                   border:2px dashed rgba(251,246,234,.85)}
     .wave{animation:popin .6s cubic-bezier(.2,.8,.25,1) both}
   </style>
@@ -172,21 +176,12 @@
 <div class="screen {{theme}} wide">
   <div class="lg">
     <h1>THE MARK</h1>
-    <p>A speech bubble with a level meter inside. The bubble is the social half,
-       somebody saying what they are on; the bars are the half that reads the music.
-       Four bars, uneven, because a meter that is level is not moving.</p>
+    <p>A quaver, fattened until it stops being notation and starts being a cartoon,
+       then printed twice slightly out of register the way cheap comics were. The
+       second impression is what gives it the shove.</p>
 
     <div class="lock r d1">
-      <svg class="wave" width="112" height="112" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg>
+      <span class="badge" style="background:#7B4BFF"><svg class="wave" width="104" height="104" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#CDFF3E"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></span>
       <div>
         <div class="wm">MUSEROOM</div>
         <div class="sub">Hear what they hear</div>
@@ -195,81 +190,27 @@
 
     <div class="grid">
       <div>
-        <div class="tile p d2" style="background:#FBF6EA"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg></div>
-        <div class="cap">on paper</div>
+        <div class="tile p d2" style="background:#7B4BFF"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#CDFF3E"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></div>
+        <div class="cap">app icon</div>
       </div>
       <div>
-        <div class="tile p d3" style="background:#17140F"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg></div>
+        <div class="tile p d3" style="background:#CDFF3E"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#7B4BFF"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#7B4BFF"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#7B4BFF"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></div>
+        <div class="cap">on lime</div>
+      </div>
+      <div>
+        <div class="tile p d4" style="background:#17140F"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#FF4D8D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#FF4D8D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#FF4D8D"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#F6F0E2"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#F6F0E2"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#F6F0E2"/></g></svg></div>
         <div class="cap">on ink</div>
       </div>
       <div>
-        <div class="tile p d4" style="background:#7B4BFF"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#FBF6EA" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg></div>
-        <div class="cap">on violet</div>
+        <div class="tile p d5" style="background:#FBF6EA"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#FF4D8D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#FF4D8D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#FF4D8D"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></div>
+        <div class="cap">on paper</div>
       </div>
       <div>
-        <div class="tile p d5" style="background:#FF4D8D"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#FBF6EA" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg></div>
-        <div class="cap">on pink</div>
-      </div>
-      <div>
-        <div class="tile p d6" style="background:#FBF6EA"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="none" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg></div>
+        <div class="tile p d6" style="background:#FBF6EA"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></div>
         <div class="cap">mono ink</div>
       </div>
       <div>
-        <div class="tile p d7" style="background:#14110D"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="none" stroke="#F6F0E2" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#F6F0E2">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg></div>
+        <div class="tile p d7" style="background:#14110D"><svg class="" width="78" height="78" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#F6F0E2"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#F6F0E2"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#F6F0E2"/></g></svg></div>
         <div class="cap">mono cream</div>
       </div>
     </div>
@@ -278,82 +219,29 @@
       <div class="panel r d6">
         <h4>Holds up small</h4>
         <div class="sizes">
-          <div><svg class="" width="72" height="72" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg><div class="cap">72</div></div>
-          <div><svg class="" width="48" height="48" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg><div class="cap">48</div></div>
-          <div><svg class="" width="32" height="32" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg><div class="cap">32</div></div>
-          <div><svg class="" width="22" height="22" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg><div class="cap">22</div></div>
-          <div><svg class="" width="16" height="16" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg><div class="cap">16</div></div>
+          <div><span class="mini" style="background:#7B4BFF"><svg class="" width="56" height="56" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#CDFF3E"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></span><div class="cap">72</div></div>
+          <div><span class="mini" style="background:#7B4BFF;width:48px;height:48px"><svg class="" width="38" height="38" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#CDFF3E"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></span><div class="cap">48</div></div>
+          <div><span class="mini" style="background:#7B4BFF;width:32px;height:32px"><svg class="" width="26" height="26" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#CDFF3E"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></span><div class="cap">32</div></div>
+          <div><span class="mini" style="background:#7B4BFF;width:22px;height:22px"><svg class="" width="18" height="18" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#CDFF3E"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></span><div class="cap">22</div></div>
         </div>
         <ul class="rules" style="margin:16px 0 0; padding-left:17px">
-          <li><b>Clear space</b> is one bar width on every side.</li>
-          <li><b>Never</b> flip the tail to the right or rotate the mark.</li>
-          <li>Below 16px drop the bubble and keep the four bars.</li>
+          <li><b>Clear space</b> is one stem width on every side.</li>
+          <li>The second impression always falls <b>down and right</b>, never the other way.</li>
+          <li>Below 20px drop the second impression; the note alone still reads.</li>
+          <li><b>Never</b> outline it. The mark is solid shapes, so overlaps merge.</li>
         </ul>
       </div>
 
       <div class="panel r d7">
         <h4>Android launcher</h4>
         <div style="display:flex; align-items:center; gap:20px">
-          <div class="adapt"><svg class="" width="72" height="72" viewBox="0 0 128 128" aria-label="Museroom">
-  <path d="M38 14 H90 A26 26 0 0 1 116 40 V70 A26 26 0 0 1 90 96 H62 L40 120 V96 H38 A26 26 0 0 1 12 70 V40 A26 26 0 0 1 38 14 Z"
-        fill="#CDFF3E" stroke="#14110D" stroke-width="7" stroke-linejoin="round"/>
-  <g fill="#14110D">
-    <rect x="32" y="52" width="11" height="24" rx="5.5"/>
-    <rect x="50" y="34" width="11" height="42" rx="5.5"/>
-    <rect x="68" y="44" width="11" height="32" rx="5.5"/>
-    <rect x="86" y="58" width="11" height="18" rx="5.5"/>
-  </g>
-</svg></div>
+          <div class="adapt"><svg class="" width="74" height="74" viewBox="0 0 128 128" aria-label="Museroom"><g transform="translate(-4.0,-7.75)"><g transform="translate(6.0,6.0)"><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#CDFF3E"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/></g><path d="M69.37,84.77 A27.0,21.0 -20.0 0 1 18.63,103.23 A27.0,21.0 -20.0 0 1 69.37,84.77 Z" fill="#14110D"/><path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/><path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/></g></svg></div>
           <ul class="rules" style="margin:0; padding-left:17px">
-            <li>Violet background layer, mark on the foreground.</li>
-            <li>Dashed ring is the <b>66dp safe zone</b>; the mark sits inside it,
-                so it survives a circle, a squircle or a rounded square.</li>
-            <li>Monochrome layer uses the ink-only version.</li>
+            <li>Violet background layer, note on the foreground.</li>
+            <li>The dashed ring is the <b>66dp safe zone</b>. The note is centred on
+                its own measured bounds, not its box, so the flag does not shove it
+                off-centre inside a circle.</li>
+            <li>Themed icons get the mono layer.</li>
           </ul>
         </div>
       </div>
