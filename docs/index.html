@@ -9,40 +9,70 @@
     font: 17px/1.65 Georgia, "Times New Roman", serif;
   }
   h1 { font-family: system-ui, sans-serif; font-size: 2.6rem; letter-spacing: -0.03em; margin-bottom: 0.4rem; }
-  .tag { font-family: system-ui, sans-serif; opacity: 0.7; margin-top: 0; }
+  .tag { font-family: system-ui, sans-serif; opacity: 0.75; margin-top: 0; }
   h2 { font-family: system-ui, sans-serif; font-size: 1.05rem; margin-top: 2.5rem; }
   ul { padding-left: 1.2rem; }
   li { margin-bottom: 0.5rem; }
+  .download {
+    display: inline-block; margin: 2rem 0 0.5rem;
+    font-family: system-ui, sans-serif; font-size: 1.05rem; font-weight: 600;
+    text-decoration: none; color: #fff; background: #5B3FD6;
+    padding: 0.85rem 1.6rem; border-radius: 999px;
+  }
+  .download:hover { background: #4a32b5; }
+  .meta { font-family: system-ui, sans-serif; font-size: 0.85rem; opacity: 0.65; margin-top: 0.35rem; }
+  .note {
+    border-left: 3px solid currentColor; padding: 0.1rem 0 0.1rem 1rem;
+    margin: 1.5rem 0; opacity: 0.85; font-size: 0.95rem;
+  }
   footer { margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid currentColor; opacity: 0.6; font-size: 0.9rem; }
 </style>
 
 <h1>Museroom</h1>
 <p class="tag">See what your friends are listening to, in real time.</p>
 
-<p>Museroom reads whatever is playing on your Android phone, whether that is
-Spotify, YouTube Music or another player, and shows it to the friends you add. It
-counts your listening minutes and ranks them on a leaderboard.</p>
+<p>Museroom reads whatever is playing on your Android phone and shows it to the
+friends you add. It counts your listening minutes and ranks them on a leaderboard,
+and it can find other listeners in the room with you.</p>
+
+<a class="download" href="museroom-latest.apk">Download for Android</a>
+<p class="meta">Version 1.2 &middot; 13 MB &middot; Android 8.0 or newer</p>
+
+<h2>Installing</h2>
+<p>Museroom is not on the Play Store, so Android will ask permission before
+installing it. Tap the download above, open the file, and allow installs from your
+browser when prompted.</p>
+<p>On first launch the app asks for notification access. That permission is what
+makes detection possible: Android publishes a media session for whatever is
+playing, and reading it is the only way to know what you are listening to.</p>
+
+<div class="note">
+  This is a test build, signed with a development key. It installs and runs
+  normally, but Android will not update it over a future release-signed version.
+</div>
+
+<h2>What it counts</h2>
+<p>Spotify and YouTube Music, including the ReVanced and RVX builds of YouTube
+Music. Nothing else on your device is read. Browsers are deliberately unsupported,
+because a browser plays whatever the web plays and no permission granted in
+advance could sensibly cover that.</p>
 
 <h2>How it works</h2>
 <ul>
   <li>Android keeps a media session for the app currently playing audio. Museroom
-      reads the track and its position from there, so it works with players that
-      have no public interface of their own.</li>
-  <li>Your listening is counted on the phone and uploaded once you sign in.</li>
-  <li>Nothing is shared until you sign in, and what friends can see is yours to set.</li>
+      reads the track and its position from there, which is why it works with
+      players that have no public interface of their own.</li>
+  <li>Minutes are counted when a track finishes, and the totals are worked out on
+      a server rather than taken on trust from the phone.</li>
+  <li>Nothing is shared until you sign in, and what friends can see is yours to
+      set. A private session stops recording entirely.</li>
 </ul>
 
-<h2>Installing</h2>
-<p>Museroom is distributed as an APK rather than through the Play Store. Download
-the latest release, allow installation from unknown sources when Android asks, and
-grant notification access when the app requests it. That permission is what makes
-detection possible.</p>
-
 <h2>Privacy</h2>
-<p>The app reads music players only, and filters everything else out before it is
-inspected. The full <a href="privacy.html">privacy policy</a> sets out what is
-stored and who can see it.</p>
+<p>The full <a href="privacy.html">privacy policy</a> sets out what is stored, what
+travels over Bluetooth when you turn on proximity, and who can see what.</p>
 
 <footer>
-  Contact: <a href="mailto:harshgaonkar57@gmail.com">harshgaonkar57@gmail.com</a>
+  <a href="https://github.com/9u3u3/museroom">Source on GitHub</a> &middot;
+  <a href="mailto:harshgaonkar57@gmail.com">harshgaonkar57@gmail.com</a>
 </footer>
