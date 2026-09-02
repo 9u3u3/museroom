@@ -129,6 +129,24 @@ object Supabase {
         }
     }
 
+    /** Updates rows matching a filter, merging [patch] into each. */
+    fun patch(table: String, query: String, patch: JsonObject, accessToken: String) {
+        val request = Request.Builder()
+            .url("$url/rest/v1/$table?$query")
+            .patch(json.encodeToString(JsonObject.serializer(), patch).toRequestBody(jsonMedia))
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .header("Content-Type", "application/json")
+            .header("Prefer", "return=minimal")
+            .build()
+
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw SupabaseError(response.code, response.body?.string().orEmpty())
+            }
+        }
+    }
+
     /** Deletes rows matching a PostgREST filter. Policies decide what is allowed. */
     fun delete(table: String, query: String, accessToken: String) {
         val request = Request.Builder()

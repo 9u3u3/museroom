@@ -107,6 +107,7 @@ fun NowPlayingScreen() {
             }
             PrivacyCard()
             AccountCard()
+            FriendsCard()
             ListeningSoFar()
             SelfCheck(sessions = sessions, lastEventAt = lastEventAt, error = error)
             if (active != null) RawMetadata(active)
@@ -123,7 +124,7 @@ private fun Header() {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Label("Phase 2 · syncing")
+        Label("Phase 3 · friends")
     }
 }
 

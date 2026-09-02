@@ -47,6 +47,7 @@ object PlaybackTracker {
         val db = MuseroomDatabase.get(app)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         privacy = PrivacyState.get(app)
+        appContext = app
         val newScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = newScope
 
@@ -95,6 +96,7 @@ object PlaybackTracker {
     }
 
     private var privacy: PrivacyState? = null
+    private lateinit var appContext: Context
 
     private suspend fun record(db: MuseroomDatabase, prefs: android.content.SharedPreferences) {
         mutex.withLock {
@@ -108,6 +110,16 @@ object PlaybackTracker {
             if (events.isEmpty()) return@withLock
             events.forEach { db.dao().insertEvent(it.toEntity()) }
             creditClosedSessions(db, prefs)
+
+            // A track change should reach friends now, not up to fifteen seconds
+            // later. The periodic publish only exists to keep the position fresh.
+            if (events.any { it.type == PlayEventType.TRACK_CHANGE || it.type == PlayEventType.PLAY }) {
+                active?.let {
+                    SyncEngine.get(appContext).publishNowPlaying(
+                        it, it.positionAt(SystemClock.elapsedRealtime()),
+                    )
+                }
+            }
         }
     }
 
