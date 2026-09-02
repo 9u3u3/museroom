@@ -3,6 +3,7 @@ package com.museroom.app.sync
 import android.content.Context
 import com.museroom.app.data.ListeningSessionEntity
 import com.museroom.app.data.MuseroomDatabase
+import com.museroom.app.data.ListeningSessionEntity as SessionEntity
 import com.museroom.app.data.PlayEventEntity
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.net.AuthRepository
@@ -104,6 +105,51 @@ class SyncEngine private constructor(context: Context) {
             }
         }
     }
+
+    /**
+     * Removes one entry everywhere: the local row, the server row, and the events
+     * behind it. Deleting only locally would leave the minutes standing on the
+     * leaderboard, which is the opposite of what someone asking to remove
+     * something wants.
+     */
+    suspend fun deleteEverywhere(session: SessionEntity) {
+        withContext(Dispatchers.IO) {
+            db.dao().deleteSession(session.id)
+            db.dao().deleteEventsFor(session.fingerprint)
+
+            val userId = auth.session.value?.userId ?: return@withContext
+            val token = auth.validAccessToken() ?: return@withContext
+            val scope = "user_id=eq.$userId&fingerprint=eq.${session.fingerprint.encoded()}"
+            runCatching {
+                Supabase.delete(
+                    "listening_sessions",
+                    "$scope&started_at=eq.${Instant.ofEpochMilli(session.startedAtClock)}",
+                    token,
+                )
+                Supabase.delete("play_events", scope, token)
+            }
+        }
+    }
+
+    /** Wipes everything, here and on the server. */
+    suspend fun deleteAllHistory() {
+        withContext(Dispatchers.IO) {
+            db.dao().clearSessions()
+            db.dao().clearEvents()
+
+            val userId = auth.session.value?.userId ?: return@withContext
+            val token = auth.validAccessToken() ?: return@withContext
+            runCatching {
+                Supabase.delete("listening_sessions", "user_id=eq.$userId", token)
+                Supabase.delete("play_events", "user_id=eq.$userId", token)
+                Supabase.delete("now_playing", "user_id=eq.$userId", token)
+            }
+        }
+    }
+
+    /** PostgREST filters are URL values; a fingerprint can contain anything. */
+    private fun String.encoded(): String =
+        java.net.URLEncoder.encode(this, "UTF-8")
 
     private fun eventsJson(events: List<PlayEventEntity>, userId: String): JsonArray = buildJsonArray {
         events.forEach { e ->

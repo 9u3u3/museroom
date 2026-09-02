@@ -56,6 +56,14 @@ import com.museroom.app.util.NotificationAccess
 import com.museroom.app.util.formatAgo
 import com.museroom.app.util.formatClock
 import com.museroom.app.util.formatMinutes
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.museroom.app.data.ListeningSessionEntity
+import com.museroom.app.privacy.PrivacyState
+import com.museroom.app.sync.SyncEngine
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.ZoneId
@@ -97,6 +105,7 @@ fun NowPlayingScreen() {
                 NowPlayingCard(active)
                 FingerprintCard(active)
             }
+            PrivacyCard()
             AccountCard()
             ListeningSoFar()
             SelfCheck(sessions = sessions, lastEventAt = lastEventAt, error = error)
@@ -313,6 +322,44 @@ private fun FingerprintCard(track: NowPlaying) {
  * What the event trail adds up to. Credited on this phone for now, by the same
  * rules that will run server-side once there is a server.
  */
+/**
+ * Stopping the recording, rather than hiding it after the fact.
+ */
+@Composable
+private fun PrivacyCard() {
+    val context = LocalContext.current
+    val privacy = remember { PrivacyState.get(context) }
+    val isPrivate by privacy.privateSession.collectAsStateWithLifecycle()
+
+    Card {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Private session",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.size(2.dp))
+                Text(
+                    text = if (isPrivate) {
+                        "Nothing is being recorded. No minutes, no history, nothing shared."
+                    } else {
+                        "Listening is being counted and shared as your settings allow."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = isPrivate, onCheckedChange = privacy::setPrivate)
+        }
+    }
+}
+
 @Composable
 private fun ListeningSoFar() {
     val context = LocalContext.current
@@ -323,6 +370,49 @@ private fun ListeningSoFar() {
 
     val todayMs by dao.creditedSince(startOfToday).collectAsStateWithLifecycle(0L)
     val recent by dao.recentSessions(12).collectAsStateWithLifecycle(emptyList())
+
+    val sync = remember { SyncEngine.get(context) }
+    val registry = remember { SourceRegistry.get(context) }
+    val scope = rememberCoroutineScope()
+    var pendingRemoval by remember { mutableStateOf<ListeningSessionEntity?>(null) }
+    var confirmWipe by remember { mutableStateOf(false) }
+
+    pendingRemoval?.let { session ->
+        RemoveDialog(
+            session = session,
+            appLabel = registry.label(session.sourcePackage),
+            onDismiss = { pendingRemoval = null },
+            onRemove = { alsoStopCounting ->
+                scope.launch {
+                    if (alsoStopCounting) registry.setTracked(session.sourcePackage, false)
+                    sync.deleteEverywhere(session)
+                }
+                pendingRemoval = null
+            },
+        )
+    }
+
+    if (confirmWipe) {
+        AlertDialog(
+            onDismissRequest = { confirmWipe = false },
+            title = { Text("Delete all history?") },
+            text = {
+                Text(
+                    "Every track, every event and your minutes are removed from this " +
+                        "phone and from the server. This cannot be undone.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch { sync.deleteAllHistory() }
+                    confirmWipe = false
+                }) { Text("Delete everything") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmWipe = false }) { Text("Cancel") }
+            },
+        )
+    }
 
     Card {
         Row(
@@ -350,11 +440,18 @@ private fun ListeningSoFar() {
             )
         } else {
             Spacer(Modifier.size(14.dp))
+            Text(
+                text = "Tap an entry to remove it",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.size(6.dp))
             recent.forEach { session ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .clickable { pendingRemoval = session }
+                        .padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -376,8 +473,54 @@ private fun ListeningSoFar() {
                     Mono(formatMinutes(session.creditedMs), size = 12.sp)
                 }
             }
+            Spacer(Modifier.size(10.dp))
+            TextButton(onClick = { confirmWipe = true }) { Text("Delete all history") }
         }
     }
+}
+
+/**
+ * Removing one entry. The second action exists because an unwanted entry is
+ * usually a symptom: a player that should not have been counted in the first
+ * place. Fixing the cause in the same tap saves finding this dialog again
+ * tomorrow.
+ */
+@Composable
+private fun RemoveDialog(
+    session: ListeningSessionEntity,
+    appLabel: String,
+    onDismiss: () -> Unit,
+    onRemove: (alsoStopCounting: Boolean) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Remove this?") },
+        text = {
+            Column {
+                Text(
+                    text = session.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = session.artist.ifBlank { "Unknown artist" },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(10.dp))
+                Text(
+                    text = "It is deleted from this phone and from the server, and its " +
+                        "minutes come off your total.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onRemove(false) }) { Text("Remove") }
+        },
+        dismissButton = {
+            TextButton(onClick = { onRemove(true) }) { Text("Remove, stop counting $appLabel") }
+        },
+    )
 }
 
 @Composable

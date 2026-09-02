@@ -9,6 +9,7 @@ import com.museroom.app.data.toEntity
 import com.museroom.app.credit.Crediting
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.pickActive
+import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,7 @@ object PlaybackTracker {
         val app = context.applicationContext
         val db = MuseroomDatabase.get(app)
         val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        privacy = PrivacyState.get(app)
         val newScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = newScope
 
@@ -69,7 +71,7 @@ object PlaybackTracker {
             while (true) {
                 delay(NOW_PLAYING_MS)
                 val active = NowPlayingRepository.sessions.value.pickActive()
-                    ?.takeIf { it.isTracked && it.isPlaying }
+                    ?.takeIf { it.isTracked && it.isPlaying && privacy?.privateSession?.value != true }
                 if (active != null) {
                     sync.publishNowPlaying(active, active.positionAt(SystemClock.elapsedRealtime()))
                 }
@@ -92,9 +94,16 @@ object PlaybackTracker {
         differ.reset()
     }
 
+    private var privacy: PrivacyState? = null
+
     private suspend fun record(db: MuseroomDatabase, prefs: android.content.SharedPreferences) {
         mutex.withLock {
-            val active = NowPlayingRepository.sessions.value.pickActive()?.takeIf { it.isTracked }
+            // Private mode is handled here, at the point of capture. Treating it
+            // as "nothing is playing" also closes the open session cleanly rather
+            // than leaving a track hanging mid-count.
+            val hidden = privacy?.privateSession?.value == true
+            val active = NowPlayingRepository.sessions.value.pickActive()
+                ?.takeIf { it.isTracked && !hidden }
             val events = differ.diff(active, System.currentTimeMillis(), SystemClock.elapsedRealtime())
             if (events.isEmpty()) return@withLock
             events.forEach { db.dao().insertEvent(it.toEntity()) }

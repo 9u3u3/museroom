@@ -67,6 +67,12 @@ interface MuseroomDao {
     @Query("DELETE FROM play_events")
     suspend fun clearEvents()
 
+    @Query("DELETE FROM listening_sessions WHERE id = :id")
+    suspend fun deleteSession(id: Long)
+
+    @Query("DELETE FROM play_events WHERE fingerprint = :fingerprint")
+    suspend fun deleteEventsFor(fingerprint: String)
+
     @Query("DELETE FROM listening_sessions")
     suspend fun clearSessions()
 }

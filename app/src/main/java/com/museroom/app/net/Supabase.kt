@@ -129,6 +129,23 @@ object Supabase {
         }
     }
 
+    /** Deletes rows matching a PostgREST filter. Policies decide what is allowed. */
+    fun delete(table: String, query: String, accessToken: String) {
+        val request = Request.Builder()
+            .url("$url/rest/v1/$table?$query")
+            .delete()
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .header("Prefer", "return=minimal")
+            .build()
+
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw SupabaseError(response.code, response.body?.string().orEmpty())
+            }
+        }
+    }
+
     fun select(table: String, query: String, accessToken: String): String {
         val request = Request.Builder()
             .url("$url/rest/v1/$table?$query")
