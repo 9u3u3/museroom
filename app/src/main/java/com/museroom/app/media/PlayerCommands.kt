@@ -40,6 +40,9 @@ object PlayerCommands {
     private const val VERIFY_ATTEMPTS = 10
     private const val VERIFY_INTERVAL_MS = 300L
 
+    /** Longer, because the app has to start before it can be told to play. */
+    private const val LAUNCH_ATTEMPTS = 25
+
     fun capabilities(context: Context): List<PlayerCapability> {
         val controllers = activeControllers(context)
         return Sources.packages.map { pkg ->
@@ -72,25 +75,102 @@ object PlayerCommands {
         packageName: String,
         title: String,
         artist: String,
+        sourceTrackId: String? = null,
     ): PlayOutcome {
         val query = listOf(title, artist).filter { it.isNotBlank() }.joinToString(" ")
         if (query.isBlank()) return PlayOutcome.Failed("Nothing to play.")
 
         val controller = controllerFor(context, packageName)
         val actions = controller?.playbackState?.actions ?: 0L
+        val before = controller?.currentTitle()
+
+        // Best case: the player accepts a track id straight from its own session,
+        // which needs no search and no guessing at which result is right.
+        val uri = trackUri(packageName, sourceTrackId)
+        if (controller != null && uri != null && actions and PlaybackState.ACTION_PLAY_FROM_URI != 0L) {
+            runCatching { controller.transportControls.playFromUri(uri, null) }
+            if (startedPlaying(context, packageName, title, before)) return PlayOutcome.Started
+        }
 
         if (controller != null && actions and PlaybackState.ACTION_PLAY_FROM_SEARCH != 0L) {
-            val before = controller.currentTitle()
             runCatching { controller.transportControls.playFromSearch(query, null) }
             if (startedPlaying(context, packageName, title, before)) return PlayOutcome.Started
         }
 
-        for (link in deepLinks(packageName, query)) {
-            if (open(context, link, packageName)) return PlayOutcome.Opened
+        // Otherwise open the app. A track link lands on the song itself; a search
+        // link only lands nearby, which is why the id is worth carrying.
+        val links = trackLinks(packageName, sourceTrackId) + searchLinks(packageName, query)
+        val exact = trackLinks(packageName, sourceTrackId).isNotEmpty()
+        for (link in links) {
+            if (!open(context, link, packageName)) continue
+            // Opening a track usually leaves it loaded but paused. Pressing play
+            // for the user is the last step towards not touching the other app.
+            if (exact && pressPlay(context, packageName, title, before)) return PlayOutcome.Started
+            return if (exact) PlayOutcome.OpenedExact else PlayOutcome.Opened
         }
         return PlayOutcome.Failed(
             "Could not open ${Sources.label(packageName)}. Is it installed?",
         )
+    }
+
+    /**
+     * Waits for the app we just opened to publish a session, then presses play.
+     *
+     * ACTION_PLAY is supported almost everywhere, unlike play-from-search, so
+     * this works with players that ignore the richer commands entirely.
+     */
+    private suspend fun pressPlay(
+        context: Context,
+        packageName: String,
+        title: String,
+        before: String?,
+    ): Boolean {
+        repeat(LAUNCH_ATTEMPTS) {
+            delay(VERIFY_INTERVAL_MS)
+            val controller = controllerFor(context, packageName) ?: return@repeat
+            val state = controller.playbackState
+            if (state?.state == PlaybackState.STATE_PLAYING) return true
+            if (state != null && state.actions and PlaybackState.ACTION_PLAY != 0L) {
+                runCatching { controller.transportControls.play() }
+            }
+        }
+        return startedPlaying(context, packageName, title, before)
+    }
+
+    /** A player-specific uri for an id the player itself published. */
+    private fun trackUri(packageName: String, id: String?): Uri? {
+        val trimmed = id?.trim().orEmpty()
+        if (trimmed.isEmpty()) return null
+        return when {
+            trimmed.startsWith("spotify:") || trimmed.startsWith("http") -> trimmed.toUri()
+            packageName == "com.spotify.music" -> "spotify:track:$trimmed".toUri()
+            else -> null
+        }
+    }
+
+    private fun trackLinks(packageName: String, id: String?): List<Uri> {
+        val trimmed = id?.trim().orEmpty()
+        if (trimmed.isEmpty()) return emptyList()
+        return when (packageName) {
+            "com.spotify.music" -> when {
+                trimmed.startsWith("spotify:") -> listOf(trimmed.toUri())
+                trimmed.startsWith("http") -> listOf(trimmed.toUri())
+                else -> listOf(
+                    "spotify:track:$trimmed".toUri(),
+                    "https://open.spotify.com/track/$trimmed".toUri(),
+                )
+            }
+            "com.google.android.apps.youtube.music",
+            "app.revanced.android.apps.youtube.music",
+            "app.rvx.android.apps.youtube.music",
+            -> when {
+                trimmed.startsWith("http") -> listOf(trimmed.toUri())
+                // YouTube ids are eleven characters; anything else is not one.
+                trimmed.length == 11 -> listOf("https://music.youtube.com/watch?v=$trimmed".toUri())
+                else -> emptyList()
+            }
+            else -> emptyList()
+        }
     }
 
     /** Watches the player's own session to see whether the command took effect. */
@@ -138,7 +218,7 @@ object PlayerCommands {
      * there is no way to name one exact song, so this lands the person on it
      * rather than in it.
      */
-    private fun deepLinks(packageName: String, query: String): List<Uri> {
+    private fun searchLinks(packageName: String, query: String): List<Uri> {
         val encoded = Uri.encode(query)
         return when (packageName) {
             "com.spotify.music" -> listOf(
@@ -163,6 +243,9 @@ object PlayerCommands {
 sealed interface PlayOutcome {
     /** The player was commanded directly and should already be playing. */
     data object Started : PlayOutcome
+
+    /** The app was opened on the exact song, but would not start itself. */
+    data object OpenedExact : PlayOutcome
 
     /** The app was opened at a search for the song. One more tap needed. */
     data object Opened : PlayOutcome

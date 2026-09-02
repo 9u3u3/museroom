@@ -26,6 +26,8 @@ data class RemoteNowPlaying(
     @SerialName("position_ms") val positionMs: Long = 0,
     @SerialName("is_playing") val isPlaying: Boolean = false,
     @SerialName("updated_at") val updatedAt: String = "",
+    @SerialName("source_track_id") val sourceTrackId: String? = null,
+    @SerialName("source_package") val sourcePackage: String = "",
 )
 
 @Serializable
@@ -88,7 +90,7 @@ class FriendsRepository private constructor(context: Context) {
         val list = ids.joinToString(",")
         val body = Supabase.select(
             "profiles",
-            "id=in.($list)&select=id,handle,display_name,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at)",
+            "id=in.($list)&select=id,handle,display_name,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at,source_track_id,source_package)",
             token,
         )
         Supabase.json

@@ -15,6 +15,12 @@ internal fun MediaController.toNowPlaying(): NowPlaying? {
     val metadata = metadata ?: return null
     val state = playbackState
 
+    // An advert is not listening. Counting one credits minutes nobody chose to
+    // spend, and publishing it makes a friend's progress bar jump to a thirty
+    // second clock and back. Treated as nothing playing, so the last real track
+    // simply stays put until the music returns.
+    if (metadata.isAdvertisement(packageName)) return null
+
     val title = metadata.text(MediaMetadata.METADATA_KEY_TITLE)
         ?: metadata.text(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
         ?: return null
@@ -46,12 +52,42 @@ internal fun MediaController.toNowPlaying(): NowPlaying? {
         reportedAtElapsed = reportedAt,
         playbackSpeed = if (playing) speed else 0f,
         isPlaying = playing,
+        // Some players name the exact track here. Where they do, a friend can be
+        // sent straight to that song rather than to a search for its title.
+        sourceTrackId = metadata.trackId(),
         audioContentType = runCatching { playbackInfo?.audioAttributes?.contentType }
             .getOrNull() ?: AudioAttributes.CONTENT_TYPE_UNKNOWN,
         artwork = metadata.artwork(),
         rawMetadata = metadata.dump(),
     )
 }
+
+private const val KEY_ADVERTISEMENT = "android.media.metadata.ADVERTISEMENT"
+private const val KEY_MEDIA_ID = "android.media.metadata.MEDIA_ID"
+private const val KEY_MEDIA_URI = "android.media.metadata.MEDIA_URI"
+
+/**
+ * Spotify sets a documented advertisement flag. Others do not, so the title is
+ * also checked, conservatively: only exact matches for the handful of strings
+ * players actually use, since a real song could be called anything.
+ */
+private fun MediaMetadata.isAdvertisement(packageName: String): Boolean {
+    // Named by string rather than constant: the platform MediaMetadata class does
+    // not expose these, only the support library does, but players set the same
+    // underlying keys either way.
+    if (getLong(KEY_ADVERTISEMENT) == 1L) return true
+
+    val title = getString(MediaMetadata.METADATA_KEY_TITLE)?.trim()?.lowercase() ?: return false
+    val artist = getString(MediaMetadata.METADATA_KEY_ARTIST)?.trim()?.lowercase().orEmpty()
+    val adTitles = setOf("advertisement", "spotify", "sponsored", "ad")
+    return title in adTitles && (artist.isEmpty() || artist in adTitles || artist == packageName)
+}
+
+/** The player's own identifier for the track, where it publishes one. */
+private fun MediaMetadata.trackId(): String? =
+    listOf(KEY_MEDIA_ID, KEY_MEDIA_URI).firstNotNullOfOrNull { key ->
+        runCatching { getString(key) }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+    }
 
 private fun MediaMetadata.text(key: String): String? =
     getString(key)?.trim()?.takeIf { it.isNotEmpty() }

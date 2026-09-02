@@ -12,6 +12,11 @@ data class NowPlaying(
     val sourceLabel: String,
     /** Whether this player is one Museroom counts. */
     val isTracked: Boolean,
+    /**
+     * The player's own id for this track, when it publishes one. With it a
+     * friend can be sent to the exact song instead of to a search.
+     */
+    val sourceTrackId: String?,
     val title: String,
     val artist: String,
     val album: String,

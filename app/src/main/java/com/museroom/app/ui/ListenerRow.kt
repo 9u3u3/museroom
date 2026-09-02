@@ -65,6 +65,7 @@ fun ListenerRow(
     positionMs: Long,
     isPlaying: Boolean,
     updatedAt: String,
+    sourceTrackId: String? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -91,11 +92,15 @@ fun ListenerRow(
         scope.launch {
             // Always say what happened. Silence after a tap is indistinguishable
             // from a broken button, which is exactly how this failed before.
-            outcome = when (val result = PlayerCommands.play(context, packageName, title, artist)) {
+            outcome = when (
+                val result = PlayerCommands.play(context, packageName, title, artist, sourceTrackId)
+            ) {
                 is PlayOutcome.Started -> "Playing in $label."
+                is PlayOutcome.OpenedExact ->
+                    "$label opened on the song but would not start itself. Press play."
                 is PlayOutcome.Opened ->
-                    "$label did not accept the command, so it opened at a search for " +
-                        "the song instead. Tap it there to play."
+                    "$label would not take the song, so it opened at a search. " +
+                        "Tap the right result to play."
                 is PlayOutcome.Failed -> result.reason
             }
         }

@@ -97,6 +97,7 @@ class SyncEngine private constructor(context: Context) {
                             put("position_ms", positionMs)
                             put("is_playing", track.isPlaying)
                             put("source_package", track.packageName)
+                            put("source_track_id", track.sourceTrackId)
                             put("updated_at", Instant.now().toString())
                         },
                     )

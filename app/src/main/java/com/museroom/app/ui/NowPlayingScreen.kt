@@ -312,6 +312,17 @@ private fun FingerprintCard(track: NowPlaying) {
         Spacer(Modifier.size(6.dp))
         Mono(track.fingerprint, size = 12.sp)
         Spacer(Modifier.size(10.dp))
+        Label("Track id from the player")
+        Spacer(Modifier.size(4.dp))
+        Mono(track.sourceTrackId ?: "none published", size = 11.sp)
+        Spacer(Modifier.size(4.dp))
+        Text(
+            text = "With an id, a friend opens this exact song. Without one they get " +
+                "a search for its title and have to pick the right result.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.size(10.dp))
         Text(
             text = "Two plays of one song must produce this same string, in both apps. " +
                 "Where it disagrees, the leaderboard would split the track in two.",

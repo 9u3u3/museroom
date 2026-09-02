@@ -25,6 +25,8 @@ data class NearbyListener(
     @SerialName("position_ms") val positionMs: Long = 0,
     @SerialName("is_playing") val isPlaying: Boolean = false,
     @SerialName("updated_at") val updatedAt: String = "",
+    @SerialName("source_track_id") val sourceTrackId: String? = null,
+    @SerialName("source_package") val sourcePackage: String = "",
 )
 
 /**

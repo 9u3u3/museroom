@@ -211,6 +211,7 @@ private fun FriendRow(friend: Friend) {
         positionMs = playing?.positionMs ?: 0,
         isPlaying = playing?.isPlaying == true,
         updatedAt = playing?.updatedAt.orEmpty(),
+        sourceTrackId = playing?.sourceTrackId,
     )
 }
 

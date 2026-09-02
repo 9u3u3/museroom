@@ -20,6 +20,7 @@ class PositionTest {
         packageName = "com.spotify.music",
         sourceLabel = "Spotify",
         isTracked = true,
+        sourceTrackId = null,
         title = "Nude",
         artist = "Radiohead",
         album = "In Rainbows",

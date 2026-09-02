@@ -21,6 +21,7 @@ class PlaybackDifferTest {
         packageName = "com.spotify.music",
         sourceLabel = "Spotify",
         isTracked = true,
+        sourceTrackId = null,
         title = title,
         artist = "Radiohead",
         album = "In Rainbows",

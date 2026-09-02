@@ -151,6 +151,7 @@ fun ProximityCard() {
                     positionMs = person.positionMs,
                     isPlaying = person.isPlaying,
                     updatedAt = person.updatedAt,
+                    sourceTrackId = person.sourceTrackId,
                 )
             }
         }
