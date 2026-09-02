@@ -125,12 +125,17 @@ object NowPlayingRepository {
 }
 
 /**
- * Which session the user actually means. Something playing always wins; between
- * two playing sessions, the one that reported most recently does.
+ * Which session the user actually means.
+ *
+ * Only supported players are ever returned. An unsupported app is not merely
+ * uncounted, it is not shown either: putting a video's title, artwork and a
+ * running timer on screen is most of the exposure, whether or not the minutes
+ * were recorded. The self-check still lists what was detected, by package name
+ * alone, so nothing is hidden from the person who owns the phone.
  */
 fun List<NowPlaying>.pickActive(): NowPlaying? =
-    filter { it.isTracked }.pick() ?: pick()
-
-private fun List<NowPlaying>.pick(): NowPlaying? =
-    filter { it.isPlaying }.maxByOrNull { it.reportedAtElapsed }
-        ?: maxByOrNull { it.reportedAtElapsed }
+    filter { it.isTracked }
+        .let { supported ->
+            supported.filter { it.isPlaying }.maxByOrNull { it.reportedAtElapsed }
+                ?: supported.maxByOrNull { it.reportedAtElapsed }
+        }

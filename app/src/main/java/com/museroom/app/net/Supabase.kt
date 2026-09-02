@@ -179,6 +179,23 @@ object Supabase {
         }
     }
 
+    /** Calls a database function. Returns the raw JSON body. */
+    fun rpc(name: String, body: JsonObject, accessToken: String): String {
+        val request = Request.Builder()
+            .url("$url/rest/v1/rpc/$name")
+            .post(json.encodeToString(JsonObject.serializer(), body).toRequestBody(jsonMedia))
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .header("Content-Type", "application/json")
+            .build()
+
+        http.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw SupabaseError(response.code, text)
+            return text
+        }
+    }
+
     private fun post(target: String, body: JsonObject, token: String?): JsonObject {
         val request = Request.Builder()
             .url(target)

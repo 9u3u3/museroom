@@ -50,6 +50,17 @@ work. Data is stored in Supabase, hosted on Amazon Web Services.</p>
 information. It does not give access to your Gmail, contacts, Drive or any other
 Google service.</p>
 
+<h2>People nearby</h2>
+<p>Proximity is off unless you switch it on. While it is on, your phone broadcasts
+a short random code over Bluetooth and listens for others doing the same. The code
+is not your name, is not derived from your account, changes every fifteen minutes
+and expires. Only Museroom can match a code to a person, and only while both people
+have the feature on.</p>
+<p>Nothing about your music travels over Bluetooth. Other phones learn only that a
+code is in range; what you are playing is looked up through this service, subject to
+the same visibility setting as everything else. Switching proximity off withdraws
+your codes immediately, and a private session pauses it.</p>
+
 <h2>Who can see your listening</h2>
 <ul>
   <li><strong>What you are playing right now</strong> is visible according to your
@@ -57,6 +68,8 @@ Google service.</p>
       only.</li>
   <li><strong>Your handle and total minutes</strong> appear on the public leaderboard
       if you are opted in. You can opt out and keep using everything else.</li>
+  <li><strong>People physically near you</strong> see what you are playing only if you
+      switch proximity on, and never if your visibility is set to nobody.</li>
   <li><strong>Your detailed history and event log</strong> are visible only to you.
       This is enforced by database policy, not only by the app.</li>
 </ul>
