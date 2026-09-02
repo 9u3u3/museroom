@@ -19,7 +19,6 @@ class PositionTest {
     ) = NowPlaying(
         packageName = "com.spotify.music",
         sourceLabel = "Spotify",
-        site = null,
         isTracked = true,
         title = "Nude",
         artist = "Radiohead",

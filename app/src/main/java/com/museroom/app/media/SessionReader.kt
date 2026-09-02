@@ -11,7 +11,7 @@ import android.os.SystemClock
  * Turns a MediaController into a [NowPlaying]. Everything here is defensive:
  * players are free to omit any field, and YouTube Music omits several.
  */
-internal fun MediaController.toNowPlaying(sources: SourceRegistry): NowPlaying? {
+internal fun MediaController.toNowPlaying(): NowPlaying? {
     val metadata = metadata ?: return null
     val state = playbackState
 
@@ -34,23 +34,10 @@ internal fun MediaController.toNowPlaying(sources: SourceRegistry): NowPlaying? 
     val reportedAt = state?.lastPositionUpdateTime?.takeIf { it > 0L } ?: SystemClock.elapsedRealtime()
     val speed = state?.playbackSpeed?.takeIf { it > 0f } ?: 1f
 
-    // A browser's origin has to come out of whatever fields it happened to fill.
-    val site = if (packageName in Browsers.PACKAGES) {
-        Browsers.siteFrom(
-            metadata.getString(MediaMetadata.METADATA_KEY_ARTIST),
-            metadata.getString(MediaMetadata.METADATA_KEY_ALBUM),
-            metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
-            metadata.getString(MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
-        )
-    } else {
-        null
-    }
-
     return NowPlaying(
         packageName = packageName,
-        site = site,
-        sourceLabel = sources.label(packageName),
-        isTracked = sources.isAllowed(SourceKey(packageName, site)),
+        sourceLabel = Sources.label(packageName),
+        isTracked = Sources.isSupported(packageName),
         title = title,
         artist = artist,
         album = album,

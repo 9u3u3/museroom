@@ -10,9 +10,7 @@ import android.graphics.Bitmap
 data class NowPlaying(
     val packageName: String,
     val sourceLabel: String,
-    /** For a browser, the site the audio came from. Null everywhere else. */
-    val site: String?,
-    /** Whether this player's listening counts toward minutes. */
+    /** Whether this player is one Museroom counts. */
     val isTracked: Boolean,
     val title: String,
     val artist: String,
@@ -33,8 +31,6 @@ data class NowPlaying(
     val artwork: Bitmap?,
     val rawMetadata: Map<String, String>,
 ) {
-
-    val sourceKey: SourceKey get() = SourceKey(packageName, site)
 
     val fingerprint: String get() = Fingerprint.of(title, artist, durationMs)
 

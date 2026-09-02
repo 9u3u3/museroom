@@ -29,7 +29,6 @@ object NowPlayingRepository {
     private val bound = mutableListOf<Pair<MediaController, MediaController.Callback>>()
 
     private var manager: MediaSessionManager? = null
-    private var sources: SourceRegistry? = null
     private var component: ComponentName? = null
     private var started = false
 
@@ -54,7 +53,6 @@ object NowPlayingRepository {
             return
         }
         val app = context.applicationContext
-        sources = SourceRegistry.get(app)
         val msm = app.getSystemService(MediaSessionManager::class.java) ?: run {
             _error.value = "This device has no MediaSessionManager."
             return
@@ -121,8 +119,7 @@ object NowPlayingRepository {
     }
 
     private fun publish() {
-        val registry = sources ?: return
-        _sessions.value = bound.mapNotNull { (controller, _) -> controller.toNowPlaying(registry) }
+        _sessions.value = bound.mapNotNull { (controller, _) -> controller.toNowPlaying() }
         _lastEventAt.value = System.currentTimeMillis()
     }
 }

@@ -49,9 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.data.MuseroomDatabase
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
-import com.museroom.app.media.Consent
-import com.museroom.app.media.SourceKey
-import com.museroom.app.media.SourceRegistry
+import com.museroom.app.media.Sources
 import com.museroom.app.tracking.PlaybackTracker
 import com.museroom.app.media.pickActive
 import com.museroom.app.util.NotificationAccess
@@ -107,7 +105,6 @@ fun NowPlayingScreen() {
                 NowPlayingCard(active)
                 FingerprintCard(active)
             }
-            ConsentCard(sessions)
             PrivacyCard()
             AccountCard()
             ListeningSoFar()
@@ -375,7 +372,6 @@ private fun ListeningSoFar() {
     val recent by dao.recentSessions(12).collectAsStateWithLifecycle(emptyList())
 
     val sync = remember { SyncEngine.get(context) }
-    val registry = remember { SourceRegistry.get(context) }
     val scope = rememberCoroutineScope()
     var pendingRemoval by remember { mutableStateOf<ListeningSessionEntity?>(null) }
     var confirmWipe by remember { mutableStateOf(false) }
@@ -383,13 +379,9 @@ private fun ListeningSoFar() {
     pendingRemoval?.let { session ->
         RemoveDialog(
             session = session,
-            appLabel = registry.label(SourceKey.parse(session.sourcePackage).packageName),
             onDismiss = { pendingRemoval = null },
-            onRemove = { alsoStopCounting ->
-                scope.launch {
-                    if (alsoStopCounting) registry.block(SourceKey.parse(session.sourcePackage))
-                    sync.deleteEverywhere(session)
-                }
+            onRemove = {
+                scope.launch { sync.deleteEverywhere(session) }
                 pendingRemoval = null
             },
         )
@@ -482,18 +474,12 @@ private fun ListeningSoFar() {
     }
 }
 
-/**
- * Removing one entry. The second action exists because an unwanted entry is
- * usually a symptom: a player that should not have been counted in the first
- * place. Fixing the cause in the same tap saves finding this dialog again
- * tomorrow.
- */
+/** Removing one entry, here and on the server. */
 @Composable
 private fun RemoveDialog(
     session: ListeningSessionEntity,
-    appLabel: String,
     onDismiss: () -> Unit,
-    onRemove: (alsoStopCounting: Boolean) -> Unit,
+    onRemove: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -518,10 +504,10 @@ private fun RemoveDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { onRemove(false) }) { Text("Remove") }
+            TextButton(onClick = onRemove) { Text("Remove") }
         },
         dismissButton = {
-            TextButton(onClick = { onRemove(true) }) { Text("Remove, stop counting $appLabel") }
+            TextButton(onClick = onDismiss) { Text("Keep") }
         },
     )
 }
@@ -530,6 +516,13 @@ private fun RemoveDialog(
 private fun SelfCheck(sessions: List<NowPlaying>, lastEventAt: Long, error: String?) {
     Card {
         Label("Self-check")
+        Spacer(Modifier.size(8.dp))
+        Text(
+            text = "Museroom counts Spotify and YouTube Music only. Everything else on " +
+                "this device is ignored, including browsers.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.size(8.dp))
 
         // A listener that has quietly stopped reporting looks exactly like a user
@@ -569,20 +562,9 @@ private fun SelfCheck(sessions: List<NowPlaying>, lastEventAt: Long, error: Stri
  */
 @Composable
 private fun SourceRow(session: NowPlaying) {
-    val context = LocalContext.current
-    val registry = remember { SourceRegistry.get(context) }
-    registry.decisions.collectAsStateWithLifecycle().value
-
-    val key = session.sourceKey
-    val consent = registry.consentFor(key)
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                if (consent == Consent.ALLOWED) registry.block(key) else registry.allow(key)
-                NowPlayingRepository.resync()
-            }
             .padding(vertical = 5.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -590,15 +572,8 @@ private fun SourceRow(session: NowPlaying) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Mono(session.sourceLabel + (session.site?.let { "  ($it)" } ?: ""), size = 12.sp)
-            Mono(
-                when (consent) {
-                    Consent.ALLOWED -> "counting"
-                    Consent.BLOCKED -> "blocked"
-                    Consent.UNDECIDED -> "not asked yet"
-                },
-                size = 12.sp,
-            )
+            Mono(session.sourceLabel, size = 12.sp)
+            Mono(if (session.isTracked) "counting" else "not supported", size = 12.sp)
         }
         Text(
             text = "${session.packageName}  ·  ${session.contentKind}",
@@ -606,78 +581,6 @@ private fun SourceRow(session: NowPlaying) {
             fontSize = 10.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/**
- * The consent prompt.
- *
- * Deliberately shows the app and, for a browser, the site, but never the title of
- * what is playing. A prompt about something private should not itself put that
- * thing on screen, and the app plus site is enough to decide on.
- */
-@Composable
-private fun ConsentCard(sessions: List<NowPlaying>) {
-    val context = LocalContext.current
-    val registry = remember { SourceRegistry.get(context) }
-    registry.decisions.collectAsStateWithLifecycle().value
-
-    val undecided = sessions
-        .map { it.sourceKey }
-        .distinctBy { it.id }
-        .filter { registry.consentFor(it) == Consent.UNDECIDED }
-
-    if (undecided.isEmpty()) return
-
-    Card {
-        Text(
-            text = if (undecided.size == 1) "New source detected" else "New sources detected",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        Spacer(Modifier.size(4.dp))
-        Text(
-            text = "Nothing from these is being counted or shared until you say so.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.size(14.dp))
-
-        undecided.forEach { key ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Text(
-                    text = registry.label(key.packageName),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = key.site ?: key.packageName,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.size(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = {
-                        registry.allow(key)
-                        NowPlayingRepository.resync()
-                    }) {
-                        Text(if (key.site != null) "Count this site" else "Count this app")
-                    }
-                    TextButton(onClick = {
-                        registry.block(key)
-                        NowPlayingRepository.resync()
-                    }) { Text("Never") }
-                }
-            }
-        }
     }
 }
 

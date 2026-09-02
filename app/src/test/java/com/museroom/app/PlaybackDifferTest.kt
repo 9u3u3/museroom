@@ -20,7 +20,6 @@ class PlaybackDifferTest {
     ) = NowPlaying(
         packageName = "com.spotify.music",
         sourceLabel = "Spotify",
-        site = null,
         isTracked = true,
         title = title,
         artist = "Radiohead",
