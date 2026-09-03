@@ -31,6 +31,8 @@ import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
+import android.os.Build
+import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.NotificationAccess
 
 /**
@@ -61,7 +63,7 @@ fun OnboardingScreen() {
             ) {
                 MuseroomMark(size = 48.dp, note = c.onAccent, ghost = c.lime)
             }
-            Text("MUSE\nROOM", style = bangers(42).copy(color = c.ink), modifier = Modifier.rotate(-2f))
+            Text("MUSEROOM", style = bangers(38).copy(color = c.ink), maxLines = 1)
         }
 
         Spacer(Modifier.size(26.dp))
@@ -69,15 +71,14 @@ fun OnboardingScreen() {
         NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
             Text(
                 "First, let it hear the music.",
-                style = MaterialTheme.typography.headlineLarge.copy(fontSize = androidx.compose.ui.unit.TextUnit(22f, androidx.compose.ui.unit.TextUnitType.Sp)),
+                style = MaterialTheme.typography.titleLarge,
                 color = c.ink,
             )
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.size(6.dp))
             Text(
-                "Android keeps a media session for whatever app is playing. Reading it " +
-                    "is the only way to know what you are listening to.",
+                "Museroom reads the media session Android keeps for whatever is playing.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = c.ink.copy(alpha = 0.82f),
+                color = c.ink.copy(alpha = 0.8f),
             )
         }
 
@@ -117,16 +118,37 @@ fun OnboardingScreen() {
         Spacer(Modifier.size(20.dp))
 
         NeoButton(
-            text = "Turn on notification access",
+            text = "Allow access",
             onClick = { NotificationAccess.openSettings(context) },
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.size(12.dp))
-        Text(
-            "Takes you to Android settings. Come straight back.",
-            style = MaterialTheme.typography.bodySmall,
-            color = c.ink.copy(alpha = 0.6f),
-            modifier = Modifier.fillMaxWidth(),
-        )
+
+        // Android 13 and later hide this switch for apps installed outside an
+        // app store, behind a dialog that explains nothing about how to proceed.
+        // Saying it here is the difference between working and looking broken.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Spacer(Modifier.size(14.dp))
+            NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
+                Text(
+                    "If Settings says \"Restricted setting\"",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = c.ink,
+                )
+                Spacer(Modifier.size(5.dp))
+                Text(
+                    "Android blocks this for apps installed outside the Play Store. " +
+                        "Open App info, tap the three dots, then Allow restricted settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.ink.copy(alpha = 0.75f),
+                )
+                Spacer(Modifier.size(10.dp))
+                NeoButton(
+                    text = "Open app info",
+                    small = true,
+                    tone = NeoTone.Paper,
+                    onClick = { NotificationAccess.openAppInfo(context) },
+                )
+            }
+        }
     }
 }

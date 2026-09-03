@@ -78,7 +78,7 @@ fun NearbyScreen() {
         ScreenTitle("Nearby", drop = c.pink)
 
         if (session == null) {
-            SignInPanel("Nearby needs an account, so a code in the air can become a person.")
+            SignInPanel("Sign in so a code in the air can become a person.")
             return@Column
         }
 
@@ -90,20 +90,13 @@ fun NearbyScreen() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "Broadcasting",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = androidx.compose.ui.graphics.Color.White,
-                    )
-                    Spacer(Modifier.size(2.dp))
-                    Text(
-                        "A code that changes every 15 minutes. Not your name, and only " +
-                            "Museroom can tell whose it is.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
-                    )
-                }
+                Text(
+                    "Broadcasting",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                )
                 NeoSwitch(checked = wanted, onCheckedChange = { on ->
                     wanted = on
                     when {
@@ -140,7 +133,7 @@ fun NearbyScreen() {
                 )
                 if (diag.beaconsHeard > 0 && nearby.isEmpty() && diag.lastResolveAtMs > 0) {
                     Spacer(Modifier.size(6.dp))
-                    Note("A phone is in range but not showing. They need to be signed in, switched on, and playing something right now.")
+                    Note("In range, but not signed in or not playing.")
                 }
             }
         }

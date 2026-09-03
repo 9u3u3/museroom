@@ -77,7 +77,7 @@ fun FriendsScreen() {
         ScreenTitle("Friends", drop = c.sky)
 
         if (session == null) {
-            SignInPanel("Friends need an account, so you have a handle other people can find.")
+            SignInPanel("Sign in for a handle other people can find.")
             return@Column
         }
 

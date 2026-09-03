@@ -82,7 +82,7 @@ fun BoardScreen() {
         ScreenTitle("Top 100", drop = c.lime)
 
         if (session == null) {
-            SignInPanel("The board ranks accounts, so it needs one of yours.")
+            SignInPanel("Sign in to be ranked.")
             return@Column
         }
 
@@ -128,7 +128,7 @@ fun BoardScreen() {
             error != null -> NeoCard { Note(error!!) }
             loading && entries.isEmpty() -> NeoCard { Note("Working out the ranks.") }
             entries.isEmpty() -> NeoCard {
-                Note("Nobody has finished a track yet this period. Play something through to the end.")
+                Note("Nobody has finished a track yet this period.")
             }
         }
     }

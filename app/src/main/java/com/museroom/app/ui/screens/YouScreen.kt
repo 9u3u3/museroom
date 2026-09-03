@@ -116,15 +116,12 @@ fun YouScreen() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text("Private session", style = MaterialTheme.typography.titleLarge)
-                    Spacer(Modifier.size(2.dp))
-                    Text(
-                        "Stops recording entirely. No minutes, no history, nothing shared.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.onAccent.copy(alpha = 0.8f),
-                    )
-                }
+                Text(
+                    "Private session",
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                )
                 NeoSwitch(checked = isPrivate, onCheckedChange = { on ->
                     privacy.setPrivate(on)
                     if (on) ProximityManager.get(context).stop()
@@ -133,7 +130,7 @@ fun YouScreen() {
         }
 
         if (session == null) {
-            SignInPanel("An account is what gives you a handle, friends and a place on the board.")
+            SignInPanel("Sign in for a handle, friends and the board.")
         } else {
             NeoCard(radius = 18.dp, padding = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -153,7 +150,8 @@ fun YouScreen() {
                     Column(Modifier.weight(1f)) {
                         Text(
                             profile?.handle?.let { "@$it" } ?: session?.email.orEmpty(),
-                            style = MaterialTheme.typography.titleLarge, color = c.ink,
+                            style = MaterialTheme.typography.titleMedium, color = c.ink,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         Note(
                             when (val s = syncState) {

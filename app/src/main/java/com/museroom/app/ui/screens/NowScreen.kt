@@ -127,20 +127,16 @@ fun NowScreen() {
     ) {
         if (isPrivate) {
             NeoAccentCard(fill = c.pink, radius = 16.dp) {
-                Text("Private session", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.size(3.dp))
-                Text(
-                    "Nothing is being recorded. Turn it off under You.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Text("Private session — nothing is being recorded",
+                    style = MaterialTheme.typography.titleMedium)
             }
         }
 
         if (active == null) {
             NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
                 Text("Nothing playing", style = MaterialTheme.typography.titleLarge, color = c.ink)
-                Spacer(Modifier.size(5.dp))
-                Note("Start a song in Spotify or YouTube Music. This updates the moment the player publishes its session.")
+                Spacer(Modifier.size(4.dp))
+                Note("Start a song in Spotify or YouTube Music.")
             }
         } else {
             NowPlayingCard(active)
@@ -152,7 +148,7 @@ fun NowScreen() {
         }
 
         if (session == null) {
-            SignInPanel("Your listening stays on this phone until you do. Signing in is what puts you on the board.")
+            SignInPanel("Your listening stays on this phone until you sign in.")
         }
 
         if (recent.isNotEmpty()) {

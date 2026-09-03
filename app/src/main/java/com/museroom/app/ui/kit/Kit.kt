@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.PointMode
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.museroom.app.ui.Mono
@@ -192,11 +193,11 @@ fun NeoButton(
             leading?.invoke()
             Text(
                 text = text.uppercase(),
-                style = if (small) {
-                    TextStyle(fontFamily = com.museroom.app.ui.Archivo)
-                } else {
-                    TextStyle(fontFamily = com.museroom.app.ui.Archivo)
-                }.copy(
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(
+                    fontFamily = com.museroom.app.ui.Archivo,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.W900,
                     fontSize = if (small) 12.sp else 14.sp,
                     letterSpacing = 1.1.sp,
@@ -237,6 +238,9 @@ fun NeoPill(
         leading?.invoke()
         Text(
             text = text.uppercase(),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
             style = TextStyle(
                 fontFamily = com.museroom.app.ui.Archivo,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.W900,
