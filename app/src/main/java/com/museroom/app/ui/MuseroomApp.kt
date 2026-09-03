@@ -50,6 +50,7 @@ import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.BoardPeriod
 import com.museroom.app.net.BoardRepository
+import com.museroom.app.net.LikesRepository
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.RoomPresence
@@ -65,6 +66,7 @@ import com.museroom.app.ui.screens.FriendsScreen
 import com.museroom.app.ui.screens.NearbyScreen
 import com.museroom.app.ui.screens.NowScreen
 import com.museroom.app.ui.screens.OnboardingScreen
+import com.museroom.app.ui.screens.PersonCard
 import com.museroom.app.ui.screens.TourState
 import com.museroom.app.ui.screens.YouScreen
 import com.museroom.app.util.NotificationAccess
@@ -119,6 +121,10 @@ fun MuseroomApp() {
                 showTour = false
             })
         }
+
+        // Drawn once, above everything, because a name is tappable on five
+        // different screens and each of them wants the same page.
+        PersonCard()
 
         Column(Modifier.fillMaxSize()) {
             TopBar()
@@ -192,6 +198,10 @@ private fun HeaderStats(signedIn: Boolean) {
     val todayTracks by dao.tracksSince(startOfToday).collectAsStateWithLifecycle(0)
 
     LaunchedEffect(context) { RoomPresence.start(context) }
+    // What this phone has already liked, so a heart is filled the first time
+    // a list is drawn rather than filling in a moment later.
+    val likes = remember { LikesRepository.get(context) }
+    LaunchedEffect(session?.userId) { if (session != null) likes.refresh() }
     val roomMembers by RoomPresence.members.collectAsStateWithLifecycle()
 
     // A rank a minute stale is still worth showing; nothing here needs the

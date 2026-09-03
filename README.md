@@ -25,6 +25,10 @@ the minutes.** An Android app, distributed from
   app to open, and no ad breaks.
 - **People nearby.** Bluetooth Low Energy with a rotating token finds other
   listeners in the room around you. No location, ever.
+- **Likes.** Tap the heart on anybody's track. The board ranks by likes as well
+  as by minutes, which is the one number other people decide.
+- **Profiles.** Tap a name anywhere to get their page: picture, when they
+  joined, their totals, their likes. Listening history stays private.
 - **A leaderboard.** Minutes and tracks, by day, week, month or all time,
   counted server-side so nobody can inflate them.
 
@@ -42,7 +46,10 @@ itself, through YouTube Music's web player in a browser view it keeps hidden,
 matched by name and held in step by nudging the position. Ad slots are stripped
 out of the player data before it loads, the same way the desktop clients do it,
 because an ad break only ever happens to one person in a room and there is
-nothing to stay in step with while it runs.
+nothing to stay in step with while it runs. An ad on the *host's* phone is the
+other half of that: it used to reach the room as silence, which reads exactly
+like somebody putting their phone down, so it is now published as an ad and
+everybody in the room holds the track and waits rather than playing on alone.
 
 **Nearby.** Your phone broadcasts a short code that changes every fifteen
 minutes and means nothing on its own. Only Museroom can match a code to a
@@ -53,7 +60,15 @@ it never asks for location on Android 12 and up.
 **Minutes.** A track counts when it finishes, not when it starts, and the
 totals are worked out on a server rather than taken on trust from a phone.
 Four separate clamps keep a paused player, a seek loop or a wrong clock from
-inventing time that was never listened to.
+inventing time that was never listened to. The track *count* needs a third of
+the song to have been heard, so skipping down an album no longer reads as
+having listened to it.
+
+**Likes.** The button sends who, never what. The server reads what that person
+is actually playing at that moment and records it, so a like always refers to
+something real, one per person per track, and no edited client can invent one.
+There is no insert policy on the table at all — every like goes through a
+function that decides for itself.
 
 ## What it reads, and what it doesn't
 

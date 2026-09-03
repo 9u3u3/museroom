@@ -50,6 +50,12 @@ sealed interface FollowState {
     /** An ad is playing here that the host is not hearing. */
     data object Advert : FollowState
 
+    /**
+     * An ad is playing at the host's end. Their song is coming back, so the
+     * track is kept and the room simply waits in silence.
+     */
+    data object HostAdvert : FollowState
+
     /** Loaded, but the player will not start. Carries what it says about itself. */
     data class Silent(val detail: String) : FollowState
 
@@ -242,6 +248,18 @@ object FollowSession {
 
         while (true) {
             val host = hostNow(friends, hostId)
+
+            // An advert at their end, which is not the same as their having
+            // stopped. Caught before the fingerprint is looked at, because an
+            // advert row carries no track and would otherwise read as a change
+            // of song and throw away a track that is about to come back.
+            if (host != null && host.isAdvert) {
+                RoomPlayer.pause()
+                publish(hostId, handle, FollowState.HostAdvert, host)
+                delay(TICK_MS)
+                continue
+            }
+
             if (host == null || !host.isPlaying || host.title.isBlank()) {
                 RoomPlayer.pause()
                 publish(hostId, handle, FollowState.HostQuiet, host)
@@ -423,16 +441,20 @@ object FollowSession {
         state: FollowState,
         host: RemoteNowPlaying?,
     ) {
-        if (_following.value == null) return
+        val previous = _following.value ?: return
         reportRoomPlayback(state, host)
+        // An advert says nothing about the song, so the last thing we knew
+        // about it stays on screen rather than the card emptying out and
+        // filling back in every time one plays.
+        val known = host?.takeIf { it.title.isNotBlank() }
         _following.value = Following(
             hostId = hostId,
             handle = handle,
             state = state,
-            title = host?.title.orEmpty(),
-            artist = host?.artist.orEmpty(),
-            durationMs = host?.durationMs ?: 0,
-            positionMs = host?.let { hostPosition(it) } ?: 0,
+            title = known?.title ?: previous.title,
+            artist = known?.artist ?: previous.artist,
+            durationMs = known?.durationMs ?: previous.durationMs,
+            positionMs = known?.let { hostPosition(it) } ?: previous.positionMs,
         )
     }
 }

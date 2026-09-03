@@ -88,7 +88,7 @@
 </header>
 
 <h1>Privacy</h1>
-<p class="date">Last updated 3 September 2026</p>
+<p class="date">Last updated 4 September 2026</p>
 
 <p>Museroom shows what you are listening to, shares it with friends you add, plays
 what they are playing, finds listeners near you, and counts your minutes. This page
@@ -141,6 +141,21 @@ before it is uploaded, and it is stored so that anybody who can see your name ca
 see it. That includes the public leaderboard. Do not use a picture you would not put on
 a public page.</p>
 
+<h2>Likes and profiles</h2>
+<div class="rule" style="background:var(--pink)"></div>
+<p>Tapping the heart on somebody's track records that you liked it: who liked
+whom, which track, and when. Only the two people involved can read that row.
+Nobody else can see who liked you or who you have liked, and a total of likes
+received appears on your profile and on the leaderboard.</p>
+<p>Your app never sends the track. It sends who, and the server records whatever
+that person was really playing at that moment, so a like cannot be made up and
+the same song cannot be liked twice.</p>
+<p>Tapping somebody's name opens their page. It shows their username, their
+picture, the month they joined, their leaderboard totals and their likes —
+everything on it was already visible somewhere else. <strong>What somebody has
+listened to is not on it.</strong> Your history stays yours, and keeping your
+totals off the leaderboard keeps them off your page too.</p>
+
 <h2>Listening rooms</h2>
 <div class="rule" style="background:var(--lime)"></div>
 <p>When you listen along with somebody, Museroom plays their track itself, inside the
@@ -149,6 +164,9 @@ hidden, and it behaves like any browser: YouTube can set cookies in it and sees 
 requests it makes, exactly as it would if you opened the same site yourself.</p>
 <p>No audio travels between phones. Each side plays its own copy of the recording, and
 all that is shared is which track and which moment.</p>
+<p>One more thing travels while a room is running: whether an advert is playing on
+your phone. Not what the advert is, only that there is one, so that people
+listening along wait for your song instead of playing on without you.</p>
 <p>Being in somebody's room is visible to that person. Nobody else is told.</p>
 
 <h2>People nearby</h2>
@@ -176,8 +194,11 @@ location on Android 12 and later.</p>
       else.</li>
   <li><strong>People physically near you</strong> see what you are playing only if you
       switch that on, and never if your visibility is set to nobody.</li>
+  <li><strong>Likes you have given or received</strong> are visible only to the two
+      people involved. The number of likes you have received is public.</li>
   <li><strong>Your detailed history and event log</strong> are visible only to you.
-      This is enforced by database policy, not only by the app.</li>
+      This is enforced by database policy, not only by the app. It is not on your
+      profile page and it is not shown to friends.</li>
 </ul>
 
 <h2>Deleting your data</h2>

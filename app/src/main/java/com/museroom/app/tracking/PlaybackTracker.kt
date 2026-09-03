@@ -8,9 +8,11 @@ import com.museroom.app.data.toDomain
 import com.museroom.app.data.toEntity
 import com.museroom.app.credit.Crediting
 import com.museroom.app.media.NowPlayingRepository
+import com.museroom.app.media.advertPlaying
 import com.museroom.app.media.pickActive
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.net.FriendsRepository
+import com.museroom.app.net.LikesRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.notify.FriendAlerts
@@ -41,6 +43,7 @@ object PlaybackTracker {
     private const val PREFS = "museroom.tracking"
     private const val KEY_WATERMARK = "credited_through_event_id"
     private const val KEY_LET_IN_THROUGH = "let_in_through_request_id"
+    private const val KEY_LIKES_THROUGH = "likes_announced_through"
     private const val HEARTBEAT_MS = 30_000L
 
     /**
@@ -131,6 +134,38 @@ object PlaybackTracker {
         // message is that it reaches you when you are not looking.
         RoomPresence.start(app)
         newScope.launch { watchFriendsListening(app) }
+        newScope.launch { watchLikes(app, prefs) }
+    }
+
+    /**
+     * Somebody liked what you were playing.
+     *
+     * On the same slow loop as everything else social, and keyed off the last
+     * like already announced rather than a clock, so signing in on a second
+     * phone does not replay a month of them. The first pass only records where
+     * we are; nothing that happened before you had the feature is news.
+     */
+    private suspend fun watchLikes(app: Context, prefs: android.content.SharedPreferences) {
+        val likes = LikesRepository.get(app)
+        val alerts = FriendAlerts.get(app)
+        while (true) {
+            delay(FRIENDS_MS)
+            if (!alerts.enabled.value) continue
+            val since = prefs.getString(KEY_LIKES_THROUGH, null)
+            if (since == null) {
+                prefs.edit().putString(KEY_LIKES_THROUGH, java.time.Instant.now().toString()).apply()
+                continue
+            }
+            likes.received(since).onSuccess { arrived ->
+                arrived.forEach { like ->
+                    prefs.edit().putString(KEY_LIKES_THROUGH, like.at).apply()
+                    val track = listOf(like.title, like.artist)
+                        .filter { it.isNotBlank() }
+                        .joinToString(" · ")
+                    Notifier.liked(app, like.handle, track)
+                }
+            }
+        }
     }
 
     /**
@@ -227,23 +262,35 @@ object PlaybackTracker {
         suspend fun publish(heartbeat: Boolean) {
             gate.withLock {
                 val hidden = privacy?.privateSession?.value == true
-                val active = NowPlayingRepository.sessions.value.pickActive()
-                    ?.takeIf { it.isTracked && !hidden }
+                val sessions = NowPlayingRepository.sessions.value
+                val active = sessions.pickActive()?.takeIf { it.isTracked && !hidden }
+                // A private session hides adverts too, for the same reason it
+                // hides everything else: nothing about this phone travels.
+                val advert = !hidden && sessions.advertPlaying()
 
-                val state = "${active?.fingerprint.orEmpty()}|${active?.isPlaying == true}"
+                val state = "${active?.fingerprint.orEmpty()}|${active?.isPlaying == true}|$advert"
                 val now = SystemClock.elapsedRealtime()
                 val due = now - lastSentAt > NOW_PLAYING_HEARTBEAT_MS
                 val changed = state != lastState
                 if (!changed && !(heartbeat && due)) return@withLock
 
-                if (active != null) {
-                    sync.publishNowPlaying(active, active.positionAt(now))
-                    wasPlaying = active.isPlaying
-                } else if (wasPlaying) {
-                    // Nothing at all is playing, and the last thing anybody
-                    // heard from this phone said otherwise.
-                    sync.publishStopped()
-                    wasPlaying = false
+                when {
+                    active != null -> {
+                        sync.publishNowPlaying(active, active.positionAt(now))
+                        wasPlaying = active.isPlaying
+                    }
+                    // An advert, said as an advert. Anybody in this room stays
+                    // put and stays quiet rather than being sent away.
+                    advert -> {
+                        sync.publishAdvert()
+                        wasPlaying = false
+                    }
+                    wasPlaying -> {
+                        // Nothing at all is playing, and the last thing anybody
+                        // heard from this phone said otherwise.
+                        sync.publishStopped()
+                        wasPlaying = false
+                    }
                 }
                 lastState = state
                 lastSentAt = now

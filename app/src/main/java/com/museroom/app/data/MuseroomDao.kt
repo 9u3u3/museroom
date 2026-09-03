@@ -33,7 +33,22 @@ interface MuseroomDao {
     @Query("SELECT COALESCE(SUM(creditedMs), 0) FROM listening_sessions WHERE startedAtClock >= :sinceClock")
     fun creditedSince(sinceClock: Long): Flow<Long>
 
-    @Query("SELECT COUNT(*) FROM listening_sessions WHERE startedAtClock >= :sinceClock")
+    /**
+     * Tracks listened to, not tracks touched.
+     *
+     * Counting every session made skipping through an album the fastest way to
+     * a large number, and made the figure beside the minutes mean nothing. A
+     * track counts once somebody is nearly a third of the way in. The same
+     * rule runs on the server over the same sessions, so the two agree.
+     */
+    @Query(
+        """
+        SELECT COUNT(*) FROM listening_sessions
+        WHERE startedAtClock >= :sinceClock
+          AND ((durationMs > 0 AND creditedMs * 10 >= durationMs * 3)
+            OR (durationMs <= 0 AND creditedMs >= 30000))
+        """,
+    )
     fun tracksSince(sinceClock: Long): Flow<Int>
 
     @Query(

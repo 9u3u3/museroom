@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Museroom — see what your friends are listening to</title>
-<meta name="description" content="Museroom reads whatever is playing on your Android phone, shows it to your friends, finds listeners in the room with you, and counts the minutes.">
+<meta name="description" content="Museroom reads whatever is playing on your Android phone, shows it to your friends, finds listeners in the room with you, and counts the minutes and the likes.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%237B4BFF'/%3E%3Cg transform='translate(-4,-7.75)'%3E%3Cpath d='M69.37,84.77 A27,21 -20 0 1 18.63,103.23 A27,21 -20 0 1 69.37,84.77 Z' fill='%2314110D'/%3E%3Cpath d='M64,96 L64,22 L80,22 L80,96 Z' fill='%2314110D'/%3E%3Cpath d='M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z' fill='%2314110D'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -183,6 +183,9 @@
   .who{font-weight:800; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
        white-space:nowrap}
   .mins{font-weight:900}
+  .hearts{font-weight:900; display:inline-flex; align-items:center; gap:4px;
+          color:var(--ink)}
+  .hearts svg{width:14px; height:14px; flex:0 0 auto}
 
   /* Room mock, and a progress bar that actually fills in when you scroll to
      it, rather than sitting there pre-drawn at 46%. --------------------- */
@@ -295,7 +298,7 @@
     your friends, finds listeners in the room around you, and counts every minute.</p>
     <div class="cta">
       <a class="download" href="museroom-latest.apk">Download for Android</a>
-      <span class="meta">Version 4.4 &middot; 10 MB &middot; Android 8.0 or newer</span>
+      <span class="meta">Version 4.5 &middot; 9.3 MB &middot; Android 8.0 or newer</span>
     </div>
     <p class="preflight">
       <span class="dot" aria-hidden="true"></span>
@@ -446,13 +449,20 @@ they take about a minute.</p>
 
   <div class="card reveal">
     <p class="kicker">Leaderboard</p>
-    <h3>Minutes, counted honestly.</h3>
-    <p>A track counts when it finishes, tallied server-side so nobody can fake
-    it. Day, week, month, or all time.</p>
+    <h3>Minutes, or likes.</h3>
+    <p>A track counts once you're a third of the way in, tallied server-side so
+    nobody can fake it. Rank by minutes or by likes. Day, week, month, all time.</p>
     <div class="board">
-      <div class="row one"><span class="rank">01</span><span class="pfp" style="background:#fff">H</span><span class="who">harsh</span><span class="mins">56m</span></div>
-      <div class="row two"><span class="rank">02</span><span class="pfp" style="background:#fff">C</span><span class="who">crispello</span><span class="mins">7m</span></div>
+      <div class="row one"><span class="rank">01</span><span class="pfp" style="background:#fff">H</span><span class="who">harsh</span><span class="hearts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4C12 20.4 3.2 14.1 3.2 8.9C3.2 6.1 5.4 4 8.1 4C9.9 4 11.4 5 12 6.5C12.6 5 14.1 4 15.9 4C18.6 4 20.8 6.1 20.8 8.9C20.8 14.1 12 20.4 12 20.4Z" fill="#FF4D8D" stroke="#14110D" stroke-width="2"/></svg>12</span></div>
+      <div class="row two"><span class="rank">02</span><span class="pfp" style="background:#fff">C</span><span class="who">crispello</span><span class="hearts"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4C12 20.4 3.2 14.1 3.2 8.9C3.2 6.1 5.4 4 8.1 4C9.9 4 11.4 5 12 6.5C12.6 5 14.1 4 15.9 4C18.6 4 20.8 6.1 20.8 8.9C20.8 14.1 12 20.4 12 20.4Z" fill="none" stroke="#14110D" stroke-width="2"/></svg>4</span></div>
     </div>
+  </div>
+
+  <div class="card reveal">
+    <p class="kicker">Likes &amp; pages</p>
+    <h3>Tell someone their taste is good.</h3>
+    <p>Tap the heart on anyone's track. Tap their name for their page: picture,
+    totals, likes. What they've listened to stays private.</p>
   </div>
 
   <div class="card reveal">
@@ -487,7 +497,9 @@ podcast apps.</p>
       name and kept in step. No audio ever crosses phones — only which track
       and which moment, pushed the instant it changes rather than polled for.</li>
   <li>Ad slots are stripped from the player data before it loads — the same
-      trick the YouTube Music desktop clients use.</li>
+      trick the YouTube Music desktop clients use. If an ad plays on the
+      host's phone, the room holds their track and waits rather than playing
+      on without them.</li>
   <li>Nearby runs on Bluetooth Low Energy with a rotating token, never
       location — which is why Android 12+ doesn't even ask for it.</li>
   <li>Nothing leaves your phone until you sign in, and visibility is always

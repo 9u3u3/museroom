@@ -30,6 +30,27 @@ object Crediting {
     /** Sixteen hours of music in one day is already beyond plausible. */
     const val DAILY_CAP_MS = 16 * 60 * 60 * 1000L
 
+    /** How much of a track has to be heard before it counts as one. */
+    const val TRACK_SHARE_PERCENT = 30
+
+    /** The same judgement for a player that never says how long a track is. */
+    const val TRACK_FLOOR_MS = 30_000L
+
+    /**
+     * Whether a stretch of listening counts as a track.
+     *
+     * Minutes and tracks answer different questions, and counting every session
+     * made the second one answer neither: skipping through an album racked up
+     * tracks nobody heard. This is the rule, and the identical one runs in the
+     * database over the same sessions, so the two never disagree.
+     */
+    fun countsAsATrack(creditedMs: Long, durationMs: Long): Boolean =
+        if (durationMs > 0) {
+            creditedMs * 100 >= durationMs * TRACK_SHARE_PERCENT
+        } else {
+            creditedMs >= TRACK_FLOOR_MS
+        }
+
     /**
      * Events must be in the order they happened. Anything the rules cannot
      * account for is dropped rather than credited.

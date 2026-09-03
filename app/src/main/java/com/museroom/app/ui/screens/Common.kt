@@ -49,6 +49,7 @@ import com.museroom.app.media.Artwork
 import com.museroom.app.media.Avatars
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.LikesRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.SyncEngine
@@ -58,6 +59,8 @@ import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
+import com.museroom.app.ui.kit.NeoIcon
+import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.NeoProgress
 import com.museroom.app.ui.kit.hardShadow
 import com.museroom.app.ui.kit.NeoTone
@@ -213,6 +216,59 @@ fun Field(
 }
 
 /**
+ * The heart.
+ *
+ * One per person per track, ever, which is decided in the database rather than
+ * here: the button sends who, never what, and the server records whatever they
+ * were really playing at that moment. So this cannot be tapped into a score,
+ * and pressing it again simply takes it back.
+ */
+@Composable
+fun LikeHeart(
+    userId: String,
+    title: String,
+    artist: String,
+    durationMs: Long,
+    tint: Color = Neo.colors.pink,
+    edge: Color = Neo.colors.ink,
+) {
+    val context = LocalContext.current
+    val likes = remember { LikesRepository.get(context) }
+    val scope = rememberCoroutineScope()
+    val mine by likes.mine.collectAsStateWithLifecycle()
+    val liked = likes.key(userId, title, artist, durationMs) in mine
+    var busy by remember { mutableStateOf(false) }
+
+    Box(
+        Modifier
+            .size(34.dp)
+            .clip(RoundedCornerShape(50))
+            .background(if (liked) tint else Color.Transparent)
+            .border(2.5.dp, edge, RoundedCornerShape(50))
+            .clickable(enabled = !busy) {
+                busy = true
+                scope.launch {
+                    if (liked) {
+                        likes.unlike(userId, title, artist, durationMs)
+                    } else {
+                        likes.like(userId, title, artist, durationMs)
+                    }
+                    busy = false
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        NeoIcon(
+            NeoIcons.Heart,
+            size = 17.dp,
+            color = edge,
+            weight = 2.2f,
+            fill = if (liked) edge else null,
+        )
+    }
+}
+
+/**
  * One person and what they are playing, shared by the friends and nearby lists.
  *
  * Artwork is looked up by track name on this phone rather than shared from
@@ -277,7 +333,16 @@ fun ListenerRow(
                 // say who without competing with the cover.
                 Face(
                     handle, avatarUrl, 24.dp,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(3.dp)
+                        .then(
+                            if (hostId != null) {
+                                Modifier.clickable { Person.show(hostId, handle) }
+                            } else {
+                                Modifier
+                            },
+                        ),
                     shape = RoundedCornerShape(8.dp),
                 )
             }
@@ -287,12 +352,23 @@ fun ListenerRow(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // A name is the way in to a person, so it behaves like
+                    // one: everywhere somebody is listed, their name opens
+                    // their page.
                     Text(
                         handle,
                         style = MaterialTheme.typography.titleMedium,
                         color = c.ink,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .then(
+                                if (hostId != null) {
+                                    Modifier.clickable { Person.show(hostId, handle) }
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -346,10 +422,16 @@ fun ListenerRow(
             Spacer(Modifier.size(7.dp))
             Row(
                 Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 MonoText("${formatClock(position)} / ${formatClock(durationMs)}", size = 11, color = c.ink)
+                Spacer(Modifier.weight(1f))
+                // Only where there is something to like: a track somebody is
+                // actually playing, right now, that you can see.
+                if (hostId != null && isPlaying) {
+                    LikeHeart(hostId, title, artist, durationMs)
+                    Spacer(Modifier.size(8.dp))
+                }
                 // Two doors. Somebody who has left theirs open is walked into
                 // without a word; somebody who has not is asked, and told, and
                 // the music starts by itself when they say yes.

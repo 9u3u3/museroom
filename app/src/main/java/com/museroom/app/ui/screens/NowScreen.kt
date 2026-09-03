@@ -574,6 +574,18 @@ private fun FollowBar() {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            // The room is where a like actually means something: you came for
+            // their taste, so say so without leaving.
+            if (room.title.isNotBlank()) {
+                LikeHeart(
+                    userId = room.hostId,
+                    title = room.title,
+                    artist = room.artist,
+                    durationMs = room.durationMs,
+                    tint = c.pink,
+                    edge = c.onAccent,
+                )
+            }
             NeoButton("Leave", small = true, tone = NeoTone.Paper, onClick = { FollowSession.stop() })
         }
 
@@ -634,6 +646,7 @@ private fun FollowBar() {
                     if (kotlin.math.abs(s.offMs) < 1000) "In step"
                     else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"
                 is FollowState.Advert -> "Ad break — back in a moment"
+                is FollowState.HostAdvert -> "Ad on their end — holding the track"
                 is FollowState.Silent -> "The player will not start"
                 is FollowState.HostQuiet -> "They stopped playing"
                 is FollowState.Stuck -> s.reason

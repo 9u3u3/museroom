@@ -154,8 +154,18 @@ object NowPlayingRepository {
  * alone, so nothing is hidden from the person who owns the phone.
  */
 fun List<NowPlaying>.pickActive(): NowPlaying? =
-    filter { it.isTracked }
+    filter { it.isTracked && !it.isAdvert }
         .let { supported ->
             supported.filter { it.isPlaying }.maxByOrNull { it.reportedAtElapsed }
                 ?: supported.maxByOrNull { it.reportedAtElapsed }
         }
+
+/**
+ * Whether the sound coming out of this phone right now is an advert.
+ *
+ * Asked separately from [pickActive] because the two want opposite things.
+ * Nothing should ever show or count an advert, so it is not an active session;
+ * but a room needs to be told, so the fact has to be reachable.
+ */
+fun List<NowPlaying>.advertPlaying(): Boolean =
+    any { it.isTracked && it.isAdvert && it.isPlaying }

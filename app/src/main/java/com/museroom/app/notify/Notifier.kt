@@ -42,6 +42,7 @@ object Notifier {
     private const val ID_JOINED = 4204
     private const val ID_FRIEND_BASE = 4400
     private const val ID_REQUEST_BASE = 4600
+    private const val ID_LIKE_BASE = 4800
 
     /** The notification for one particular request, so answering clears it. */
     fun requestNotificationId(requestId: Long): Int =
@@ -197,6 +198,30 @@ object Notifier {
             .setContentIntent(openApp(context, 5))
             .build()
         val id = ID_FRIEND_BASE + (userId.hashCode().mod(120))
+        runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
+    }
+
+    /**
+     * Somebody liked what you were playing.
+     *
+     * Quiet, like the other social messages. Getting one is the whole point of
+     * a like, and a number that only moves while you happen to be looking at
+     * your own page is not worth collecting.
+     */
+    fun liked(context: Context, handle: String, track: String) {
+        if (!canPost(context)) return
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_FRIENDS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("$handle liked your music")
+            .setContentText(track.ifBlank { "Something you were playing." })
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context, 6))
+            .build()
+        val id = ID_LIKE_BASE + (handle.hashCode().mod(60))
         runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
     }
 

@@ -288,11 +288,23 @@ fun YouScreen() {
                         }
                     }
                     Column(Modifier.weight(1f)) {
-                        Text(
-                            profile?.handle ?: "Loading",
-                            style = MaterialTheme.typography.titleMedium, color = c.ink,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            Text(
+                                profile?.handle ?: "Loading",
+                                style = MaterialTheme.typography.titleMedium, color = c.ink,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            // The one number here somebody else decided, so it
+                            // belongs beside the name rather than buried with
+                            // the settings.
+                            profile?.likesReceived?.takeIf { it > 0 }?.let { count ->
+                                NeoPill("$count liked", fill = c.pink)
+                            }
+                        }
                         if (profile?.avatarUrl.isNullOrBlank()) {
                             Note("Tap the square to add a photo")
                         }

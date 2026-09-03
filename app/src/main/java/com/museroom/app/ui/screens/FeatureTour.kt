@@ -95,8 +95,22 @@ fun FeatureTour(onDismiss: () -> Unit) {
         Feature(
             c.sky,
             "Minutes and tracks are counted",
-            "A track counts when it finishes, and the totals are worked out on a " +
-                "server so nobody can inflate them. Day, week, month, all time.",
+            "A track counts once you are a third of the way in, and the totals are " +
+                "worked out on a server so nobody can inflate them. Day, week, " +
+                "month, all time.",
+        ),
+        Feature(
+            c.pink,
+            "Like what somebody is playing",
+            "Tap the heart on anybody's track. The board can be ranked by likes " +
+                "instead of minutes, which is the one number other people decide.",
+        ),
+        Feature(
+            c.violet,
+            "Tap a name for their page",
+            "Anywhere somebody is listed. You get their picture, when they joined, " +
+                "their totals and their likes. What they have listened to stays " +
+                "private.",
         ),
         Feature(
             c.lime,

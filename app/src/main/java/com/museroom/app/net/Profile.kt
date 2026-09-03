@@ -23,6 +23,8 @@ data class MyProfile(
     @SerialName("avatar_url") val avatarUrl: String? = null,
     @SerialName("join_mode") val joinMode: String = "ask",
     @SerialName("on_global_board") val onGlobalBoard: Boolean = true,
+    /** How many times other people have liked something you were playing. */
+    @SerialName("likes_received") val likesReceived: Int = 0,
     @SerialName("proximity_enabled") val proximityEnabled: Boolean = false,
     @SerialName("created_at") val createdAt: String = "",
 ) {

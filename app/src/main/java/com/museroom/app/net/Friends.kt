@@ -32,6 +32,11 @@ data class RemoteNowPlaying(
     @SerialName("updated_at") val updatedAt: String = "",
     @SerialName("source_track_id") val sourceTrackId: String? = null,
     @SerialName("source_package") val sourcePackage: String = "",
+    /**
+     * An advert is on at their end. Not the same as having stopped: the track
+     * is coming back, so a room holds rather than letting go.
+     */
+    @SerialName("is_advert") val isAdvert: Boolean = false,
 ) {
     /**
      * Whether this is somebody listening now or the last thing they played.
@@ -129,7 +134,7 @@ class FriendsRepository private constructor(context: Context) {
         val list = ids.joinToString(",")
         val body = Supabase.select(
             "profiles",
-            "id=in.($list)&select=id,handle,display_name,avatar_url,join_mode,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at,source_track_id,source_package)",
+            "id=in.($list)&select=id,handle,display_name,avatar_url,join_mode,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at,source_track_id,source_package,is_advert)",
             token,
         )
         Supabase.json
@@ -151,7 +156,7 @@ class FriendsRepository private constructor(context: Context) {
         val body = Supabase.select(
             "now_playing",
             "user_id=eq.$userId&select=title,artist,duration_ms,position_ms,is_playing,updated_at," +
-                "source_track_id,source_package",
+                "source_track_id,source_package,is_advert",
             token,
         )
         Supabase.json

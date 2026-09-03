@@ -13,6 +13,15 @@ data class NowPlaying(
     /** Whether this player is one Museroom counts. */
     val isTracked: Boolean,
     /**
+     * An advert, rather than anything anybody chose to play.
+     *
+     * Carried instead of thrown away, because to a room the difference between
+     * an advert and a phone put down is the difference between waiting and
+     * giving up. Nothing about the advert itself travels with it: the title,
+     * the artist and the length are all cleared where it is detected.
+     */
+    val isAdvert: Boolean = false,
+    /**
      * The player's own id for this track, when it publishes one. With it a
      * friend can be sent to the exact song instead of to a search.
      */

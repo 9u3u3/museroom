@@ -17,6 +17,7 @@ data class BoardEntry(
     @SerialName("user_id") val userId: String,
     @SerialName("credited_ms") val creditedMs: Long,
     val trackCount: Long = 0,
+    val likes: Long = 0,
     val handle: String = "",
     val avatarUrl: String? = null,
 )
@@ -24,9 +25,11 @@ data class BoardEntry(
 @Serializable
 private data class BoardRow(
     val rank: Int,
+    @SerialName("like_rank") val likeRank: Int = 0,
     @SerialName("user_id") val userId: String,
     @SerialName("credited_ms") val creditedMs: Long,
     @SerialName("track_count") val trackCount: Long = 0,
+    val likes: Long = 0,
     val profiles: Who? = null,
 ) {
     @Serializable
@@ -38,6 +41,18 @@ private data class BoardRow(
 
 enum class BoardPeriod(val key: String) {
     Day("day"), Week("week"), Month("month"), All("all")
+}
+
+/**
+ * Which of two questions the board is answering.
+ *
+ * Minutes reward whoever left something running longest, which is a measure of
+ * stamina. Likes are the only number here other people decide, so they get an
+ * order of their own rather than a column nobody sorts by.
+ */
+enum class BoardSort(val label: String, val column: String) {
+    Minutes("Minutes", "rank"),
+    Likes("Likes", "like_rank"),
 }
 
 /**
@@ -53,7 +68,11 @@ class BoardRepository private constructor(context: Context) {
     private val auth = AuthRepository.get(context)
     private var lastRefresh = 0L
 
-    suspend fun top(period: BoardPeriod, limit: Int = 100): Result<List<BoardEntry>> =
+    suspend fun top(
+        period: BoardPeriod,
+        sort: BoardSort = BoardSort.Minutes,
+        limit: Int = 100,
+    ): Result<List<BoardEntry>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val token = auth.validAccessToken() ?: error("Sign in to see the board.")
@@ -62,18 +81,14 @@ class BoardRepository private constructor(context: Context) {
                 val body = Supabase.select(
                     "leaderboard_entries",
                     "period=eq.${period.key}&period_key=eq.${periodKey(period)}" +
-                        "&select=rank,user_id,credited_ms,track_count,profiles(handle,avatar_url)" +
-                        "&order=rank.asc&limit=$limit",
+                        "&select=rank,like_rank,user_id,credited_ms,track_count,likes," +
+                        "profiles(handle,avatar_url)" +
+                        "&order=${sort.column}.asc&limit=$limit",
                     token,
                 )
                 Supabase.json
                     .decodeFromString(ListSerializer(BoardRow.serializer()), body)
-                    .map {
-                        BoardEntry(
-                            it.rank, it.userId, it.creditedMs, it.trackCount,
-                            it.profiles?.handle.orEmpty(), it.profiles?.avatarUrl,
-                        )
-                    }
+                    .map { it.toEntry(sort) }
             }
         }
 
@@ -92,20 +107,27 @@ class BoardRepository private constructor(context: Context) {
                 val body = Supabase.select(
                     "leaderboard_entries",
                     "period=eq.${period.key}&period_key=eq.${periodKey(period)}&user_id=eq.$me" +
-                        "&select=rank,user_id,credited_ms,track_count,profiles(handle,avatar_url)&limit=1",
+                        "&select=rank,like_rank,user_id,credited_ms,track_count,likes," +
+                        "profiles(handle,avatar_url)&limit=1",
                     token,
                 )
                 Supabase.json
                     .decodeFromString(ListSerializer(BoardRow.serializer()), body)
                     .firstOrNull()
-                    ?.let {
-                        BoardEntry(
-                            it.rank, it.userId, it.creditedMs, it.trackCount,
-                            it.profiles?.handle.orEmpty(), it.profiles?.avatarUrl,
-                        )
-                    }
+                    ?.toEntry(BoardSort.Minutes)
             }
         }
+
+    /** Whichever of the two ranks the board is currently sorted by. */
+    private fun BoardRow.toEntry(sort: BoardSort) = BoardEntry(
+        rank = if (sort == BoardSort.Likes) likeRank else rank,
+        userId = userId,
+        creditedMs = creditedMs,
+        trackCount = trackCount,
+        likes = likes,
+        handle = profiles?.handle.orEmpty(),
+        avatarUrl = profiles?.avatarUrl,
+    )
 
     private fun nudgeRefresh(token: String) {
         val now = System.currentTimeMillis()

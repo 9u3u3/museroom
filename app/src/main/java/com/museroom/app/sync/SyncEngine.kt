@@ -98,6 +98,7 @@ class SyncEngine private constructor(context: Context) {
                             put("is_playing", track.isPlaying)
                             put("source_package", track.packageName)
                             put("source_track_id", track.sourceTrackId)
+                            put("is_advert", false)
                             put("updated_at", Instant.now().toString())
                         },
                     )
@@ -108,7 +109,25 @@ class SyncEngine private constructor(context: Context) {
     }
 
     /** Nothing is playing here any more. Said so that a room stops with you. */
-    suspend fun publishStopped() {
+    suspend fun publishStopped() = patchNowPlaying {
+        put("is_playing", false)
+        put("is_advert", false)
+    }
+
+    /**
+     * An advert is on here, and it will end.
+     *
+     * Said out loud because the alternative was silence, and silence already
+     * means something else. A room hearing "stopped" lets the track go; a room
+     * hearing "advert" holds it, stays quiet, and picks the song back up where
+     * the host does. Nothing about the advert itself is published.
+     */
+    suspend fun publishAdvert() = patchNowPlaying {
+        put("is_playing", false)
+        put("is_advert", true)
+    }
+
+    private suspend fun patchNowPlaying(build: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit) {
         val userId = auth.session.value?.userId ?: return
         val token = auth.validAccessToken() ?: return
         runCatching {
@@ -117,7 +136,7 @@ class SyncEngine private constructor(context: Context) {
                     "now_playing",
                     "user_id=eq.$userId",
                     buildJsonObject {
-                        put("is_playing", false)
+                        build()
                         put("updated_at", Instant.now().toString())
                     },
                     token,

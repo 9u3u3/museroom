@@ -17,9 +17,31 @@ internal fun MediaController.toNowPlaying(): NowPlaying? {
 
     // An advert is not listening. Counting one credits minutes nobody chose to
     // spend, and publishing it makes a friend's progress bar jump to a thirty
-    // second clock and back. Treated as nothing playing, so the last real track
-    // simply stays put until the music returns.
-    if (metadata.isAdvertisement(packageName)) return null
+    // second clock and back.
+    //
+    // It used to be dropped here, which left a room unable to tell an advert
+    // from a phone put down. So the fact of it survives and nothing else does:
+    // no title, no artist, no length, nothing anybody could mistake for music.
+    if (metadata.isAdvertisement(packageName)) {
+        return NowPlaying(
+            packageName = packageName,
+            sourceLabel = Sources.label(packageName),
+            isTracked = Sources.isSupported(packageName),
+            isAdvert = true,
+            sourceTrackId = null,
+            title = "",
+            artist = "",
+            album = "",
+            durationMs = 0,
+            reportedPositionMs = 0,
+            reportedAtElapsed = SystemClock.elapsedRealtime(),
+            playbackSpeed = 0f,
+            isPlaying = state?.state == PlaybackState.STATE_PLAYING,
+            audioContentType = AudioAttributes.CONTENT_TYPE_UNKNOWN,
+            artwork = null,
+            rawMetadata = emptyMap(),
+        )
+    }
 
     val title = metadata.text(MediaMetadata.METADATA_KEY_TITLE)
         ?: metadata.text(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)

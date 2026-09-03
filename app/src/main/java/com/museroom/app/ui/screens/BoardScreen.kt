@@ -1,6 +1,7 @@
 package com.museroom.app.ui.screens
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.BoardEntry
 import com.museroom.app.net.BoardPeriod
 import com.museroom.app.net.BoardRepository
+import com.museroom.app.net.BoardSort
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
@@ -69,14 +71,15 @@ fun BoardScreen() {
     // All time by default: it is the number that means something the first
     // time somebody opens this, and the only one that is never empty.
     var period by remember { mutableStateOf(BoardPeriod.All) }
+    var sort by remember { mutableStateOf(BoardSort.Minutes) }
     var entries by remember { mutableStateOf<List<BoardEntry>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
 
-    LaunchedEffect(period, session?.userId) {
+    LaunchedEffect(period, sort, session?.userId) {
         if (session == null) return@LaunchedEffect
         loading = true
-        repo.top(period)
+        repo.top(period, sort)
             .onSuccess { entries = it; error = null }
             .onFailure { error = it.message }
         loading = false
@@ -113,14 +116,27 @@ fun BoardScreen() {
             }
         }
 
+        // Two questions, not one. Minutes say who sat there longest; likes say
+        // whose taste other people actually turned up for.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BoardSort.entries.forEach { option ->
+                NeoButton(
+                    text = option.label,
+                    small = true,
+                    tone = if (option == sort) NeoTone.Pink else NeoTone.Paper,
+                    onClick = { sort = option },
+                )
+            }
+        }
+
         val me = session?.userId
         entries.forEach { entry ->
-            BoardRow(entry, mine = entry.userId == me)
+            BoardRow(entry, mine = entry.userId == me, sort = sort)
         }
 
         entries.firstOrNull { it.userId == me }?.takeIf { it.rank > 3 }?.let {
             Spacer(Modifier.size(4.dp))
-            BoardRow(it, mine = true)
+            BoardRow(it, mine = true, sort = sort)
         }
 
         when {
@@ -134,7 +150,7 @@ fun BoardScreen() {
 }
 
 @Composable
-private fun BoardRow(entry: BoardEntry, mine: Boolean) {
+private fun BoardRow(entry: BoardEntry, mine: Boolean, sort: BoardSort) {
     val c = Neo.colors
     // Your own row is the one you came to find, so it keeps the loud colour.
     // The leaders get a tint, which is enough to read as a top three without
@@ -153,6 +169,9 @@ private fun BoardRow(entry: BoardEntry, mine: Boolean) {
         stroke = if (mine || onLead) c.onAccent else c.ink,
         content = ink,
         radius = 16.dp, shadow = if (mine || onLead) 5.dp else 3.dp, padding = 11.dp,
+        // Everybody on this list is a person with a page, including the ones
+        // you have never met. That is most of what a leaderboard is for.
+        modifier = Modifier.clickable(enabled = !mine) { Person.show(entry.userId, entry.handle) },
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -168,20 +187,35 @@ private fun BoardRow(entry: BoardEntry, mine: Boolean) {
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            // Whichever number the list is sorted by leads, and the other
+            // rides underneath. A column sorted by likes that still shouts the
+            // minutes is a column nobody can read the order of.
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    formatMinutes(entry.creditedMs),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = ink,
-                )
-                // Minutes alone said how long, not how much of it was music
-                // rather than one long track left running. The count answers
-                // that in a word, so it rides along underneath in small type
-                // rather than competing for the same line.
-                MonoText(
-                    "${entry.trackCount} " + if (entry.trackCount == 1L) "track" else "tracks",
-                    size = 10, color = ink.copy(alpha = 0.7f),
-                )
+                if (sort == BoardSort.Likes) {
+                    Text(
+                        "${entry.likes} " + if (entry.likes == 1L) "like" else "likes",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ink,
+                    )
+                    MonoText(
+                        formatMinutes(entry.creditedMs),
+                        size = 10, color = ink.copy(alpha = 0.7f),
+                    )
+                } else {
+                    Text(
+                        formatMinutes(entry.creditedMs),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = ink,
+                    )
+                    // Minutes alone said how long, not how much of it was music
+                    // rather than one long track left running. The count answers
+                    // that in a word, so it rides along underneath in small type
+                    // rather than competing for the same line.
+                    MonoText(
+                        "${entry.trackCount} " + if (entry.trackCount == 1L) "track" else "tracks",
+                        size = 10, color = ink.copy(alpha = 0.7f),
+                    )
+                }
             }
         }
     }

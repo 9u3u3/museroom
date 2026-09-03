@@ -39,6 +39,9 @@ object NeoIcons {
     const val Trash = "M6.5 5.5h11l-1 14h-9zM9.5 5.5V3.6h5v1.9M10.5 9.5v6M13.5 9.5v6"
     const val Lock = "M4 12.6a2.6 2.6 0 0 1 2.6-2.6h10.8a2.6 2.6 0 0 1 2.6 2.6v5.3a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.9zM8 10V7.2a4 4 0 0 1 8 0V10"
     const val Search = "M11 4.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13M15.8 15.8 20 20"
+    const val Heart = "M12 20.4C12 20.4 3.2 14.1 3.2 8.9C3.2 6.1 5.4 4 8.1 4" +
+        "C9.9 4 11.4 5 12 6.5C12.6 5 14.1 4 15.9 4C18.6 4 20.8 6.1 20.8 8.9" +
+        "C20.8 14.1 12 20.4 12 20.4Z"
 }
 
 @Composable
@@ -48,11 +51,14 @@ fun NeoIcon(
     size: Dp = 22.dp,
     color: Color = Neo.colors.ink,
     weight: Float = 2.6f,
+    /** Painted inside the outline. A heart is empty or it is not. */
+    fill: Color? = null,
 ) {
     val parsed = remember(path) { PathParser().parsePathString(path).toPath() }
     Canvas(modifier.size(size)) {
         val scale = this.size.minDimension / 24f
         scale(scale) {
+            if (fill != null) drawPath(path = parsed, color = fill)
             drawPath(
                 path = parsed,
                 color = color,
