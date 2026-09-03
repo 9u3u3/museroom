@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.Sources
@@ -63,10 +64,12 @@ fun YouScreen() {
     val profiles = remember { ProfileRepository.get(context) }
     val privacy = remember { PrivacyState.get(context) }
     val sync = remember { SyncEngine.get(context) }
+    val theme = remember { com.museroom.app.ui.ThemeState.get(context) }
 
     val session by auth.session.collectAsStateWithLifecycle()
     val profile by profiles.profile.collectAsStateWithLifecycle()
     val isPrivate by privacy.privateSession.collectAsStateWithLifecycle()
+    val isDark by theme.dark.collectAsStateWithLifecycle()
     val syncState by sync.state.collectAsStateWithLifecycle()
     val waiting by sync.pendingEvents.collectAsStateWithLifecycle(0)
 
@@ -102,7 +105,7 @@ fun YouScreen() {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
             .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ScreenTitle("You")
 
@@ -200,14 +203,28 @@ fun YouScreen() {
             }
         }
 
+        NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    "Dark theme",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = c.ink, modifier = Modifier.weight(1f),
+                )
+                NeoSwitch(checked = isDark, onCheckedChange = theme::setDark)
+            }
+        }
+
         Label("Counted", color = c.ink)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NeoPill("Spotify", fill = c.lime, accent = true)
             NeoPill("YouTube Music", fill = c.lime, accent = true)
         }
-        Note("Everything else on this phone is ignored, browsers included.")
 
-        Spacer(Modifier.size(4.dp))
+        Spacer(Modifier.size(6.dp))
         NeoButton(
             "Delete all history",
             tone = NeoTone.Paper,

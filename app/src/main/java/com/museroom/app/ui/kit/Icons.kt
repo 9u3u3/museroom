@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -61,13 +62,20 @@ fun NeoIcon(
     }
 }
 
+/**
+ * Scales about the origin, not the centre.
+ *
+ * Compose's transform pivots on the canvas centre by default, which for a path
+ * authored from 0,0 pushes the drawing up and left until only a corner of it is
+ * still on the canvas. That is exactly what happened to the tab icons.
+ */
 private inline fun androidx.compose.ui.graphics.drawscope.DrawScope.scale(
     factor: Float,
     block: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit,
 ) {
-    drawContext.transform.scale(factor, factor)
+    drawContext.transform.scale(factor, factor, Offset.Zero)
     block()
-    drawContext.transform.scale(1f / factor, 1f / factor)
+    drawContext.transform.scale(1f / factor, 1f / factor, Offset.Zero)
 }
 
 /** The Museroom mark: a fat comic quaver, printed twice out of register. */

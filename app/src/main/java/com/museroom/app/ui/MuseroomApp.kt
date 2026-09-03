@@ -78,7 +78,7 @@ fun MuseroomApp() {
         }
 
         Column(Modifier.fillMaxSize()) {
-            TopBar(tab)
+            TopBar()
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     Tab.Now -> NowScreen()
@@ -94,13 +94,13 @@ fun MuseroomApp() {
 }
 
 @Composable
-private fun TopBar(tab: Tab) {
+private fun TopBar() {
     val c = Neo.colors
     Row(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
@@ -118,8 +118,6 @@ private fun TopBar(tab: Tab) {
             text = "MUSEROOM",
             style = bangers(26).copy(color = c.ink),
         )
-        Spacer(Modifier.weight(1f))
-        Label(tab.label, color = c.ink)
     }
 }
 

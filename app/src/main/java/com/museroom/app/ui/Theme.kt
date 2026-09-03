@@ -1,6 +1,5 @@
 package com.museroom.app.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -107,9 +106,13 @@ private val NeoType = Typography(
     labelSmall = TextStyle(fontFamily = Mono, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.6.sp),
 )
 
+/**
+ * [dark] is passed in rather than read from the system on purpose: this design
+ * has a light theme it was drawn in, and dark is a choice the person makes.
+ */
 @Composable
 fun MuseroomTheme(
-    dark: Boolean = isSystemInDarkTheme(),
+    dark: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val neo = if (dark) DarkNeo else LightNeo

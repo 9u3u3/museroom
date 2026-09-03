@@ -33,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -41,6 +40,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.proximity.ProximityManager
 import com.museroom.app.proximity.ProximityStatus
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Color
+import com.museroom.app.ui.bangers
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MonoText
@@ -80,7 +82,7 @@ fun NearbyScreen() {
             return@Column
         }
 
-        Radar(active = wanted, blips = nearby.size)
+        Pulse(active = wanted, blips = nearby.size)
 
         NeoAccentCard(fill = c.violet, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
             Row(
@@ -159,65 +161,61 @@ fun NearbyScreen() {
     }
 }
 
-/** A sweeping dial, because "listening" needs to look like something. */
+/**
+ * Rings pushing outward, not a sweeping dial.
+ *
+ * The sweep was a gradient smeared over a circle, which is exactly the sort of
+ * soft effect this design has none of anywhere else. Three hard rings expanding
+ * and fading is the same idea drawn in the same ink as everything around it, and
+ * it reads as broadcasting rather than as radar.
+ */
 @Composable
-private fun Radar(active: Boolean, blips: Int) {
+private fun Pulse(active: Boolean, blips: Int) {
     val c = Neo.colors
-    val spin = rememberInfiniteTransition(label = "radar")
-    val angle by spin.animateFloat(
+    val beat = rememberInfiniteTransition(label = "pulse")
+    val phase by beat.animateFloat(
         initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
-        label = "sweep",
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
+        label = "phase",
     )
 
     Box(
         Modifier
             .fillMaxWidth()
-            .size(200.dp)
-            .clip(CircleShape)
-            .background(c.card)
-            .border(3.dp, c.ink, CircleShape),
+            .height(168.dp),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val r = size.minDimension / 2f
             val centre = Offset(size.width / 2f, size.height / 2f)
-            listOf(0.32f, 0.62f, 0.92f).forEach { ring ->
-                drawCircle(c.ink.copy(alpha = 0.3f), r * ring, centre, style = Stroke(width = 4f))
-            }
+            val maxR = size.minDimension / 2f - 8.dp.toPx()
             if (active) {
-                rotate(angle, centre) {
-                    drawArc(
-                        brush = Brush.sweepGradient(
-                            0f to c.violet.copy(alpha = 0.55f),
-                            0.22f to c.violet.copy(alpha = 0f),
-                            1f to c.violet.copy(alpha = 0f),
-                            center = centre,
-                        ),
-                        startAngle = 0f, sweepAngle = 360f, useCenter = true,
+                repeat(3) { i ->
+                    val t = (phase + i / 3f) % 1f
+                    drawCircle(
+                        color = c.violet.copy(alpha = (1f - t) * 0.9f),
+                        radius = 26.dp.toPx() + t * (maxR - 26.dp.toPx()),
+                        center = centre,
+                        style = Stroke(width = 3.dp.toPx()),
                     )
                 }
             }
-            repeat(blips.coerceAtMost(4)) { i ->
-                val a = Math.toRadians((40.0 + i * 78.0))
-                val d = r * (0.42f + 0.16f * i)
-                drawCircle(
-                    c.pink,
-                    9f,
-                    Offset(centre.x + (d * kotlin.math.cos(a)).toFloat(), centre.y + (d * kotlin.math.sin(a)).toFloat()),
-                )
-            }
+        }
+
+        Box(
+            Modifier
+                .size(74.dp)
+                .clip(CircleShape)
+                .background(if (active) c.violet else c.card)
+                .border(3.dp, c.onAccent, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                if (active) "$blips" else "off",
+                style = bangers(if (active) 34 else 20).copy(
+                    color = if (active) Color.White else c.ink,
+                ),
+            )
         }
     }
-}
-
-private inline fun androidx.compose.ui.graphics.drawscope.DrawScope.rotate(
-    degrees: Float,
-    pivot: Offset,
-    block: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit,
-) {
-    drawContext.transform.rotate(degrees, pivot)
-    block()
-    drawContext.transform.rotate(-degrees, pivot)
 }

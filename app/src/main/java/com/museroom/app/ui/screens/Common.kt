@@ -59,11 +59,14 @@ import java.time.Instant
 /** A screen title, in the display face with a hard coloured drop. */
 @Composable
 fun ScreenTitle(text: String, drop: Color = Neo.colors.violet) {
-    val c = Neo.colors
-    Box {
-        Text(text.uppercase(), style = bangers(34).copy(color = drop),
-            modifier = Modifier.padding(start = 4.dp, top = 4.dp))
-        Text(text.uppercase(), style = bangers(34).copy(color = c.ink))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(text.uppercase(), style = bangers(32).copy(color = Neo.colors.ink))
+        Box(
+            Modifier
+                .size(width = 26.dp, height = 7.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(drop),
+        )
     }
 }
 

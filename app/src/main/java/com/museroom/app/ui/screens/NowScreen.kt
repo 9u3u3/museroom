@@ -83,7 +83,7 @@ fun NowScreen() {
         LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
     val todayMs by dao.creditedSince(startOfToday).collectAsStateWithLifecycle(0L)
-    val recent by dao.recentSessions(12).collectAsStateWithLifecycle(emptyList())
+    val recent by dao.recentSessions(8).collectAsStateWithLifecycle(emptyList())
 
     var pending by remember { mutableStateOf<ListeningSessionEntity?>(null) }
     val active = sessions.pickActive()
@@ -123,7 +123,7 @@ fun NowScreen() {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
             .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         if (isPrivate) {
             NeoAccentCard(fill = c.pink, radius = 16.dp) {
@@ -147,22 +147,8 @@ fun NowScreen() {
         }
 
         NeoAccentCard(fill = c.lime, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Label("Listening today", color = c.onAccent)
-                    Text(formatMinutes(todayMs), style = bangers(52).copy(color = c.onAccent))
-                }
-                Text(
-                    "Counted when a track finishes.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.onAccent.copy(alpha = 0.75f),
-                    modifier = Modifier.fillMaxWidth(0.42f),
-                )
-            }
+            Label("Listening today", color = c.onAccent)
+            Text(formatMinutes(todayMs), style = bangers(56).copy(color = c.onAccent))
         }
 
         if (session == null) {
@@ -171,7 +157,7 @@ fun NowScreen() {
 
         if (recent.isNotEmpty()) {
             Label("Recent — tap to remove", color = c.ink)
-            recent.forEach { entry ->
+            recent.take(4).forEach { entry ->
                 Row(
                     Modifier
                         .fillMaxWidth()
