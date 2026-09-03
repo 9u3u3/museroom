@@ -59,6 +59,7 @@ import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.ui.kit.NeoSwitch
 import com.museroom.app.ui.kit.NeoTone
+import com.museroom.app.util.StayAwake
 import com.museroom.app.util.formatAgo
 import kotlinx.coroutines.launch
 
@@ -89,11 +90,7 @@ fun YouScreen() {
     val waiting by sync.pendingEvents.collectAsStateWithLifecycle(0)
 
     var confirmWipe by remember { mutableStateOf(false) }
-    var myFace by remember(profile?.avatarUrl) { mutableStateOf(Avatars.cached(profile?.avatarUrl)) }
     var photoNote by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(profile?.avatarUrl) {
-        if (myFace == null) myFace = Avatars.fetch(profile?.avatarUrl)
-    }
 
     // The system picker, so Museroom never asks for access to the gallery: it
     // is handed one picture and sees nothing else.
@@ -109,7 +106,7 @@ fun YouScreen() {
                 return@launch
             }
             profiles.setAvatar(bytes)
-                .onSuccess { photoNote = null; myFace = null }
+                .onSuccess { photoNote = null }
                 .onFailure { photoNote = it.message }
         }
     }
@@ -173,28 +170,15 @@ fun YouScreen() {
         } else {
             NeoCard(radius = 18.dp, padding = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                    Box(
-                        Modifier
-                            .size(60.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(c.violet)
-                            .border(3.dp, c.onAccent, RoundedCornerShape(16.dp))
-                            .clickable { pickPhoto.launch(PickVisualMediaRequest(ImageOnly)) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val face = myFace
-                        if (face != null) {
-                            Image(
-                                face.asImageBitmap(), null, Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop,
-                            )
-                        } else {
-                            Text(
-                                profile?.handle.orEmpty().take(1).uppercase().ifBlank { "?" },
-                                style = bangers(28).copy(color = Color.White),
-                            )
-                        }
-                    }
+                    Face(
+                        profile?.handle.orEmpty(),
+                        profile?.avatarUrl,
+                        62.dp,
+                        modifier = Modifier.clickable {
+                            pickPhoto.launch(PickVisualMediaRequest(ImageOnly))
+                        },
+                        shape = RoundedCornerShape(18.dp),
+                    )
                     Column(Modifier.weight(1f)) {
                         Text(
                             profile?.handle ?: "Loading",
@@ -283,6 +267,30 @@ fun YouScreen() {
                     small = true,
                     tone = if (profile?.openToAll == true) NeoTone.Violet else NeoTone.Paper,
                     onClick = { scope.launch { profiles.setOpenToAll(true) } },
+                )
+            }
+        }
+
+        if (!StayAwake.isExempt(context)) {
+            Label("Keep counting", color = c.ink)
+            NeoAccentCard(fill = c.pink, radius = 16.dp, padding = 14.dp) {
+                Text(
+                    "Android may stop Museroom in the background",
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    "Minutes go uncounted when it does, with nothing on screen to say so.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+                Spacer(Modifier.size(10.dp))
+                NeoButton(
+                    "Let it keep running",
+                    small = true,
+                    tone = NeoTone.Paper,
+                    onClick = { StayAwake.ask(context) },
                 )
             }
         }

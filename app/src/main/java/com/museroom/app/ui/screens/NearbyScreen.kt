@@ -1,5 +1,7 @@
 package com.museroom.app.ui.screens
 
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
@@ -10,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.NearbyListener
 import com.museroom.app.proximity.ProximityManager
 import com.museroom.app.proximity.ProximityStatus
 import androidx.compose.foundation.layout.height
@@ -47,6 +53,9 @@ import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoSwitch
+import kotlin.math.sin
+import kotlin.math.cos
+import kotlin.math.PI
 
 @Composable
 fun NearbyScreen() {
@@ -67,9 +76,35 @@ fun NearbyScreen() {
     // say.
     val running = status is ProximityStatus.Searching || status is ProximityStatus.PausedForPrivacy
     var wanted by remember(running) { mutableStateOf(running) }
+    var selected by remember { mutableStateOf<String?>(null) }
     val ask = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted -> if (granted.values.all { it }) manager.start() else wanted = false }
+
+    // Turning the radio on is part of turning this on. Being told "turn
+    // Bluetooth on" and left to find Settings is a step nobody should have to
+    // take, so the system's own dialog is raised instead.
+    val turnOnBluetooth = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) manager.start() else wanted = false
+    }
+
+    fun goOnAir() {
+        when {
+            !manager.hasPermissions() -> ask.launch(manager.requiredPermissions())
+            !manager.bluetoothReady() ->
+                turnOnBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            else -> manager.start()
+        }
+    }
+
+    // A permission granted is only half of it: the radio may still be off.
+    LaunchedEffect(status) {
+        if (wanted && status is ProximityStatus.BluetoothOff) {
+            turnOnBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+        }
+    }
 
     Column(
         Modifier
@@ -86,7 +121,12 @@ fun NearbyScreen() {
             return@Column
         }
 
-        Pulse(active = status is ProximityStatus.Searching, blips = nearby.size)
+        Radar(
+            active = status is ProximityStatus.Searching,
+            people = nearby,
+            selected = selected,
+            onPick = { selected = if (selected == it) null else it },
+        )
 
         NeoAccentCard(fill = c.violet, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
             Row(
@@ -95,7 +135,7 @@ fun NearbyScreen() {
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Text(
-                    "Broadcasting",
+                    "On the air",
                     style = MaterialTheme.typography.titleLarge,
                     color = androidx.compose.ui.graphics.Color.White,
                     modifier = Modifier.weight(1f),
@@ -103,11 +143,7 @@ fun NearbyScreen() {
                 )
                 NeoSwitch(checked = wanted, onCheckedChange = { on ->
                     wanted = on
-                    when {
-                        !on -> manager.stop()
-                        manager.hasPermissions() -> manager.start()
-                        else -> ask.launch(manager.requiredPermissions())
-                    }
+                    if (on) goOnAir() else manager.stop()
                 })
             }
         }
@@ -117,7 +153,7 @@ fun NearbyScreen() {
         // know why nobody is showing up.
         val trouble = when (val s = status) {
             is ProximityStatus.NeedsPermission -> "Bluetooth permission is needed."
-            is ProximityStatus.BluetoothOff -> "Turn Bluetooth on."
+            is ProximityStatus.BluetoothOff -> "Bluetooth is off."
             is ProximityStatus.PausedForPrivacy -> "Paused while your session is private."
             is ProximityStatus.Failed -> s.reason
             is ProximityStatus.Searching ->
@@ -128,7 +164,8 @@ fun NearbyScreen() {
             NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) { Note(it) }
         }
 
-        nearby.forEach { person ->
+        val shown = nearby.filter { selected == null || it.userId == selected }
+        shown.forEach { person ->
             ListenerRow(
                 handle = person.handle,
                 title = person.title,
@@ -149,15 +186,21 @@ fun NearbyScreen() {
 }
 
 /**
- * Rings pushing outward, not a sweeping dial.
+ * Rings pushing outward, with the people in them.
  *
- * The sweep was a gradient smeared over a circle, which is exactly the sort of
- * soft effect this design has none of anywhere else. Three hard rings expanding
- * and fading is the same idea drawn in the same ink as everything around it, and
- * it reads as broadcasting rather than as radar.
+ * A number in a circle told you how many were around and nothing about who. The
+ * faces sit on the ring, evenly spaced, and tapping one narrows the list below
+ * to that person; tapping again lets everybody back in. Three hard rings
+ * expanding and fading is the same idea drawn in the same ink as everything
+ * around it, and it reads as broadcasting rather than as radar.
  */
 @Composable
-private fun Pulse(active: Boolean, blips: Int) {
+private fun Radar(
+    active: Boolean,
+    people: List<NearbyListener>,
+    selected: String?,
+    onPick: (String) -> Unit,
+) {
     val c = Neo.colors
     val beat = rememberInfiniteTransition(label = "pulse")
     val phase by beat.animateFloat(
@@ -167,10 +210,11 @@ private fun Pulse(active: Boolean, blips: Int) {
         label = "phase",
     )
 
+    val ring = 108.dp
     Box(
         Modifier
             .fillMaxWidth()
-            .height(168.dp),
+            .height(ring * 2 + 76.dp),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(Modifier.fillMaxSize()) {
@@ -198,11 +242,31 @@ private fun Pulse(active: Boolean, blips: Int) {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                if (active) "$blips" else "off",
+                if (active) "${people.size}" else "off",
                 style = bangers(if (active) 34 else 20).copy(
                     color = if (active) Color.White else c.ink,
                 ),
             )
+        }
+
+        people.take(8).forEachIndexed { index, person ->
+            val turn = (index.toFloat() / people.take(8).size.coerceAtLeast(1)) * 2f * PI - PI / 2
+            val chosen = selected == person.userId
+            Box(
+                Modifier
+                    .offset(
+                        x = (cos(turn).toFloat() * ring.value).dp,
+                        y = (sin(turn).toFloat() * ring.value).dp,
+                    )
+                    .clickable { onPick(person.userId) },
+            ) {
+                Face(
+                    person.handle,
+                    person.avatarUrl,
+                    if (chosen) 56.dp else 46.dp,
+                    border = if (chosen) c.pink else c.onAccent,
+                )
+            }
         }
     }
 }

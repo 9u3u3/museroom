@@ -33,6 +33,13 @@
         it has to keep playing once you leave the screen. Declaring the service
         as media playback is how the system is told that audio is the point.
     -->
+    <!--
+        Asking not to be put to sleep. Detection lives in a service the system
+        keeps running, which is enough on a stock phone and not enough on the
+        many that stop background apps anyway.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 

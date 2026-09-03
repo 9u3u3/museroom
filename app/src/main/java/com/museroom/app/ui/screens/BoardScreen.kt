@@ -148,11 +148,6 @@ private fun BoardRow(entry: BoardEntry, mine: Boolean) {
     val onLead = lead != null && !mine
     val ink = if (mine) Color.White else if (onLead) c.onAccent else c.ink
 
-    var face by remember(entry.avatarUrl) { mutableStateOf(Avatars.cached(entry.avatarUrl)) }
-    LaunchedEffect(entry.avatarUrl) {
-        if (face == null) face = Avatars.fetch(entry.avatarUrl)
-    }
-
     NeoCard(
         fill = if (mine) c.violet else lead ?: c.card,
         stroke = if (mine || onLead) c.onAccent else c.ink,
@@ -165,27 +160,7 @@ private fun BoardRow(entry: BoardEntry, mine: Boolean) {
             horizontalArrangement = Arrangement.spacedBy(11.dp),
         ) {
             MonoText("%02d".format(entry.rank), size = 13, color = ink.copy(alpha = 0.7f))
-            Box(
-                Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(ink.copy(alpha = 0.15f))
-                    .border(2.dp, ink, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                val picture = face
-                if (picture != null) {
-                    Image(
-                        picture.asImageBitmap(), null, Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Text(
-                        entry.handle.take(1).uppercase().ifBlank { "?" },
-                        style = MaterialTheme.typography.titleMedium, color = ink,
-                    )
-                }
-            }
+            Face(entry.handle, entry.avatarUrl, 40.dp, border = ink)
             Text(
                 entry.handle + if (mine) " · you" else "",
                 style = MaterialTheme.typography.titleMedium,

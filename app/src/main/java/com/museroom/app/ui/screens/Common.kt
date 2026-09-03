@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -34,6 +36,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.Artwork
@@ -55,6 +58,7 @@ import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.formatClock
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 import java.time.Instant
 
 /** A screen title, in the display face with a hard coloured drop. */
@@ -230,8 +234,6 @@ fun ListenerRow(
     val scope = rememberCoroutineScope()
     val listen = remember { ListenRepository.get(context) }
     val following by FollowSession.following.collectAsStateWithLifecycle()
-    var face by remember(avatarUrl) { mutableStateOf(Avatars.cached(avatarUrl)) }
-    LaunchedEffect(avatarUrl) { if (face == null) face = Avatars.fetch(avatarUrl) }
     val inTheirRoom = hostId != null && following?.hostId == hostId
 
     var art by remember(title, artist) { mutableStateOf<Bitmap?>(Artwork.cached(title, artist)) }
@@ -262,20 +264,13 @@ fun ListenerRow(
                 art?.let {
                     Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 }
-                face?.let {
-                    // Their face in the corner of their music, small enough to
-                    // say who without competing with the cover.
-                    Image(
-                        it.asImageBitmap(), null,
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(3.dp)
-                            .size(22.dp)
-                            .clip(RoundedCornerShape(7.dp))
-                            .border(2.dp, c.onAccent, RoundedCornerShape(7.dp)),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
+                // Their face in the corner of their music, small enough to
+                // say who without competing with the cover.
+                Face(
+                    handle, avatarUrl, 24.dp,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp),
+                    shape = RoundedCornerShape(8.dp),
+                )
             }
             Column(Modifier.weight(1f)) {
                 Row(
@@ -351,4 +346,52 @@ private fun livePosition(positionMs: Long, updatedAt: String, isPlaying: Boolean
     if (!isPlaying) return positionMs
     val takenAt = runCatching { Instant.parse(updatedAt).toEpochMilli() }.getOrNull() ?: return positionMs
     return positionMs + (nowMs - takenAt).coerceAtLeast(0)
+}
+
+/**
+ * Somebody's face, or a stand-in for one.
+ *
+ * Everybody has one from the first moment, because a list of blank circles is
+ * worse than a list of names. The stand-in takes its colour from the name, so
+ * it is the same colour everywhere that person appears and reads as theirs
+ * rather than as a placeholder.
+ */
+@Composable
+fun Face(
+    handle: String,
+    url: String?,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    shape: Shape = CircleShape,
+    border: Color = Neo.colors.onAccent,
+) {
+    val c = Neo.colors
+    var picture by remember(url) { mutableStateOf(Avatars.cached(url)) }
+    LaunchedEffect(url) { if (picture == null) picture = Avatars.fetch(url) }
+
+    val palette = listOf(c.violet, c.sky, c.pink, c.lime)
+    val tint = palette[(handle.hashCode().absoluteValue) % palette.size]
+
+    Box(
+        modifier
+            .size(size)
+            .clip(shape)
+            .background(tint)
+            .border(3.dp, border, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        val bitmap = picture
+        if (bitmap != null) {
+            Image(
+                bitmap.asImageBitmap(), null, Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(
+                handle.take(1).uppercase().ifBlank { "?" },
+                style = bangers((size.value * 0.44f).toInt().coerceAtLeast(12))
+                    .copy(color = c.onAccent),
+            )
+        }
+    }
 }

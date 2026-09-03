@@ -11,6 +11,9 @@
   h1 { font-family: system-ui, sans-serif; font-size: 2.6rem; letter-spacing: -0.03em; margin-bottom: 0.4rem; }
   .tag { font-family: system-ui, sans-serif; opacity: 0.75; margin-top: 0; }
   h2 { font-family: system-ui, sans-serif; font-size: 1.05rem; margin-top: 2.5rem; }
+  pre { background: #111; color: #eee; padding: 0.7rem 0.8rem; border-radius: 8px;
+        overflow-x: auto; font-size: 0.8rem; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; }
   ul { padding-left: 1.2rem; }
   li { margin-bottom: 0.5rem; }
   .download {
@@ -36,7 +39,7 @@ friends you add. It counts your listening minutes and ranks them on a leaderboar
 and it can find other listeners in the room with you.</p>
 
 <a class="download" href="museroom-latest.apk">Download for Android</a>
-<p class="meta">Version 3.7 &middot; 13 MB &middot; Android 8.0 or newer</p>
+<p class="meta">Version 3.8 &middot; 13 MB &middot; Android 8.0 or newer</p>
 
 <h2>Installing</h2>
 <p>Museroom is not on the Play Store, so Android will ask permission before
@@ -46,10 +49,25 @@ browser when prompted.</p>
 makes detection possible: Android publishes a media session for whatever is
 playing, and reading it is the only way to know what you are listening to.</p>
 <div class="note">
-  <b>Android 13 and later:</b> if Settings says <em>Restricted setting</em>, that is
-  Android blocking the switch for apps installed outside the Play Store. Open App
-  info, tap the three dots, choose <em>Allow restricted settings</em>, then try again.
-  Play Protect may also warn on install, because Google has not seen this app before.
+  <b>Android 13 and later: "Restricted setting".</b> Android blocks the notification
+  access switch for apps installed outside the Play Store, and nothing in the app can
+  unblock it. Open <em>App info</em> for Museroom and find <em>Allow restricted
+  settings</em>. It is behind the three dots on most phones, under <em>Advanced</em> or
+  <em>More</em> on some, and near the bottom of the page on others.
+  <p>If the option is missing entirely, uninstall Museroom, install it again, and open
+  App info within the next few minutes. The option only appears for a short while after
+  installing.</p>
+  <p>If you have a computer with <a href="https://developer.android.com/tools/adb">adb</a>,
+  this does the same thing in one line, with USB debugging turned on:</p>
+  <pre><code>adb shell appops set com.museroom.app ACCESS_RESTRICTED_SETTINGS allow</code></pre>
+</div>
+
+<div class="note">
+  <b>Play Protect will warn you.</b> Google shows that warning for any app it has not
+  seen before, which means every app that is not on the Play Store. Choosing
+  <em>Install anyway</em> is the whole of it. There is no setting in the app that turns
+  it off, and there is no way to remove it while Museroom is downloaded from here
+  rather than from Google.
 </div>
 
 <div class="note">

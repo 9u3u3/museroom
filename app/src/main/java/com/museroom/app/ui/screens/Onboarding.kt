@@ -136,8 +136,13 @@ fun OnboardingScreen() {
                 )
                 Spacer(Modifier.size(5.dp))
                 Text(
-                    "Android blocks this for apps installed outside the Play Store. " +
-                        "Open App info, tap the three dots, then Allow restricted settings.",
+                    "Android blocks this for apps installed outside the Play Store, and " +
+                        "nothing in Museroom can unblock it. Open App info below, then find " +
+                        "Allow restricted settings. It is behind the three dots on most " +
+                        "phones, under Advanced or More on some, and near the bottom of the " +
+                        "page on others. If it is not there at all, uninstall Museroom, " +
+                        "install it again, and open this within the next few minutes: the " +
+                        "option only appears for a short while after installing.",
                     style = MaterialTheme.typography.bodySmall,
                     color = c.ink.copy(alpha = 0.75f),
                 )
