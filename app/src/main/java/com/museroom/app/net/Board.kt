@@ -16,6 +16,7 @@ data class BoardEntry(
     val rank: Int,
     @SerialName("user_id") val userId: String,
     @SerialName("credited_ms") val creditedMs: Long,
+    val trackCount: Long = 0,
     val handle: String = "",
     val avatarUrl: String? = null,
 )
@@ -25,6 +26,7 @@ private data class BoardRow(
     val rank: Int,
     @SerialName("user_id") val userId: String,
     @SerialName("credited_ms") val creditedMs: Long,
+    @SerialName("track_count") val trackCount: Long = 0,
     val profiles: Who? = null,
 ) {
     @Serializable
@@ -60,7 +62,7 @@ class BoardRepository private constructor(context: Context) {
                 val body = Supabase.select(
                     "leaderboard_entries",
                     "period=eq.${period.key}&period_key=eq.${periodKey(period)}" +
-                        "&select=rank,user_id,credited_ms,profiles(handle,avatar_url)" +
+                        "&select=rank,user_id,credited_ms,track_count,profiles(handle,avatar_url)" +
                         "&order=rank.asc&limit=$limit",
                     token,
                 )
@@ -68,7 +70,37 @@ class BoardRepository private constructor(context: Context) {
                     .decodeFromString(ListSerializer(BoardRow.serializer()), body)
                     .map {
                         BoardEntry(
-                            it.rank, it.userId, it.creditedMs,
+                            it.rank, it.userId, it.creditedMs, it.trackCount,
+                            it.profiles?.handle.orEmpty(), it.profiles?.avatarUrl,
+                        )
+                    }
+            }
+        }
+
+    /**
+     * Just your own row, for a glance somewhere small like the header. Reads
+     * one row rather than a page of a hundred, and skips the refresh nudge:
+     * whatever the last scheduled pass wrote is close enough for a header
+     * badge, and it means this never blocks on a write the board screen
+     * would otherwise pay for anyway.
+     */
+    suspend fun myRank(period: BoardPeriod): Result<BoardEntry?> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val token = auth.validAccessToken() ?: return@runCatching null
+                val me = auth.session.value?.userId ?: return@runCatching null
+                val body = Supabase.select(
+                    "leaderboard_entries",
+                    "period=eq.${period.key}&period_key=eq.${periodKey(period)}&user_id=eq.$me" +
+                        "&select=rank,user_id,credited_ms,track_count,profiles(handle,avatar_url)&limit=1",
+                    token,
+                )
+                Supabase.json
+                    .decodeFromString(ListSerializer(BoardRow.serializer()), body)
+                    .firstOrNull()
+                    ?.let {
+                        BoardEntry(
+                            it.rank, it.userId, it.creditedMs, it.trackCount,
                             it.profiles?.handle.orEmpty(), it.profiles?.avatarUrl,
                         )
                     }

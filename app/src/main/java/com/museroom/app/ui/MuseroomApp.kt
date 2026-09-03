@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,9 +45,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.museroom.app.data.MuseroomDatabase
 import com.museroom.app.media.NowPlayingRepository
+import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.BoardPeriod
+import com.museroom.app.net.BoardRepository
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.FollowSession
+import com.museroom.app.sync.RoomPresence
 import com.museroom.app.tracking.PlaybackTracker
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MuseroomMark
@@ -59,6 +66,10 @@ import com.museroom.app.ui.screens.NowScreen
 import com.museroom.app.ui.screens.OnboardingScreen
 import com.museroom.app.ui.screens.YouScreen
 import com.museroom.app.util.NotificationAccess
+import com.museroom.app.util.formatMinutes
+import kotlinx.coroutines.delay
+import java.time.LocalDate
+import java.time.ZoneId
 
 enum class Tab(val label: String, val icon: String) {
     Now("Now", NeoIcons.Now),
@@ -114,6 +125,10 @@ fun MuseroomApp() {
 @Composable
 private fun TopBar() {
     val c = Neo.colors
+    val context = LocalContext.current
+    val auth = remember { AuthRepository.get(context) }
+    val session by auth.session.collectAsStateWithLifecycle()
+
     Row(
         Modifier
             .fillMaxWidth()
@@ -135,6 +150,96 @@ private fun TopBar() {
         Text(
             text = "MUSEROOM",
             style = bangers(26).copy(color = c.ink),
+        )
+        Spacer(Modifier.weight(1f))
+        HeaderStats(signedIn = session != null)
+    }
+}
+
+/**
+ * Today's minutes, rank and who's listening along, at a glance, on every
+ * screen. It used to take scrolling past a full-bleed album cover to find any
+ * of this, which meant it took scrolling past a full-bleed album cover to
+ * have a reason to open the app again.
+ */
+@Composable
+private fun HeaderStats(signedIn: Boolean) {
+    val c = Neo.colors
+    val context = LocalContext.current
+    val dao = remember { MuseroomDatabase.get(context).dao() }
+    val board = remember { BoardRepository.get(context) }
+    val auth = remember { AuthRepository.get(context) }
+    val session by auth.session.collectAsStateWithLifecycle()
+
+    val startOfToday = remember {
+        LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
+    val todayMs by dao.creditedSince(startOfToday).collectAsStateWithLifecycle(0L)
+    val todayTracks by dao.tracksSince(startOfToday).collectAsStateWithLifecycle(0)
+
+    LaunchedEffect(context) { RoomPresence.start(context) }
+    val roomMembers by RoomPresence.members.collectAsStateWithLifecycle()
+
+    // A rank a minute stale is still worth showing; nothing here needs the
+    // fresh-to-the-second board read that the Board screen pays for itself.
+    var rank by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(session?.userId) {
+        rank = null
+        while (session != null) {
+            board.myRank(BoardPeriod.All).onSuccess { rank = it?.rank }
+            delay(60_000)
+        }
+    }
+
+    Column(horizontalAlignment = Alignment.End) {
+        if (signedIn) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                if (roomMembers.isNotEmpty()) {
+                    // The number worth opening the app to check: somebody is
+                    // listening along with you right now.
+                    Box(
+                        Modifier
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(c.pink)
+                            .border(2.dp, c.onAccent, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            "${roomMembers.size}",
+                            style = TextStyle(
+                                fontFamily = Archivo, fontWeight = FontWeight.W900,
+                                fontSize = 10.sp, color = c.onAccent,
+                            ),
+                        )
+                    }
+                }
+                rank?.let {
+                    Text(
+                        "#$it",
+                        style = TextStyle(
+                            fontFamily = Archivo, fontWeight = FontWeight.W900,
+                            fontSize = 11.sp, color = c.onAccent,
+                        ),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(c.lime)
+                            .border(2.dp, c.onAccent, RoundedCornerShape(50))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.size(3.dp))
+        }
+        Text(
+            "${formatMinutes(todayMs)} · $todayTracks trk",
+            style = TextStyle(
+                fontFamily = Archivo, fontWeight = FontWeight.W800,
+                fontSize = 11.sp, color = c.ink.copy(alpha = 0.75f),
+            ),
         )
     }
 }

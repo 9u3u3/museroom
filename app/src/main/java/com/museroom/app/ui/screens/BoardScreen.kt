@@ -168,11 +168,21 @@ private fun BoardRow(entry: BoardEntry, mine: Boolean) {
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                formatMinutes(entry.creditedMs),
-                style = MaterialTheme.typography.titleMedium,
-                color = ink,
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    formatMinutes(entry.creditedMs),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = ink,
+                )
+                // Minutes alone said how long, not how much of it was music
+                // rather than one long track left running. The count answers
+                // that in a word, so it rides along underneath in small type
+                // rather than competing for the same line.
+                MonoText(
+                    "${entry.trackCount} " + if (entry.trackCount == 1L) "track" else "tracks",
+                    size = 10, color = ink.copy(alpha = 0.7f),
+                )
+            }
         }
     }
 }

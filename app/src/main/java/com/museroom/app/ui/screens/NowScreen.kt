@@ -52,13 +52,13 @@ import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.pickActive
 import com.museroom.app.net.AuthRepository
-import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.net.ListenRequest
 import com.museroom.app.net.RoomMember
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.FollowState
+import com.museroom.app.sync.RoomPresence
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
@@ -346,16 +346,10 @@ private fun RoomMembers() {
     val context = LocalContext.current
     val c = Neo.colors
     val auth = remember { AuthRepository.get(context) }
-    val friends = remember { FriendsRepository.get(context) }
     val session by auth.session.collectAsStateWithLifecycle()
 
-    var members by remember { mutableStateOf<List<RoomMember>>(emptyList()) }
-    LaunchedEffect(session?.userId) {
-        while (session != null) {
-            friends.roomMembers().onSuccess { members = it }
-            delay(20_000)
-        }
-    }
+    LaunchedEffect(Unit) { RoomPresence.start(context) }
+    val members by RoomPresence.members.collectAsStateWithLifecycle()
     if (session == null) return
 
     NeoAccentCard(fill = c.sky, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
