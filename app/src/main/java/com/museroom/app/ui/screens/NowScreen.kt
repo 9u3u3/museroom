@@ -5,27 +5,28 @@ import android.os.SystemClock
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,26 +34,30 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.museroom.app.data.ListeningSessionEntity
 import com.museroom.app.data.MuseroomDatabase
-import com.museroom.app.media.Artwork
+import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
-import com.museroom.app.media.Sources
 import com.museroom.app.media.pickActive
 import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.net.ListenRequest
+import com.museroom.app.net.RoomMember
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.FollowState
-import com.museroom.app.sync.SyncEngine
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
@@ -60,7 +65,6 @@ import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
-import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.ui.kit.NeoProgress
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.formatClock
@@ -70,127 +74,253 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** Now playing, today's tally, and the tracks behind it. */
+/** How far you scroll before the player has finished folding itself away. */
+private val COLLAPSE_OVER = 200.dp
+
 @Composable
 fun NowScreen() {
     val context = LocalContext.current
     val c = Neo.colors
-    val scope = rememberCoroutineScope()
 
     val sessions by NowPlayingRepository.sessions.collectAsStateWithLifecycle()
     val privacy = remember { PrivacyState.get(context) }
     val isPrivate by privacy.privateSession.collectAsStateWithLifecycle()
     val auth = remember { AuthRepository.get(context) }
     val session by auth.session.collectAsStateWithLifecycle()
-    val sync = remember { SyncEngine.get(context) }
     val dao = remember { MuseroomDatabase.get(context).dao() }
 
     val startOfToday = remember {
         LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
     val todayMs by dao.creditedSince(startOfToday).collectAsStateWithLifecycle(0L)
-    val recent by dao.recentSessions(8).collectAsStateWithLifecycle(emptyList())
 
-    var pending by remember { mutableStateOf<ListeningSessionEntity?>(null) }
     val active = sessions.pickActive()
     val following by FollowSession.following.collectAsStateWithLifecycle()
 
-    pending?.let { entry ->
-        AlertDialog(
-            onDismissRequest = { pending = null },
-            containerColor = c.card,
-            titleContentColor = c.ink,
-            textContentColor = c.ink,
-            title = { Text("Remove this?", style = bangers(26).copy(color = c.ink)) },
-            text = {
-                Column {
-                    Text(entry.title, style = MaterialTheme.typography.titleMedium, color = c.ink)
-                    Note(entry.artist.ifBlank { "Unknown artist" })
-                    Spacer(Modifier.size(10.dp))
-                    Note("Deleted from this phone and from the server. Its minutes come off your total.")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    scope.launch { sync.deleteEverywhere(entry) }
-                    pending = null
-                }) { Text("REMOVE", color = c.pink, style = MaterialTheme.typography.labelLarge) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pending = null }) {
-                    Text("KEEP", color = c.ink, style = MaterialTheme.typography.labelLarge)
-                }
-            },
-        )
-    }
+    val scroll = rememberScrollState()
+    val collapseOverPx = with(LocalDensity.current) { COLLAPSE_OVER.toPx() }
+    val collapse = (scroll.value / collapseOverPx).coerceIn(0f, 1f)
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        FollowBar()
-        ListenInbox()
-
-        if (isPrivate) {
-            NeoAccentCard(fill = c.pink, radius = 16.dp) {
-                Text("Private session — nothing is being recorded",
-                    style = MaterialTheme.typography.titleMedium)
-            }
-        }
-
-        // While a room is running, this phone playing nothing of its own is
-        // the normal case, not news.
+    Column(Modifier.fillMaxSize()) {
+        // The player stays put and folds down instead of scrolling away, so
+        // that what you are listening to is never something you have to scroll
+        // back up to check.
         if (active != null) {
-            NowPlayingCard(active)
-        } else if (following == null) {
-            NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
-                Text("Nothing playing", style = MaterialTheme.typography.titleLarge, color = c.ink)
-                Spacer(Modifier.size(4.dp))
-                Note("Start a song in Spotify or YouTube Music.")
+            NowPlayingHeader(
+                track = active,
+                collapse = collapse,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+        }
+
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(scroll)
+                .padding(horizontal = 20.dp)
+                .padding(top = 14.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            FollowBar()
+            ListenInbox()
+            RoomMembers()
+
+            if (isPrivate) {
+                NeoAccentCard(fill = c.pink, radius = 16.dp) {
+                    Text(
+                        "Private session — nothing is being recorded",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
             }
-        }
 
-        NeoAccentCard(fill = c.lime, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
-            Label("Listening today", color = c.onAccent)
-            Text(formatMinutes(todayMs), style = bangers(56).copy(color = c.onAccent))
-        }
+            // While a room is running, this phone playing nothing of its own is
+            // the normal case, not news.
+            if (active == null && following == null) {
+                NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
+                    Text("Nothing playing", style = MaterialTheme.typography.titleLarge, color = c.ink)
+                    Spacer(Modifier.size(4.dp))
+                    Note("Start a song in Spotify or YouTube Music.")
+                }
+            }
 
-        if (session == null) {
-            SignInPanel("Your listening stays on this phone until you sign in.")
-        }
+            NeoAccentCard(fill = c.lime, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
+                Label("Listening today", color = c.onAccent)
+                Text(formatMinutes(todayMs), style = bangers(56).copy(color = c.onAccent))
+            }
 
-        if (recent.isNotEmpty()) {
-            Label("Recent — tap to remove", color = c.ink)
-            recent.take(4).forEach { entry ->
-                Row(
+            if (session == null) {
+                SignInPanel("Your listening stays on this phone until you sign in.")
+            }
+
+            // Room to scroll into. Without it, a quiet day has too little on
+            // the page to move, and the player could never be folded away on
+            // the one screen where somebody would most want to.
+            if (active != null) Spacer(Modifier.height(COLLAPSE_OVER))
+        }
+    }
+}
+
+/**
+ * What is playing here, folding down as the page moves under it.
+ *
+ * Everything travels rather than swapping: the cover shrinks into a thumbnail
+ * and slides left, the big title fades as a small one appears beside the cover,
+ * and the progress bar simply rides along. Nothing is ever cut off mid-word,
+ * because the two titles are separate pieces of text with their own line
+ * limits rather than one piece being squeezed.
+ */
+@Composable
+private fun NowPlayingHeader(track: NowPlaying, collapse: Float, modifier: Modifier = Modifier) {
+    val c = Neo.colors
+    val density = LocalDensity.current
+
+    var elapsed by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(track.reportedAtElapsed, track.isPlaying) {
+        while (true) {
+            elapsed = SystemClock.elapsedRealtime()
+            delay(250)
+        }
+    }
+    val position = track.positionAt(elapsed)
+    val fraction = if (track.durationMs > 0) position.toFloat() / track.durationMs else 0f
+
+    // Measured once while open, then used to fold. Guessing it would either
+    // clip a two-line title or leave a gap under a one-line one.
+    var openTextPx by remember { mutableIntStateOf(0) }
+
+    val small = ((collapse - 0.35f) / 0.65f).coerceIn(0f, 1f)
+    val large = (1f - collapse * 1.7f).coerceIn(0f, 1f)
+
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val cover = lerp(maxWidth, 56.dp, collapse)
+        val corner = lerp(22.dp, 14.dp, collapse)
+        val shape = RoundedCornerShape(corner)
+
+        Column(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
                     Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(c.card)
-                        .border(3.dp, c.ink, RoundedCornerShape(14.dp))
-                        .clickable { pending = entry }
-                        .padding(horizontal = 13.dp, vertical = 11.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .size(cover)
+                        .clip(shape)
+                        .background(c.violet)
+                        .border(3.dp, c.onAccent, shape),
                 ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            entry.title, style = MaterialTheme.typography.bodyMedium,
-                            color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            entry.artist.ifBlank { "Unknown artist" },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = c.ink.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    track.artwork?.let {
+                        Image(
+                            it.asImageBitmap(), null, Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
                         )
                     }
-                    MonoText(formatMinutes(entry.creditedMs), size = 12, color = c.ink)
+                }
+                Spacer(Modifier.width(lerp(0.dp, 13.dp, collapse)))
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .alpha(small),
+                ) {
+                    Text(
+                        track.title, style = MaterialTheme.typography.titleMedium,
+                        color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        track.artist.ifBlank { "Unknown artist" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = c.ink.copy(alpha = 0.62f),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
+
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (openTextPx == 0) Modifier
+                        else Modifier.height(with(density) { (openTextPx * (1f - collapse)).toDp() })
+                    )
+                    .clipToBounds(),
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        // Unbounded so the fold never changes what was measured.
+                        .wrapContentHeight(Alignment.Top, unbounded = true)
+                        .onSizeChanged { if (collapse < 0.02f && it.height > 0) openTextPx = it.height }
+                        .alpha(large),
+                ) {
+                    Spacer(Modifier.size(16.dp))
+                    Text(
+                        track.title, style = MaterialTheme.typography.headlineLarge,
+                        color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.size(5.dp))
+                    Text(
+                        listOf(track.artist, track.album).filter { it.isNotBlank() }
+                            .joinToString(" · ").ifBlank { "Unknown artist" },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.ink.copy(alpha = 0.7f),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Spacer(Modifier.size(lerp(16.dp, 10.dp, collapse)))
+            NeoProgress(fraction)
+            Spacer(Modifier.size(lerp(8.dp, 5.dp, collapse)))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MonoText(formatClock(position), color = c.ink)
+                MonoText(
+                    if (track.isPlaying) "playing" else "paused",
+                    color = c.ink,
+                    modifier = Modifier.alpha(large),
+                )
+                MonoText(
+                    if (track.durationMs > 0) formatClock(track.durationMs) else "--:--",
+                    color = c.ink,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Who is listening along with you.
+ *
+ * A joiner's music comes out of Museroom rather than out of a player, so there
+ * is nothing on their phone for anybody to notice. They say they are here, and
+ * this is where the host sees it.
+ */
+@Composable
+private fun RoomMembers() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val auth = remember { AuthRepository.get(context) }
+    val friends = remember { FriendsRepository.get(context) }
+    val session by auth.session.collectAsStateWithLifecycle()
+
+    var members by remember { mutableStateOf<List<RoomMember>>(emptyList()) }
+    LaunchedEffect(session?.userId) {
+        while (session != null) {
+            friends.roomMembers().onSuccess { members = it }
+            delay(20_000)
+        }
+    }
+    if (members.isEmpty()) return
+
+    NeoAccentCard(fill = c.sky, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
+        Label(
+            if (members.size == 1) "Listening with you" else "${members.size} listening with you",
+            color = c.onAccent,
+        )
+        Spacer(Modifier.size(8.dp))
+        members.forEach { member ->
+            Text(
+                "@${member.handle}",
+                style = MaterialTheme.typography.titleMedium,
+                color = c.onAccent,
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -222,10 +352,11 @@ private fun ListenInbox() {
 
     inbox.forEach { request ->
         NeoAccentCard(fill = c.sky, radius = 16.dp) {
-            Text("@${request.handle} wants to listen along", style = MaterialTheme.typography.titleMedium)
-            if (request.title.isNotBlank()) {
-                Text(request.title, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-            }
+            Text(
+                "@${request.handle} wants to listen along",
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
             Spacer(Modifier.size(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 NeoButton("Let them in", small = true, tone = NeoTone.Lime, onClick = {
@@ -242,7 +373,6 @@ private fun ListenInbox() {
                 })
             }
         }
-        Spacer(Modifier.size(4.dp))
     }
 }
 
@@ -257,28 +387,27 @@ private fun ListenInbox() {
 private fun FollowBar() {
     val c = Neo.colors
     val following by FollowSession.following.collectAsStateWithLifecycle()
-    val session = following ?: return
+    val room = following ?: return
     val white = androidx.compose.ui.graphics.Color.White
 
-    var cover by remember(session.title, session.artist) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(session.title, session.artist) {
-        if (session.title.isNotBlank()) cover = Artwork.fetch(session.title, session.artist)
+    var cover by remember(room.title, room.artist) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(room.title, room.artist) {
+        if (room.title.isNotBlank()) {
+            cover = com.museroom.app.media.Artwork.fetch(room.title, room.artist)
+        }
     }
 
-    // The host's position arrives every couple of seconds. Between arrivals it
-    // is carried forward here, so the clock ticks rather than jumping.
     var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
-    val stampedAt = remember(session.positionMs) { SystemClock.elapsedRealtime() }
+    val stampedAt = remember(room.positionMs) { SystemClock.elapsedRealtime() }
     LaunchedEffect(Unit) {
         while (true) {
             tick = SystemClock.elapsedRealtime()
             delay(400)
         }
     }
-    val moving = session.state is FollowState.InStep
-    val position = session.positionMs + if (moving) (tick - stampedAt).coerceAtLeast(0) else 0
-    val fraction =
-        if (session.durationMs > 0) position.toFloat() / session.durationMs else 0f
+    val moving = room.state is FollowState.InStep
+    val position = room.positionMs + if (moving) (tick - stampedAt).coerceAtLeast(0) else 0
+    val fraction = if (room.durationMs > 0) position.toFloat() / room.durationMs else 0f
 
     NeoAccentCard(fill = c.violet, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
         Row(
@@ -287,7 +416,7 @@ private fun FollowBar() {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "Listening with @${session.handle}",
+                "Listening with @${room.handle}",
                 style = MaterialTheme.typography.titleMedium,
                 color = white,
                 maxLines = 1,
@@ -297,7 +426,7 @@ private fun FollowBar() {
             NeoButton("Leave", small = true, tone = NeoTone.Paper, onClick = { FollowSession.stop() })
         }
 
-        if (session.title.isNotBlank()) {
+        if (room.title.isNotBlank()) {
             Spacer(Modifier.size(14.dp))
             Row(
                 Modifier.fillMaxWidth(),
@@ -320,11 +449,11 @@ private fun FollowBar() {
                 }
                 Column(Modifier.weight(1f)) {
                     Text(
-                        session.title, style = MaterialTheme.typography.titleMedium,
+                        room.title, style = MaterialTheme.typography.titleMedium,
                         color = white, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        session.artist.ifBlank { "Unknown artist" },
+                        room.artist.ifBlank { "Unknown artist" },
                         style = MaterialTheme.typography.bodySmall,
                         color = white.copy(alpha = 0.8f),
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -337,7 +466,7 @@ private fun FollowBar() {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 MonoText(formatClock(position), color = white)
                 MonoText(
-                    if (session.durationMs > 0) formatClock(session.durationMs) else "--:--",
+                    if (room.durationMs > 0) formatClock(room.durationMs) else "--:--",
                     color = white,
                 )
             }
@@ -345,7 +474,7 @@ private fun FollowBar() {
 
         Spacer(Modifier.size(10.dp))
         Text(
-            when (val s = session.state) {
+            when (val s = room.state) {
                 is FollowState.Starting -> "Warming up the player"
                 is FollowState.Finding -> "Finding the track"
                 is FollowState.Loading -> "Loading ${s.title}"
@@ -366,67 +495,9 @@ private fun FollowBar() {
 
         // What the player says about itself, shown only when it is not doing
         // the one thing it is for. Unlovely, and better than a guess.
-        (session.state as? FollowState.Silent)?.detail?.takeIf { it.isNotBlank() }?.let {
+        (room.state as? FollowState.Silent)?.detail?.takeIf { it.isNotBlank() }?.let {
             Spacer(Modifier.size(4.dp))
             MonoText(it, size = 10, color = white.copy(alpha = 0.7f))
-        }
-    }
-    Spacer(Modifier.size(4.dp))
-}
-
-@Composable
-private fun NowPlayingCard(track: com.museroom.app.media.NowPlaying) {
-    val c = Neo.colors
-    var elapsed by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
-    LaunchedEffect(track.reportedAtElapsed, track.isPlaying) {
-        while (true) {
-            elapsed = SystemClock.elapsedRealtime()
-            delay(250)
-        }
-    }
-    val position = track.positionAt(elapsed)
-    val fraction = if (track.durationMs > 0) position.toFloat() / track.durationMs else 0f
-
-    Column {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(22.dp))
-                .background(c.violet)
-                .border(3.dp, c.onAccent, RoundedCornerShape(22.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            track.artwork?.let {
-                Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
-            NeoPill(
-                text = Sources.label(track.packageName),
-                fill = c.lime,
-                accent = true,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(14.dp),
-            )
-        }
-        Spacer(Modifier.size(18.dp))
-        Text(
-            track.title, style = MaterialTheme.typography.headlineLarge,
-            color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.size(5.dp))
-        Text(
-            listOf(track.artist, track.album).filter { it.isNotBlank() }.joinToString(" · "),
-            style = MaterialTheme.typography.bodyLarge,
-            color = c.ink.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.size(16.dp))
-        NeoProgress(fraction)
-        Spacer(Modifier.size(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            MonoText(formatClock(position), color = c.ink)
-            MonoText(if (track.isPlaying) "playing" else "paused", color = c.ink)
-            MonoText(if (track.durationMs > 0) formatClock(track.durationMs) else "--:--", color = c.ink)
         }
     }
 }

@@ -28,6 +28,8 @@ data class MyProfile(
         get() = Visibility.entries.firstOrNull { it.key == visibility } ?: Visibility.Friends
 }
 
+private val HANDLE = Regex("^[a-z0-9_]{3,20}$")
+
 /** Your own row. Every setting on the You screen is a column here. */
 class ProfileRepository private constructor(context: Context) {
 
@@ -41,6 +43,39 @@ class ProfileRepository private constructor(context: Context) {
         Supabase.json.decodeFromString(ListSerializer(MyProfile.serializer()), body)
             .firstOrNull()
             .also { _profile.value = it }
+    }
+
+    /**
+     * Choosing your own name.
+     *
+     * Handles used to be made out of the email address, which put a piece of
+     * everybody's real identity on a public leaderboard without anyone asking
+     * for it. This is the way back: a name you picked, and nothing else about
+     * you visible to a stranger.
+     */
+    suspend fun setHandle(handle: String): Result<Unit> {
+        val wanted = handle.trim().lowercase()
+        if (!HANDLE.matches(wanted)) {
+            return Result.failure(
+                IllegalArgumentException(
+                    "Three to twenty characters: letters, numbers and underscores.",
+                ),
+            )
+        }
+        return io { token, me ->
+            try {
+                Supabase.patch("profiles", "id=eq.$me", buildJsonObject { put("handle", wanted) }, token)
+            } catch (clash: SupabaseError) {
+                // 23505 is the unique index doing its job, and "taken" is the
+                // only part of that a person needs.
+                if (clash.body.contains("23505") || clash.status == 409) {
+                    error("@$wanted is taken.")
+                }
+                throw clash
+            }
+            refresh()
+            Unit
+        }
     }
 
     suspend fun setVisibility(v: Visibility) = patch { put("visibility", v.key) }

@@ -1,6 +1,5 @@
 package com.museroom.app.ui.screens
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -40,7 +39,6 @@ import com.museroom.app.net.Visibility
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.proximity.ProximityManager
 import com.museroom.app.sync.SyncEngine
-import com.museroom.app.sync.YouTubeSignInActivity
 import com.museroom.app.sync.SyncState
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
@@ -62,34 +60,6 @@ import kotlinx.coroutines.launch
  * is a fact about that player rather than something to assume. Shown here so a
  * failure to follow has an explanation on screen.
  */
-@Composable
-private fun ListeningRoomPanel() {
-    val context = LocalContext.current
-    val c = Neo.colors
-
-    NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
-        Note("Rooms play inside Museroom, without ad breaks.")
-        Spacer(Modifier.size(10.dp))
-        NeoButton(
-            "Connect YouTube Music",
-            tone = NeoTone.Paper,
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                context.startActivity(Intent(context, YouTubeSignInActivity::class.java))
-            },
-        )
-        Spacer(Modifier.size(8.dp))
-        MonoText(
-            if (com.museroom.app.media.TrackResolver.configured) {
-                "track lookup: api key and the player"
-            } else {
-                "track lookup: the player"
-            },
-            size = 11, color = c.ink,
-        )
-    }
-}
-
 @Composable
 fun YouScreen() {
     val context = LocalContext.current
@@ -179,13 +149,13 @@ fun YouScreen() {
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            (profile?.handle ?: session?.email.orEmpty()).take(1).uppercase(),
+                            profile?.handle.orEmpty().take(1).uppercase().ifBlank { "?" },
                             style = bangers(28).copy(color = Color.White),
                         )
                     }
                     Column(Modifier.weight(1f)) {
                         Text(
-                            profile?.handle?.let { "@$it" } ?: session?.email.orEmpty(),
+                            profile?.handle?.let { "@$it" } ?: "Loading",
                             style = MaterialTheme.typography.titleMedium, color = c.ink,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -252,8 +222,10 @@ fun YouScreen() {
             }
         }
 
-        Label("Listening rooms", color = c.ink)
-        ListeningRoomPanel()
+        if (session != null) {
+            Label("Username", color = c.ink)
+            HandlePicker()
+        }
 
         Label("Counted", color = c.ink)
 
@@ -276,6 +248,54 @@ fun YouScreen() {
                 small = true,
                 onClick = { auth.signOut() },
             )
+        }
+    }
+}
+
+/**
+ * Your name here, chosen rather than inherited.
+ *
+ * Everything anybody else sees of you is this word: the leaderboard, a friend
+ * search, a request to listen along. It used to be built out of your email
+ * address, which is not a thing anybody should discover about themselves on a
+ * public board.
+ */
+@Composable
+private fun HandlePicker() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val scope = rememberCoroutineScope()
+    val profiles = remember { ProfileRepository.get(context) }
+    val profile by profiles.profile.collectAsStateWithLifecycle()
+
+    var draft by remember(profile?.handle) { mutableStateOf(profile?.handle.orEmpty()) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    val changed = draft.trim().lowercase() != profile?.handle?.lowercase()
+
+    NeoCard(radius = 16.dp, padding = 14.dp) {
+        Field(draft, { draft = it.trim(); message = null }, "Username")
+        Spacer(Modifier.size(10.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            NeoButton(
+                text = if (saving) "Saving" else "Save",
+                small = true,
+                enabled = changed && !saving,
+                onClick = {
+                    saving = true
+                    scope.launch {
+                        profiles.setHandle(draft)
+                            .onSuccess { message = "Saved." }
+                            .onFailure { message = it.message }
+                        saving = false
+                    }
+                },
+            )
+            message?.let { Note(it) }
         }
     }
 }

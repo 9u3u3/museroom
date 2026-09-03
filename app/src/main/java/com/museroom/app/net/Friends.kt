@@ -40,6 +40,17 @@ private data class ProfileWithPlayback(
     @SerialName("now_playing") val nowPlaying: RemoteNowPlaying? = null,
 )
 
+/** Somebody listening along with you. */
+data class RoomMember(val userId: String, val handle: String)
+
+@Serializable
+private data class RoomMemberRow(
+    @SerialName("user_id") val userId: String = "",
+    val profiles: Listener? = null,
+) {
+    @Serializable data class Listener(val handle: String = "")
+}
+
 /** A friend, and whatever they were last heard playing. */
 data class Friend(
     val profile: Profile,
@@ -116,6 +127,26 @@ class FriendsRepository private constructor(context: Context) {
         Supabase.json
             .decodeFromString(ListSerializer(RemoteNowPlaying.serializer()), body)
             .firstOrNull()
+    }
+
+    /**
+     * People listening along with you right now.
+     *
+     * They say so themselves, on a stamp of their own, because a joiner has
+     * nothing playing locally for anyone to notice. Anything older than a
+     * couple of minutes is somebody who closed the app rather than left.
+     */
+    suspend fun roomMembers(): Result<List<RoomMember>> = call { token, me ->
+        val since = java.time.Instant.now().minusSeconds(120).toString()
+        val body = Supabase.select(
+            "now_playing",
+            "following_user=eq.$me&following_since=gte.${URLEncoder.encode(since, "UTF-8")}" +
+                "&select=user_id,following_since,profiles!now_playing_user_id_fkey(handle)",
+            token,
+        )
+        Supabase.json.decodeFromString(ListSerializer(RoomMemberRow.serializer()), body)
+            .map { RoomMember(it.userId, it.profiles?.handle.orEmpty()) }
+            .filter { it.handle.isNotBlank() }
     }
 
     suspend fun pending(): Result<List<PendingRequest>> = call { token, me ->

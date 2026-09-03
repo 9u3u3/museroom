@@ -72,18 +72,6 @@
             </intent-filter>
         </activity>
 
-        <!--
-            Signing in to YouTube Music, once, so a listening room plays without
-            ads for anybody who pays for that and plays at all for everybody
-            else. Its own window because a sign-in page is the one part of this
-            the person genuinely has to see.
-        -->
-        <activity
-            android:name=".sync.YouTubeSignInActivity"
-            android:exported="false"
-            android:label="@string/sign_in_music_label"
-            android:theme="@style/Theme.Museroom" />
-
         <!-- Saying yes or no from the notification, without opening anything. -->
         <receiver
             android:name=".notify.ListenActions"

@@ -108,6 +108,36 @@ class SyncEngine private constructor(context: Context) {
     }
 
     /**
+     * Says, out loud, that you are listening along with somebody.
+     *
+     * The host cannot work this out for themselves. A joiner's music comes out
+     * of Museroom rather than out of a player, so there is no session for
+     * anybody to notice, and being in a room would otherwise be invisible to
+     * the one person it is about.
+     */
+    suspend fun publishRoomPresence(hostId: String?) {
+        val userId = auth.session.value?.userId ?: return
+        val token = auth.validAccessToken() ?: return
+        runCatching {
+            withContext(Dispatchers.IO) {
+                // A patch rather than an upsert, so that joining a room can
+                // never overwrite what this phone was playing. Somebody who has
+                // never played anything has no row to patch, and simply does
+                // not show up in the host's room until they do.
+                Supabase.patch(
+                    "now_playing",
+                    "user_id=eq.$userId",
+                    buildJsonObject {
+                        put("following_user", hostId)
+                        put("following_since", hostId?.let { Instant.now().toString() })
+                    },
+                    token,
+                )
+            }
+        }
+    }
+
+    /**
      * Removes one entry everywhere: the local row, the server row, and the events
      * behind it. Deleting only locally would leave the minutes standing on the
      * leaderboard, which is the opposite of what someone asking to remove

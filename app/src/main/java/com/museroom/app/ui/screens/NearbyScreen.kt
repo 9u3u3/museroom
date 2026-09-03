@@ -44,12 +44,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Color
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.Neo
-import com.museroom.app.ui.kit.Label
-import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoSwitch
-import com.museroom.app.util.formatAgo
 
 @Composable
 fun NearbyScreen() {
@@ -60,9 +57,16 @@ fun NearbyScreen() {
     val session by auth.session.collectAsStateWithLifecycle()
     val status by manager.state.collectAsStateWithLifecycle()
     val nearby by manager.nearby.collectAsStateWithLifecycle()
-    val diag by manager.diagnostics.collectAsStateWithLifecycle()
 
-    var wanted by remember { mutableStateOf(status != ProximityStatus.Off) }
+    // The switch reads the real state rather than remembering what was asked
+    // for. Bluetooth being off, or a permission declined, used to leave it
+    // sitting on "Broadcasting" while nothing was being broadcast.
+    // Only actually searching counts as on. Bluetooth switched off, or a
+    // permission declined, used to leave the switch sitting on "Broadcasting"
+    // while nothing was being broadcast, which is the one thing it must never
+    // say.
+    val running = status is ProximityStatus.Searching || status is ProximityStatus.PausedForPrivacy
+    var wanted by remember(running) { mutableStateOf(running) }
     val ask = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { granted -> if (granted.values.all { it }) manager.start() else wanted = false }
@@ -82,7 +86,7 @@ fun NearbyScreen() {
             return@Column
         }
 
-        Pulse(active = wanted, blips = nearby.size)
+        Pulse(active = status is ProximityStatus.Searching, blips = nearby.size)
 
         NeoAccentCard(fill = c.violet, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
             Row(
@@ -108,34 +112,20 @@ fun NearbyScreen() {
             }
         }
 
-        if (wanted) {
-            NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
-                Label("Self-check", color = c.ink)
-                Spacer(Modifier.size(6.dp))
-                MonoText(
-                    when (val s = status) {
-                        is ProximityStatus.Off -> "off"
-                        is ProximityStatus.NeedsPermission -> "bluetooth permission needed"
-                        is ProximityStatus.BluetoothOff -> "turn bluetooth on"
-                        is ProximityStatus.PausedForPrivacy -> "paused: private session"
-                        is ProximityStatus.Searching ->
-                            if (nearby.isEmpty()) "listening" else "${nearby.size} nearby"
-                        is ProximityStatus.Failed -> s.reason
-                    },
-                    size = 11, color = c.ink,
-                )
-                MonoText("broadcasting: ${if (diag.advertising) "yes" else "no"}", size = 11, color = c.ink)
-                MonoText("listening: ${if (diag.scanning) "yes" else "no"}", size = 11, color = c.ink)
-                MonoText(
-                    "beacons heard: ${diag.beaconsHeard}" +
-                        if (diag.lastHeardAtMs > 0) "  (${formatAgo(diag.lastHeardAtMs)})" else "",
-                    size = 11, color = c.ink,
-                )
-                if (diag.beaconsHeard > 0 && nearby.isEmpty() && diag.lastResolveAtMs > 0) {
-                    Spacer(Modifier.size(6.dp))
-                    Note("In range, but not signed in or not playing.")
-                }
-            }
+        // One line, and only when there is something to do about it. A person
+        // does not need to know whether the radio is advertising; they need to
+        // know why nobody is showing up.
+        val trouble = when (val s = status) {
+            is ProximityStatus.NeedsPermission -> "Bluetooth permission is needed."
+            is ProximityStatus.BluetoothOff -> "Turn Bluetooth on."
+            is ProximityStatus.PausedForPrivacy -> "Paused while your session is private."
+            is ProximityStatus.Failed -> s.reason
+            is ProximityStatus.Searching ->
+                if (nearby.isEmpty()) "Nobody nearby yet. They need Museroom open too." else null
+            is ProximityStatus.Off -> null
+        }
+        trouble?.let {
+            NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) { Note(it) }
         }
 
         nearby.forEach { person ->

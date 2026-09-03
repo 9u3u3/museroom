@@ -46,8 +46,12 @@ import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.formatMinutes
 
 /**
- * The top 100, read from precomputed ranks. The podium is the first three, given
- * the room they earn; everyone else is a row.
+ * The top 100, read from precomputed ranks.
+ *
+ * Rows all the way down, including the first three. A podium spends the top of
+ * the screen on three names and makes the fourth look like an afterthought,
+ * which is the wrong shape for a list somebody is scrolling to find themselves
+ * in. The leaders are marked instead of staged.
  */
 @Composable
 fun BoardScreen() {
@@ -102,20 +106,7 @@ fun BoardScreen() {
         }
 
         val me = session?.userId
-        val top3 = entries.take(3)
-        if (top3.size == 3) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Podium(top3[1], c.sky, 104.dp, Modifier.weight(1f))
-                Podium(top3[0], c.lime, 132.dp, Modifier.weight(1.15f))
-                Podium(top3[2], c.pink, 88.dp, Modifier.weight(1f))
-            }
-        }
-
-        entries.drop(if (top3.size == 3) 3 else 0).forEach { entry ->
+        entries.forEach { entry ->
             BoardRow(entry, mine = entry.userId == me)
         }
 
@@ -135,42 +126,23 @@ fun BoardScreen() {
 }
 
 @Composable
-private fun Podium(entry: BoardEntry, fill: Color, height: androidx.compose.ui.unit.Dp, modifier: Modifier) {
-    val c = Neo.colors
-    val shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
-    Column(
-        modifier
-            .height(height)
-            .clip(shape)
-            .background(fill)
-            .border(3.dp, c.onAccent, shape)
-            .padding(horizontal = 6.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text("${entry.rank}", style = bangers(30).copy(color = c.onAccent))
-        Spacer(Modifier.size(4.dp))
-        Text(
-            "@${entry.handle}",
-            style = MaterialTheme.typography.bodySmall,
-            color = c.onAccent, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            formatMinutes(entry.creditedMs),
-            style = MaterialTheme.typography.bodySmall,
-            color = c.onAccent.copy(alpha = 0.75f),
-        )
-    }
-}
-
-@Composable
 private fun BoardRow(entry: BoardEntry, mine: Boolean) {
     val c = Neo.colors
+    // Your own row is the one you came to find, so it keeps the loud colour.
+    // The leaders get a tint, which is enough to read as a top three without
+    // taking a third of the screen to say so.
+    val lead = when (entry.rank) {
+        1 -> c.lime
+        2 -> c.sky
+        3 -> c.pink
+        else -> null
+    }
+    val onLead = lead != null && !mine
     NeoCard(
-        fill = if (mine) c.violet else c.card,
-        stroke = if (mine) c.onAccent else c.ink,
-        content = if (mine) Color.White else c.ink,
-        radius = 14.dp, shadow = if (mine) 5.dp else 3.dp, padding = 12.dp,
+        fill = if (mine) c.violet else lead ?: c.card,
+        stroke = if (mine) c.onAccent else if (onLead) c.onAccent else c.ink,
+        content = if (mine) Color.White else if (onLead) c.onAccent else c.ink,
+        radius = 14.dp, shadow = if (mine || onLead) 5.dp else 3.dp, padding = 12.dp,
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -180,19 +152,19 @@ private fun BoardRow(entry: BoardEntry, mine: Boolean) {
             MonoText(
                 "%02d".format(entry.rank),
                 size = 13,
-                color = if (mine) Color.White else c.ink,
+                color = if (mine) Color.White else if (onLead) c.onAccent else c.ink,
             )
             Text(
                 "@${entry.handle}" + if (mine) " · you" else "",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (mine) Color.White else c.ink,
+                color = if (mine) Color.White else if (onLead) c.onAccent else c.ink,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 formatMinutes(entry.creditedMs),
                 style = MaterialTheme.typography.titleMedium,
-                color = if (mine) Color.White else c.ink,
+                color = if (mine) Color.White else if (onLead) c.onAccent else c.ink,
             )
         }
     }

@@ -94,6 +94,9 @@ object FollowSession {
 
     private const val TICK_MS = 2_000L
 
+    /** Comfortably inside the two minutes the host counts as still here. */
+    private const val PRESENCE_MS = 30_000L
+
     /** A YouTube video id, which is the only thing the player can be handed. */
     private val VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
 
@@ -118,6 +121,22 @@ object FollowSession {
         val newScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = newScope
         newScope.launch { follow(app, hostId, handle) }
+        newScope.launch { announcePresence(app, hostId) }
+    }
+
+    /**
+     * Tells the host somebody is in their room, and keeps saying so.
+     *
+     * On its own loop rather than inside the follow loop, because presence
+     * should survive a track that will not load: being there is true even
+     * while the music is not.
+     */
+    private suspend fun announcePresence(app: Context, hostId: String) {
+        val sync = SyncEngine.get(app)
+        while (true) {
+            sync.publishRoomPresence(hostId)
+            delay(PRESENCE_MS)
+        }
     }
 
     @Synchronized
@@ -126,7 +145,14 @@ object FollowSession {
         scope = null
         _following.value = null
         RoomPlayer.leave()
-        RoomPlayer.context?.let { RoomService.stop(it) }
+        RoomPlayer.context?.let { context ->
+            RoomService.stop(context)
+            // Said once on the way out, off the cancelled scope, so the host
+            // stops seeing somebody who has left.
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                SyncEngine.get(context).publishRoomPresence(null)
+            }
+        }
     }
 
     private suspend fun follow(context: Context, hostId: String, handle: String) {
