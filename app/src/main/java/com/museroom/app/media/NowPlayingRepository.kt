@@ -42,6 +42,24 @@ object NowPlayingRepository {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /**
+     * What Museroom is playing itself, while you are in somebody's room.
+     *
+     * A listening room comes out of a browser view Museroom owns, and a browser
+     * view is not a media session anybody can read — so as far as everything
+     * downstream was concerned, an hour spent in a friend's room was an hour of
+     * silence. None of it counted. It is reported here instead, and from that
+     * point on it is an ordinary session: the same crediting, the same minutes,
+     * the same thing friends can see.
+     */
+    private var room: NowPlaying? = null
+
+    fun setRoomPlayback(track: NowPlaying?) {
+        if (room == track) return
+        room = track
+        publish()
+    }
+
     private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         rebind(controllers.orEmpty())
     }
@@ -79,6 +97,7 @@ object NowPlayingRepository {
         manager = null
         component = null
         started = false
+        room = null
         _sessions.value = emptyList()
     }
 
@@ -119,7 +138,8 @@ object NowPlayingRepository {
     }
 
     private fun publish() {
-        _sessions.value = bound.mapNotNull { (controller, _) -> controller.toNowPlaying() }
+        val live = bound.mapNotNull { (controller, _) -> controller.toNowPlaying() }
+        _sessions.value = live + listOfNotNull(room)
         _lastEventAt.value = System.currentTimeMillis()
     }
 }

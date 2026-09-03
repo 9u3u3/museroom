@@ -1,8 +1,11 @@
 package com.museroom.app.sync
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.SystemClock
 import com.museroom.app.media.Fingerprint
+import com.museroom.app.media.NowPlaying
+import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.TrackResolver
 import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.RemoteNowPlaying
@@ -97,6 +100,14 @@ object FollowSession {
     /** Comfortably inside the two minutes the host counts as still here. */
     private const val PRESENCE_MS = 30_000L
 
+    /**
+     * The package a room reports itself under. Deliberately not in the
+     * allowlist: this is the one session Museroom constructs rather than
+     * reads, so it should never be picked up as though somebody's own copy of
+     * Museroom were a music player somebody else could be recorded through.
+     */
+    private const val ROOM_PACKAGE = "com.museroom.app"
+
     /** A YouTube video id, which is the only thing the player can be handed. */
     private val VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
 
@@ -144,6 +155,7 @@ object FollowSession {
         scope?.cancel()
         scope = null
         _following.value = null
+        NowPlayingRepository.setRoomPlayback(null)
         RoomPlayer.leave()
         RoomPlayer.context?.let { context ->
             RoomService.stop(context)
@@ -288,6 +300,43 @@ object FollowSession {
         return TrackResolver.youtubeId(context, host.title, host.artist, host.durationMs)
     }
 
+    /**
+     * Tells the rest of the app that this counts as listening.
+     *
+     * Hung off every state change rather than off the one branch that plays,
+     * because the states that are not listening are the ones that matter here:
+     * an ad, a track still loading, a player that will not start, a host who
+     * paused. Leave a room session behind in any of those and the position
+     * goes on advancing by arithmetic, quietly crediting silence. Anything
+     * other than being in step clears it.
+     */
+    private fun reportRoomPlayback(state: FollowState, host: RemoteNowPlaying?) {
+        val snapshot = RoomPlayer.snapshot.value
+        if (state !is FollowState.InStep || host == null || !snapshot.playing) {
+            NowPlayingRepository.setRoomPlayback(null)
+            return
+        }
+        NowPlayingRepository.setRoomPlayback(
+            NowPlaying(
+                packageName = ROOM_PACKAGE,
+                sourceLabel = "Museroom room",
+                isTracked = true,
+                sourceTrackId = snapshot.videoId.ifBlank { null },
+                title = host.title,
+                artist = host.artist,
+                album = "",
+                durationMs = if (host.durationMs > 0) host.durationMs else snapshot.durationMs,
+                reportedPositionMs = snapshot.positionMs,
+                reportedAtElapsed = snapshot.takenAt,
+                playbackSpeed = 1f,
+                isPlaying = true,
+                audioContentType = AudioAttributes.CONTENT_TYPE_MUSIC,
+                artwork = null,
+                rawMetadata = emptyMap(),
+            ),
+        )
+    }
+
     /** Their position now, projected from the snapshot and when it was taken. */
     private fun hostPosition(host: RemoteNowPlaying): Long {
         val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
@@ -310,6 +359,7 @@ object FollowSession {
         host: RemoteNowPlaying?,
     ) {
         if (_following.value == null) return
+        reportRoomPlayback(state, host)
         _following.value = Following(
             hostId = hostId,
             handle = handle,

@@ -6,8 +6,8 @@ package com.museroom.app.media
  * A fixed list rather than a question the user answers. Asking per app puts the
  * burden of a privacy decision on someone in the middle of doing something else,
  * and a wrong tap is not recoverable in the way a wrong setting is: the thing is
- * already written down. So the list is short, it is music players only, and it
- * grows when a player is added here deliberately.
+ * already written down. So the list is music players only, and it grows when a
+ * player is added here deliberately rather than when one happens to play audio.
  *
  * Browsers are absent on purpose. A browser plays whatever the web plays, so
  * supporting one means recording anything the person happens to open, and there
@@ -21,6 +21,24 @@ object Sources {
         // The ReVanced and RVX builds are the same app under their own package.
         "app.revanced.android.apps.youtube.music" to "YouTube Music",
         "app.rvx.android.apps.youtube.music" to "YouTube Music",
+        "com.apple.android.music" to "Apple Music",
+        "com.amazon.mp3" to "Amazon Music",
+        "deezer.android.app" to "Deezer",
+        "com.soundcloud.android" to "SoundCloud",
+        "com.aspiro.tidal" to "Tidal",
+        "com.pandora.android" to "Pandora",
+        "com.jio.media.jiobeats" to "JioSaavn",
+        "com.bsbportal.music" to "Wynk Music",
+        "com.gaana" to "Gaana",
+        "com.anghami" to "Anghami",
+        "tv.yandex.music" to "Yandex Music",
+        "com.kakao.music" to "Kakao Music",
+        "com.tencent.ibg.joox" to "JOOX",
+        "com.melodis.midomiMusicIdentifier.freemium" to "SoundHound",
+        "com.napster.android" to "Napster",
+        "com.qobuz.music" to "Qobuz",
+        "com.bandcamp.android" to "Bandcamp",
+        "com.audiomack" to "Audiomack",
     )
 
     val packages: Set<String> get() = SUPPORTED.keys

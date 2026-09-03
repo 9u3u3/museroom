@@ -51,10 +51,14 @@ import com.museroom.app.data.MuseroomDatabase
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.pickActive
+import com.museroom.app.net.AnsweredListenRequests
 import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.net.ListenRequest
+import com.museroom.app.net.PendingRequest
 import com.museroom.app.net.RoomMember
+import com.museroom.app.notify.Notifier
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.FollowState
@@ -138,6 +142,7 @@ fun NowScreen() {
             }
 
             FollowBar()
+            FriendRequests()
             ListenInbox()
             RoomMembers()
 
@@ -156,7 +161,7 @@ fun NowScreen() {
                 NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
                     Text("Nothing playing", style = MaterialTheme.typography.titleLarge, color = c.ink)
                     Spacer(Modifier.size(4.dp))
-                    Note("Start a song in Spotify or YouTube Music.")
+                    Note("Start a song in Spotify, YouTube Music or another music app.")
                 }
             }
 
@@ -397,6 +402,7 @@ private fun ListenInbox() {
     val session by auth.session.collectAsStateWithLifecycle()
 
     var inbox by remember { mutableStateOf<List<ListenRequest>>(emptyList()) }
+    val answered by AnsweredListenRequests.ids.collectAsStateWithLifecycle()
 
     LaunchedEffect(session?.userId) {
         while (session != null) {
@@ -405,25 +411,115 @@ private fun ListenInbox() {
         }
     }
 
-    inbox.forEach { request ->
+    // Anything answered from the shade drops out of here at once rather than
+    // waiting for the next poll to notice.
+    val waiting = inbox.filter { it.id !in answered }
+    if (waiting.isEmpty()) return
+
+    fun answer(request: ListenRequest, accept: Boolean) {
+        AnsweredListenRequests.mark(request.id)
+        Notifier.clearRequest(context, request.id)
+        scope.launch {
+            listen.respond(request.id, accept)
+            listen.inbox().onSuccess { inbox = it }
+        }
+    }
+
+    Label("Asking to join", color = c.ink)
+    waiting.forEach { request ->
         NeoAccentCard(fill = c.sky, radius = 16.dp) {
             Text(
                 "${request.handle} wants to listen along",
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
+            if (request.title.isNotBlank()) {
+                Text(
+                    request.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = c.onAccent.copy(alpha = 0.75f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
             Spacer(Modifier.size(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                 NeoButton("Let them in", small = true, tone = NeoTone.Lime, onClick = {
-                    scope.launch {
-                        listen.respond(request.id, true)
-                        listen.inbox().onSuccess { inbox = it }
-                    }
+                    answer(request, true)
                 })
                 NeoButton("No", small = true, tone = NeoTone.Paper, onClick = {
+                    answer(request, false)
+                })
+            }
+        }
+    }
+}
+
+/**
+ * People asking to be friends, on the screen you actually open.
+ *
+ * It lived only on the Friends tab, which is a tab nobody opens unless they
+ * already suspect there is something there. A request nobody sees is a request
+ * nobody answers.
+ */
+@Composable
+private fun FriendRequests() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val scope = rememberCoroutineScope()
+    val friends = remember { FriendsRepository.get(context) }
+    val auth = remember { AuthRepository.get(context) }
+    val session by auth.session.collectAsStateWithLifecycle()
+
+    var pending by remember { mutableStateOf<List<PendingRequest>>(emptyList()) }
+    var busy by remember { mutableStateOf(false) }
+
+    suspend fun reload() {
+        friends.pending().onSuccess { pending = it }
+    }
+
+    LaunchedEffect(session?.userId) {
+        while (session != null) {
+            reload()
+            delay(15_000)
+        }
+    }
+
+    val incoming = pending.filter { it.incoming }
+    if (incoming.isEmpty()) return
+
+    Label("Wants to be friends", color = c.ink)
+    incoming.forEach { request ->
+        NeoAccentCard(fill = c.lime, radius = 16.dp) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Face(request.profile.handle, request.profile.avatarUrl, 38.dp)
+                Text(
+                    request.profile.handle,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = c.onAccent,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Spacer(Modifier.size(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                NeoButton("Accept", small = true, tone = NeoTone.Violet, enabled = !busy, onClick = {
+                    busy = true
                     scope.launch {
-                        listen.respond(request.id, false)
-                        listen.inbox().onSuccess { inbox = it }
+                        friends.accept(request.profile)
+                        reload()
+                        busy = false
+                    }
+                })
+                NeoButton("Decline", small = true, tone = NeoTone.Paper, enabled = !busy, onClick = {
+                    busy = true
+                    scope.launch {
+                        friends.remove(request.profile)
+                        reload()
+                        busy = false
                     }
                 })
             }

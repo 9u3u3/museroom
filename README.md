@@ -73,3 +73,14 @@ Install this on a real handset with both apps, play a song in each, and read the
 raw metadata panel. Expect YouTube Music to need work: artist arrives as
 `Name - Topic`, and non-catalogue uploads carry a video thumbnail rather than an
 album cover.
+
+## Licence
+
+Museroom is free software under the **GNU General Public License, version 3**.
+The full text is in [LICENSE](LICENSE).
+
+That means anybody may use, study, change and share it, on the condition that
+anything built on it stays free in the same way. It is a deliberate choice for
+an app that reads what you listen to: the only real assurance that a thing is
+doing what it claims is that anyone can check, and copyleft keeps that true of
+every version anybody else ships.

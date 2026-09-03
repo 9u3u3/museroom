@@ -13,10 +13,18 @@ import org.junit.Test
 class SourcesTest {
 
     @Test
-    fun `the three players we support are counted`() {
-        assertTrue(Sources.isSupported("com.spotify.music"))
-        assertTrue(Sources.isSupported("com.google.android.apps.youtube.music"))
-        assertTrue(Sources.isSupported("app.revanced.android.apps.youtube.music"))
+    fun `the streaming apps we support are counted`() {
+        listOf(
+            "com.spotify.music",
+            "com.google.android.apps.youtube.music",
+            "app.revanced.android.apps.youtube.music",
+            "com.apple.android.music",
+            "com.amazon.mp3",
+            "deezer.android.app",
+            "com.soundcloud.android",
+            "com.aspiro.tidal",
+            "com.jio.media.jiobeats",
+        ).forEach { assertTrue(it, Sources.isSupported(it)) }
     }
 
     @Test
@@ -44,6 +52,21 @@ class SourcesTest {
         assertFalse(Sources.isSupported("com.some.podcast.app"))
         assertFalse(Sources.isSupported("com.spotify.music.fake"))
         assertFalse(Sources.isSupported("com.whatsapp"))
+    }
+
+    @Test
+    fun `a longer list is still a list, not everything that makes noise`() {
+        // The allowlist grew to cover the streaming apps people actually use.
+        // What it must never grow into is "anything with a media session",
+        // which is every podcast app, every game and every video in a browser.
+        listOf(
+            "com.google.android.videos",
+            "com.netflix.mediaclient",
+            "com.instagram.android",
+            "com.zhiliaoapp.musically",
+            "org.videolan.vlc",
+            "com.google.android.apps.podcasts",
+        ).forEach { assertFalse(it, Sources.isSupported(it)) }
     }
 
     @Test

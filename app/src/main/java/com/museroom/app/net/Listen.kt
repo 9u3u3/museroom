@@ -2,6 +2,9 @@ package com.museroom.app.net
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -27,6 +30,25 @@ data class ListenRequest(
     @Serializable data class Who(val handle: String = "")
 
     val handle: String get() = profiles?.handle.orEmpty()
+}
+
+/**
+ * Requests already answered, wherever the answer came from.
+ *
+ * A request can be answered in two places — the card on the Now screen and the
+ * notification in the shade — and neither used to know about the other. The
+ * card went on offering a question that had been answered from the shade until
+ * the next poll came round, and answering in the app left the notification
+ * sitting there asking. Both write here now, and both read it.
+ */
+object AnsweredListenRequests {
+
+    private val _ids = MutableStateFlow<Set<Long>>(emptySet())
+    val ids: StateFlow<Set<Long>> = _ids.asStateFlow()
+
+    fun mark(id: Long) {
+        _ids.value = _ids.value + id
+    }
 }
 
 /**

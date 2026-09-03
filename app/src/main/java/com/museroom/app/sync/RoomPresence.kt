@@ -4,6 +4,7 @@ import android.content.Context
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.RoomMember
+import com.museroom.app.notify.Notifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,13 +46,41 @@ object RoomPresence {
             auth.session.collectLatest { session ->
                 if (session == null) {
                     _members.value = emptyList()
+                    seen = emptySet()
                     return@collectLatest
                 }
+                // First pass after signing in only learns who is already
+                // there. Announcing them would mean a notification for
+                // everybody still in the room every time the app restarts.
+                var first = true
                 while (true) {
-                    friends.roomMembers().onSuccess { _members.value = it }
+                    friends.roomMembers().onSuccess { members ->
+                        if (!first) announceArrivals(app, members)
+                        seen = members.map { it.userId }.toSet()
+                        _members.value = members
+                        first = false
+                    }
                     delay(POLL_MS)
                 }
             }
         }
+    }
+
+    /** Who was here last time round, so only new faces are worth a message. */
+    private var seen: Set<String> = emptySet()
+
+    /**
+     * Somebody arriving is the only moment a host would ever learn it, and
+     * with an open door there is no request to notice instead. It has to reach
+     * them whether or not they are looking at the app, which is why this poll
+     * runs from the background service rather than from a screen.
+     */
+    private fun announceArrivals(app: Context, members: List<RoomMember>) {
+        val arrived = members.filter { it.userId !in seen }
+        if (arrived.isEmpty()) return
+        // One message for the newest arrival rather than a burst of them; the
+        // count says how full the room is.
+        val newest = arrived.last()
+        Notifier.someoneJoined(app, newest.handle, members.size - 1)
     }
 }

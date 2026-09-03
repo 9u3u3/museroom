@@ -3,7 +3,7 @@ package com.museroom.app.notify
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.core.app.NotificationManagerCompat
+import com.museroom.app.net.AnsweredListenRequests
 import com.museroom.app.net.ListenRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +25,10 @@ class ListenActions : BroadcastReceiver() {
         val accept = intent.action == ACTION_ACCEPT
         val app = context.applicationContext
 
-        NotificationManagerCompat.from(app).cancel(Notifier.REQUEST_ID)
+        // Clear the one notification this answer belongs to, and say so
+        // where the in-app card can see it, so the card does not go on asking.
+        Notifier.clearRequest(app, id)
+        AnsweredListenRequests.mark(id)
 
         val finish = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {

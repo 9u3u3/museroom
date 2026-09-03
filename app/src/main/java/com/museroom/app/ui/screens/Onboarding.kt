@@ -85,7 +85,7 @@ fun OnboardingScreen() {
         Spacer(Modifier.size(22.dp))
 
         listOf(
-            "Spotify and YouTube Music only",
+            "Music apps only, from a fixed list",
             "Every other notification is ignored",
             "Nothing is shared until you sign in",
         ).forEach { promise ->

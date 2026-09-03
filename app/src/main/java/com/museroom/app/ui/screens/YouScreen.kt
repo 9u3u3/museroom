@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -90,6 +92,7 @@ fun YouScreen() {
     val waiting by sync.pendingEvents.collectAsStateWithLifecycle(0)
 
     var confirmWipe by remember { mutableStateOf(false) }
+    var explainPrivate by remember { mutableStateOf(false) }
     var photoNote by remember { mutableStateOf<String?>(null) }
 
     // The system picker, so Museroom never asks for access to the gallery: it
@@ -112,6 +115,34 @@ fun YouScreen() {
     }
 
     LaunchedEffect(session?.userId) { if (session != null) profiles.refresh() }
+
+    if (explainPrivate) {
+        AlertDialog(
+            onDismissRequest = { explainPrivate = false },
+            containerColor = c.card,
+            title = { Text("Private session", style = bangers(26).copy(color = c.ink)) },
+            text = {
+                Column {
+                    Note(
+                        "While it is on, Museroom records nothing at all. No track is " +
+                            "written down, no minutes are counted towards your total or the " +
+                            "board, and nobody can see what you are playing.",
+                    )
+                    Spacer(Modifier.size(10.dp))
+                    Note(
+                        "Nearby is switched off with it, so your phone stops broadcasting " +
+                            "to the people around you as well. Everything already recorded " +
+                            "stays exactly as it was.",
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { explainPrivate = false }) {
+                    Text("GOT IT", color = c.ink, style = MaterialTheme.typography.labelLarge)
+                }
+            },
+        )
+    }
 
     if (confirmWipe) {
         AlertDialog(
@@ -150,14 +181,32 @@ fun YouScreen() {
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
                     "Private session",
                     style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f),
                     maxLines = 1,
                 )
+                // The switch turns off more than it sounds like it does, and
+                // what it turns off is the whole point of the app. Worth a
+                // tap to find out before you flip it, not a paragraph nobody
+                // reads sitting underneath it forever.
+                Box(
+                    Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(c.onAccent.copy(alpha = 0.14f))
+                        .border(2.dp, c.onAccent, CircleShape)
+                        .clickable { explainPrivate = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "i",
+                        style = bangers(15).copy(color = c.onAccent),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
                 NeoSwitch(checked = isPrivate, onCheckedChange = { on ->
                     privacy.setPrivate(on)
                     if (on) ProximityManager.get(context).stop()
@@ -170,21 +219,47 @@ fun YouScreen() {
         } else {
             NeoCard(radius = 18.dp, padding = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                    Face(
-                        profile?.handle.orEmpty(),
-                        profile?.avatarUrl,
-                        62.dp,
-                        modifier = Modifier.clickable {
-                            pickPhoto.launch(PickVisualMediaRequest(ImageOnly))
-                        },
-                        shape = RoundedCornerShape(18.dp),
-                    )
+                    // A tappable thing that looks exactly like a non-tappable
+                    // thing is not tappable as far as anybody knows. The badge
+                    // is the only reason anyone would find out a picture can
+                    // go here, so it stays until there is one.
+                    Box {
+                        Face(
+                            profile?.handle.orEmpty(),
+                            profile?.avatarUrl,
+                            62.dp,
+                            modifier = Modifier.clickable {
+                                pickPhoto.launch(PickVisualMediaRequest(ImageOnly))
+                            },
+                            shape = RoundedCornerShape(18.dp),
+                        )
+                        if (profile?.avatarUrl.isNullOrBlank()) {
+                            Box(
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .offset(x = 5.dp, y = 5.dp)
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(c.lime)
+                                    .border(2.5.dp, c.onAccent, CircleShape)
+                                    .clickable {
+                                        pickPhoto.launch(PickVisualMediaRequest(ImageOnly))
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("+", style = bangers(17).copy(color = c.onAccent))
+                            }
+                        }
+                    }
                     Column(Modifier.weight(1f)) {
                         Text(
                             profile?.handle ?: "Loading",
                             style = MaterialTheme.typography.titleMedium, color = c.ink,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
+                        if (profile?.avatarUrl.isNullOrBlank()) {
+                            Note("Tap the square to add a photo")
+                        }
                         Note(
                             when (val s = syncState) {
                                 is SyncState.Synced ->

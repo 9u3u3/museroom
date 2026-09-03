@@ -10,9 +10,11 @@ import com.museroom.app.credit.Crediting
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.pickActive
 import com.museroom.app.privacy.PrivacyState
+import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.notify.Notifier
+import com.museroom.app.sync.RoomPresence
 import com.museroom.app.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +49,9 @@ object PlaybackTracker {
 
     /** Faster than the inbox, because somebody is waiting on this one. */
     private const val ANSWER_MS = 8_000L
+
+    /** A friend putting a record on can wait a minute to be mentioned. */
+    private const val FRIENDS_MS = 60_000L
 
     private val differ = PlaybackDiffer(heartbeatMs = HEARTBEAT_MS)
 
@@ -115,6 +120,43 @@ object PlaybackTracker {
         // anything. Asking and then having to find a second button on a screen
         // you are not looking at is the same manual step this was meant to end.
         newScope.launch { watchForBeingLetIn(app, listen, prefs) }
+
+        // Somebody walking into your room, and friends putting something on.
+        // Both belong here rather than on a screen: the whole point of either
+        // message is that it reaches you when you are not looking.
+        RoomPresence.start(app)
+        newScope.launch { watchFriendsListening(app) }
+    }
+
+    /**
+     * A friend has started something.
+     *
+     * Only the transition is worth a message. Somebody who was already playing
+     * when this loop first looked is not news, and neither is the same person
+     * still playing on the next pass; what gets announced is the moment they
+     * went from quiet to listening, once, silently.
+     */
+    private suspend fun watchFriendsListening(app: Context) {
+        val friends = FriendsRepository.get(app)
+        var playing = emptySet<String>()
+        var first = true
+
+        while (true) {
+            delay(FRIENDS_MS)
+            friends.friends().onSuccess { list ->
+                val nowPlaying = list.filter { it.nowPlaying != null }
+                if (!first) {
+                    nowPlaying.filter { it.profile.id !in playing }.forEach { friend ->
+                        val track = friend.nowPlaying?.let { np ->
+                            listOf(np.title, np.artist).filter { it.isNotBlank() }.joinToString(" · ")
+                        }.orEmpty()
+                        Notifier.friendListening(app, friend.profile.id, friend.profile.handle, track)
+                    }
+                }
+                playing = nowPlaying.map { it.profile.id }.toSet()
+                first = false
+            }
+        }
     }
 
     /**
