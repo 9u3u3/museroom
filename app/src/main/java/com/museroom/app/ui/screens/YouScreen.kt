@@ -73,6 +73,10 @@ private fun PlayerControlReport() {
         return
     }
     NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
+        if (!com.museroom.app.media.TrackResolver.configured) {
+            MonoText("exact track links: not configured", size = 11, color = c.ink)
+            Spacer(Modifier.size(4.dp))
+        }
         caps.forEach { cap ->
             MonoText(
                 Sources.label(cap.packageName) + ": " + when {

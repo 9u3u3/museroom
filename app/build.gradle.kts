@@ -25,12 +25,15 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "2.4-follow"
+        versionName = "2.5-exact"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${env("SUPABASE_URL")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${env("SUPABASE_ANON_KEY")}\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${env("GOOGLE_WEB_CLIENT_ID")}\"")
+        // Turns a song title into an exact YouTube Music link, which is what
+        // makes following somebody automatic instead of a search and a tap.
+        buildConfigField("String", "YOUTUBE_API_KEY", "\"${env("YOUTUBE_API_KEY")}\"")
     }
 
     signingConfigs {

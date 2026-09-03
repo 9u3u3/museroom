@@ -80,6 +80,7 @@ object PlayerCommands {
         title: String,
         artist: String,
         sourceTrackId: String? = null,
+        durationMs: Long = 0,
     ): PlayOutcome {
         val query = listOf(title, artist).filter { it.isNotBlank() }.joinToString(" ")
         if (query.isBlank()) return PlayOutcome.Failed("Nothing to play.")
@@ -101,10 +102,15 @@ object PlayerCommands {
             if (startedPlaying(context, packageName, title, before)) return PlayOutcome.Started
         }
 
+        // No id from the host? Resolve one. An exact link opens the song itself,
+        // where a search link only lands nearby and needs a tap.
+        val resolvedId = sourceTrackId
+            ?: TrackResolver.youtubeId(context, title, artist, durationMs)
+
         // Otherwise open the app. A track link lands on the song itself; a search
         // link only lands nearby, which is why the id is worth carrying.
-        val links = trackLinks(packageName, sourceTrackId) + searchLinks(packageName, query)
-        val exact = trackLinks(packageName, sourceTrackId).isNotEmpty()
+        val links = trackLinks(packageName, resolvedId) + searchLinks(packageName, query)
+        val exact = trackLinks(packageName, resolvedId).isNotEmpty()
         for (link in links) {
             if (!open(context, link, packageName)) continue
             // Opening a track usually leaves it loaded but paused. Pressing play

@@ -107,7 +107,7 @@ object FollowSession {
                 // it fails loudly rather than pretending to be in step.
                 update(hostId, handle, FollowState.Changing(host.title))
                 val outcome = PlayerCommands.play(
-                    context, player, host.title, host.artist, host.sourceTrackId,
+                    context, player, host.title, host.artist, host.sourceTrackId, host.durationMs,
                 )
                 if (outcome is PlayOutcome.Failed) {
                     update(hostId, handle, FollowState.Stuck(outcome.reason))
