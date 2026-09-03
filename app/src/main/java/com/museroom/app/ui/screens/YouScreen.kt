@@ -68,7 +68,7 @@ private fun ListeningRoomPanel() {
     val c = Neo.colors
 
     NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
-        Note("Rooms play inside Museroom. Nothing opens another app.")
+        Note("Rooms play inside Museroom, without ad breaks.")
         Spacer(Modifier.size(10.dp))
         NeoButton(
             "Connect YouTube Music",

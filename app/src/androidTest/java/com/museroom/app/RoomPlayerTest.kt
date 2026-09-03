@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.museroom.app.sync.RoomPlayer
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,6 +32,48 @@ class RoomPlayerTest {
     fun tearDown() {
         RoomPlayer.leave()
         scenario?.close()
+    }
+
+    /**
+     * Ad breaks are the one interruption a room cannot absorb: the host never
+     * pauses, so while an ad runs there is no shared moment to hold. Both
+     * routes ad slots arrive by are checked, because closing one is no use.
+     */
+    @Test
+    fun theAdSlotsNeverReachThePlayer() {
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        RoomPlayer.warmUp()
+        assertTrue(
+            "The YouTube Music page never finished loading.",
+            waitFor(90_000) { RoomPlayer.started },
+        )
+
+        assertEquals(
+            "The document-start script never ran on the page.",
+            "true",
+            runBlocking { RoomPlayer.evaluate("window.__museroomAdblock === true") },
+        )
+        assertEquals(
+            "Ad fields survived being parsed from the network.",
+            "true",
+            runBlocking {
+                RoomPlayer.evaluate(
+                    "(function(){var o=JSON.parse('{\"adPlacements\":[1],\"adSlots\":[2],\"playerAds\":[3]}');" +
+                        "return o.adPlacements===undefined&&o.adSlots===undefined&&o.playerAds===undefined;})()",
+                )
+            },
+        )
+        assertEquals(
+            "Ad fields baked into the page survived.",
+            "true",
+            runBlocking {
+                RoomPlayer.evaluate(
+                    "window.ytInitialPlayerResponse === undefined || " +
+                        "(window.ytInitialPlayerResponse.adPlacements === undefined && " +
+                        "window.ytInitialPlayerResponse.adSlots === undefined)",
+                )
+            },
+        )
     }
 
     @Test

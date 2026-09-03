@@ -14,6 +14,8 @@ import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.museroom.app.BuildConfig
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,22 +133,53 @@ object RoomPlayer {
                 }
             }
         }
+        blockAds(view)
         view.webViewClient = object : WebViewClient() {
+            override fun onPageStarted(v: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                if (!documentStartSupported) asset(v, "adblock.js")
+            }
+
             override fun onPageFinished(v: WebView, url: String) {
                 booted = true
-                inject(v)
+                asset(v, "room.js")
             }
         }
         web = view
         return view
     }
 
-    private fun inject(view: WebView) {
-        val script = runCatching {
-            view.context.assets.open("room.js").bufferedReader().use { it.readText() }
-        }.getOrNull() ?: return
+    /**
+     * Ad breaks, dealt with before the page can arrange one.
+     *
+     * The listener is the only one who would hear it. The host never pauses,
+     * so an ad here is a stretch of time with nothing to stay in step with,
+     * and the room is broken for as long as it runs. It has to be the page's
+     * own scripts that never see the ad slots, which means running first, and
+     * a document-start script is the only hook that reliably does.
+     */
+    private fun blockAds(view: WebView) {
+        if (!documentStartSupported) return
+        runCatching {
+            val script = read(view.context, "adblock.js") ?: return
+            WebViewCompat.addDocumentStartJavaScript(
+                view,
+                script,
+                setOf("https://music.youtube.com", "https://www.youtube.com"),
+            )
+        }
+    }
+
+    private val documentStartSupported: Boolean
+        get() = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+
+    private fun asset(view: WebView, name: String) {
+        val script = read(view.context, name) ?: return
         view.evaluateJavascript(script, null)
     }
+
+    private fun read(context: Context, name: String): String? = runCatching {
+        context.assets.open(name).bufferedReader().use { it.readText() }
+    }.getOrNull()
 
     // ---- playback --------------------------------------------------------
 
@@ -233,6 +266,23 @@ object RoomPlayer {
         val found = withTimeoutOrNull(12_000) { waiting.await() }
         pending.remove(token)
         return found?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * Runs an expression in the page and hands back what it evaluated to.
+     *
+     * Exists for the tests. Nothing about a listening room is a documented
+     * interface, so the only way to know the page still behaves is to ask it.
+     */
+    suspend fun evaluate(expression: String): String? {
+        if (!booted) return null
+        val answer = CompletableDeferred<String?>()
+        onMain {
+            val view = web
+            if (view == null) answer.complete(null)
+            else view.evaluateJavascript(expression) { answer.complete(it) }
+        }
+        return withTimeoutOrNull(10_000) { answer.await() }
     }
 
     // ---- plumbing --------------------------------------------------------

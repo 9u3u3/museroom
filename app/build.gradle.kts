@@ -24,8 +24,8 @@ android {
         applicationId = "com.museroom.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "3.0-rooms"
+        versionCode = 3
+        versionName = "3.1-rooms"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${env("SUPABASE_URL")}\"")
@@ -94,6 +94,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.okhttp)
+    implementation(libs.androidx.webkit)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
