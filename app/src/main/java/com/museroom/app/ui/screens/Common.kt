@@ -36,9 +36,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.museroom.app.media.Artwork
-import com.museroom.app.media.PlayOutcome
-import com.museroom.app.media.PlayerCommands
-import com.museroom.app.media.PlayerPreference
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ListenRepository
@@ -226,7 +223,6 @@ fun ListenerRow(
     val context = LocalContext.current
     val c = Neo.colors
     val scope = rememberCoroutineScope()
-    val preference = remember { PlayerPreference.get(context) }
     val listen = remember { ListenRepository.get(context) }
 
     var art by remember(title, artist) { mutableStateOf<Bitmap?>(Artwork.cached(title, artist)) }

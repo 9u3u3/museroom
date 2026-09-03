@@ -1,5 +1,6 @@
 package com.museroom.app.ui.screens
 
+import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -41,14 +42,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.data.ListeningSessionEntity
 import com.museroom.app.data.MuseroomDatabase
+import com.museroom.app.media.Artwork
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.Sources
 import com.museroom.app.media.pickActive
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.net.ListenRequest
-import com.museroom.app.media.PlayerCommands
-import com.museroom.app.media.PlayerPreference
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.FollowState
@@ -267,46 +267,121 @@ private fun ListenInbox() {
 }
 
 /**
- * Following somebody: what it is doing, and how far off you are.
+ * A listening room: what Museroom is playing, and how far off the host it is.
  *
- * The offset is shown because "in sync" is a claim, and a number is checkable.
+ * This is the joiner's whole player. There is nothing to press because there
+ * is nothing to decide; the host decides, and this follows. The offset is
+ * shown because "in sync" is a claim and a number is checkable.
  */
 @Composable
 private fun FollowBar() {
     val c = Neo.colors
     val following by FollowSession.following.collectAsStateWithLifecycle()
     val session = following ?: return
+    val white = androidx.compose.ui.graphics.Color.White
 
-    NeoAccentCard(fill = c.violet, radius = 16.dp) {
+    var cover by remember(session.title, session.artist) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(session.title, session.artist) {
+        if (session.title.isNotBlank()) cover = Artwork.fetch(session.title, session.artist)
+    }
+
+    // The host's position arrives every couple of seconds. Between arrivals it
+    // is carried forward here, so the clock ticks rather than jumping.
+    var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    val stampedAt = remember(session.positionMs) { SystemClock.elapsedRealtime() }
+    LaunchedEffect(Unit) {
+        while (true) {
+            tick = SystemClock.elapsedRealtime()
+            delay(400)
+        }
+    }
+    val moving = session.state is FollowState.InStep
+    val position = session.positionMs + if (moving) (tick - stampedAt).coerceAtLeast(0) else 0
+    val fraction =
+        if (session.durationMs > 0) position.toFloat() / session.durationMs else 0f
+
+    NeoAccentCard(fill = c.violet, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "Following @${session.handle}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = androidx.compose.ui.graphics.Color.White,
-                    maxLines = 1,
-                )
-                Text(
-                    when (val s = session.state) {
-                        is FollowState.Starting -> "Getting in step"
-                        is FollowState.InStep ->
-                            if (kotlin.math.abs(s.offMs) < 1000) "In step"
-                            else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"
-                        is FollowState.Changing -> "Moving to ${s.title}"
-                        is FollowState.HostQuiet -> "They stopped playing"
-                        is FollowState.Stuck -> s.reason
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
-                    maxLines = 2,
+            Text(
+                "Listening with @${session.handle}",
+                style = MaterialTheme.typography.titleMedium,
+                color = white,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            NeoButton("Leave", small = true, tone = NeoTone.Paper, onClick = { FollowSession.stop() })
+        }
+
+        if (session.title.isNotBlank()) {
+            Spacer(Modifier.size(14.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(13.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(62.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(white.copy(alpha = 0.18f))
+                        .border(3.dp, c.onAccent, RoundedCornerShape(14.dp)),
+                ) {
+                    cover?.let {
+                        Image(
+                            it.asImageBitmap(), null, Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop,
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        session.title, style = MaterialTheme.typography.titleMedium,
+                        color = white, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        session.artist.ifBlank { "Unknown artist" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = white.copy(alpha = 0.8f),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.size(14.dp))
+            NeoProgress(fraction, fill = c.lime)
+            Spacer(Modifier.size(7.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                MonoText(formatClock(position), color = white)
+                MonoText(
+                    if (session.durationMs > 0) formatClock(session.durationMs) else "--:--",
+                    color = white,
                 )
             }
-            NeoButton("Stop", small = true, tone = NeoTone.Paper, onClick = { FollowSession.stop() })
         }
+
+        Spacer(Modifier.size(10.dp))
+        Text(
+            when (val s = session.state) {
+                is FollowState.Starting -> "Warming up the player"
+                is FollowState.Finding -> "Finding the track"
+                is FollowState.Loading -> "Loading ${s.title}"
+                is FollowState.CatchingUp -> "Catching up"
+                is FollowState.InStep ->
+                    if (kotlin.math.abs(s.offMs) < 1000) "In step"
+                    else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"
+                is FollowState.Advert -> "Ad break — back in a moment"
+                is FollowState.HostQuiet -> "They stopped playing"
+                is FollowState.Stuck -> s.reason
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = white.copy(alpha = 0.85f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
     Spacer(Modifier.size(4.dp))
 }

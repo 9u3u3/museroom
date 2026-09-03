@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import com.museroom.app.sync.RoomPlayer
 import com.museroom.app.ui.MuseroomApp
 import com.museroom.app.ui.MuseroomTheme
 import com.museroom.app.ui.ThemeState
@@ -22,5 +23,17 @@ class MainActivity : ComponentActivity() {
                 MuseroomApp()
             }
         }
+
+        // Museroom plays a listening room itself, from a WebView it keeps one
+        // pixel wide. It needs a window to live in, and this is the window;
+        // the player outlives this activity so that a rotation is not a reason
+        // for the music to stop.
+        RoomPlayer.prime(this)
+        RoomPlayer.attach(this)
+    }
+
+    override fun onDestroy() {
+        RoomPlayer.detach()
+        super.onDestroy()
     }
 }

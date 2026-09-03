@@ -41,6 +41,17 @@ object TrackResolver {
 
     val configured: Boolean get() = BuildConfig.YOUTUBE_API_KEY.isNotBlank()
 
+    /**
+     * A search that needs no key, installed by whoever has one.
+     *
+     * Museroom's own player runs a signed-in YouTube Music page, and that page
+     * can search as the person using it. Letting it answer here is what makes
+     * following work out of the box: the key becomes an optimisation rather
+     * than a requirement, and the answer still lands in the shared catalogue.
+     */
+    @Volatile
+    var searcher: (suspend (title: String, artist: String) -> String?)? = null
+
     /** A YouTube video id for this track, or null if it cannot be found. */
     suspend fun youtubeId(
         context: Context,
@@ -76,7 +87,10 @@ object TrackResolver {
             ?.get("youtube_video_id")?.jsonPrimitive?.contentOrNull
     }.getOrNull()
 
-    private fun search(title: String, artist: String): String? {
+    private suspend fun search(title: String, artist: String): String? =
+        byKey(title, artist) ?: searcher?.invoke(title, artist)
+
+    private fun byKey(title: String, artist: String): String? {
         if (!configured) return null
         val query = URLEncoder.encode(
             listOf(title, artist).filter { it.isNotBlank() }.joinToString(" "),

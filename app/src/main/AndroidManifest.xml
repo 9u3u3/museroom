@@ -29,6 +29,14 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!--
+        Museroom plays the music itself when you listen along with somebody, so
+        it has to keep playing once you leave the screen. Declaring the service
+        as media playback is how the system is told that audio is the point.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+
+    <!--
         Package visibility (Android 11+). We never read these apps' data directly;
         we only need to resolve their labels and, later, deep links into them.
     -->
@@ -63,6 +71,24 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Signing in to YouTube Music, once, so a listening room plays without
+            ads for anybody who pays for that and plays at all for everybody
+            else. Its own window because a sign-in page is the one part of this
+            the person genuinely has to see.
+        -->
+        <activity
+            android:name=".sync.YouTubeSignInActivity"
+            android:exported="false"
+            android:label="@string/sign_in_music_label"
+            android:theme="@style/Theme.Museroom" />
+
+        <!-- Keeps a room playing while Museroom is not the app on screen. -->
+        <service
+            android:name=".sync.RoomService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
         <!--
             Enabling this component in Settings is what grants access to

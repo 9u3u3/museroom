@@ -1,5 +1,6 @@
 package com.museroom.app.ui.screens
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -33,14 +34,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.museroom.app.media.PlayerCommands
-import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ProfileRepository
 import com.museroom.app.net.Visibility
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.proximity.ProximityManager
 import com.museroom.app.sync.SyncEngine
+import com.museroom.app.sync.YouTubeSignInActivity
 import com.museroom.app.sync.SyncState
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
@@ -63,31 +63,30 @@ import kotlinx.coroutines.launch
  * failure to follow has an explanation on screen.
  */
 @Composable
-private fun PlayerControlReport() {
+private fun ListeningRoomPanel() {
     val context = LocalContext.current
     val c = Neo.colors
-    val caps = remember { PlayerCommands.capabilities(context).filter { it.installed } }
 
-    if (caps.isEmpty()) {
-        Note("No supported player installed.")
-        return
-    }
     NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
-        if (!com.museroom.app.media.TrackResolver.configured) {
-            MonoText("exact track links: not configured", size = 11, color = c.ink)
-            Spacer(Modifier.size(4.dp))
-        }
-        caps.forEach { cap ->
-            MonoText(
-                Sources.label(cap.packageName) + ": " + when {
-                    !cap.hasLiveSession -> "idle, unknown until it plays"
-                    cap.canSeek && cap.canPlayFromSearch -> "can follow and start songs"
-                    cap.canSeek -> "can follow"
-                    else -> "will not take a seek"
-                },
-                size = 11, color = c.ink,
-            )
-        }
+        Note("Rooms play inside Museroom. Nothing opens another app.")
+        Spacer(Modifier.size(10.dp))
+        NeoButton(
+            "Connect YouTube Music",
+            tone = NeoTone.Paper,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                context.startActivity(Intent(context, YouTubeSignInActivity::class.java))
+            },
+        )
+        Spacer(Modifier.size(8.dp))
+        MonoText(
+            if (com.museroom.app.media.TrackResolver.configured) {
+                "track lookup: api key and the player"
+            } else {
+                "track lookup: the player"
+            },
+            size = 11, color = c.ink,
+        )
     }
 }
 
@@ -253,8 +252,8 @@ fun YouScreen() {
             }
         }
 
-        Label("Player control", color = c.ink)
-        PlayerControlReport()
+        Label("Listening rooms", color = c.ink)
+        ListeningRoomPanel()
 
         Label("Counted", color = c.ink)
 
