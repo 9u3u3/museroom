@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,6 +95,7 @@ fun NowScreen() {
         LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
     val todayMs by dao.creditedSince(startOfToday).collectAsStateWithLifecycle(0L)
+    val todayTracks by dao.tracksSince(startOfToday).collectAsStateWithLifecycle(0)
 
     val active = sessions.pickActive()
     val following by FollowSession.following.collectAsStateWithLifecycle()
@@ -105,15 +107,28 @@ fun NowScreen() {
     // That is what keeps the two from ever drawing on top of each other: the
     // page slides underneath, and the player folds in place at the same rate.
     var openPx by remember { mutableIntStateOf(0) }
+    var contentPx by remember { mutableIntStateOf(0) }
     val foldedPx = with(density) { FOLDED_HEIGHT.toPx() }
     val travel = (openPx - foldedPx).coerceAtLeast(1f)
     val collapse = if (openPx == 0) 0f else (scroll.value / travel).coerceIn(0f, 1f)
 
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewportPx = with(density) { maxHeight.toPx() }
+        // Exactly enough slack to fold the player and not a pixel more. Too
+        // little and it can never fold on a quiet day; too much and the page
+        // keeps travelling after the fold is done, dragging the cards up
+        // underneath and cutting them off.
+        val runwayPx = (travel - (contentPx - viewportPx)).coerceIn(0f, travel)
+
         Column(
             Modifier
-                .fillMaxSize()
-                .verticalScroll(scroll)
+                .fillMaxWidth()
+                .verticalScroll(scroll),
+        ) {
+            Column(
+            Modifier
+                .fillMaxWidth()
+                .onSizeChanged { contentPx = it.height }
                 .padding(horizontal = 20.dp)
                 .padding(top = 14.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -146,19 +161,32 @@ fun NowScreen() {
             }
 
             NeoAccentCard(fill = c.lime, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
-                Label("Listening today", color = c.onAccent)
-                Text(formatMinutes(todayMs), style = bangers(56).copy(color = c.onAccent))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Bottom,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column {
+                        Label("Listening today", color = c.onAccent)
+                        Text(formatMinutes(todayMs), style = bangers(52).copy(color = c.onAccent))
+                    }
+                    // The right half was empty, which on a card this loud reads
+                    // as a missing number rather than as space.
+                    Column(horizontalAlignment = Alignment.End) {
+                        Label("Tracks", color = c.onAccent)
+                        Text("$todayTracks", style = bangers(52).copy(color = c.onAccent))
+                    }
+                }
             }
 
             if (session == null) {
                 SignInPanel("Your listening stays on this phone until you sign in.")
             }
 
-            // Room to scroll into. Without it, a quiet day has too little on the
-            // page to move, and the player could never be folded away on the one
-            // screen where somebody would most want to.
+        }
+
             if (active != null) {
-                Spacer(Modifier.height(with(density) { travel.toDp() }))
+                Spacer(Modifier.height(with(density) { runwayPx.toDp() }))
             }
         }
 
@@ -208,8 +236,14 @@ private fun NowPlayingHeader(track: NowPlaying, collapse: Float, modifier: Modif
     val small = ((collapse - 0.55f) / 0.4f).coerceIn(0f, 1f)
     val large = (1f - collapse / 0.45f).coerceIn(0f, 1f)
 
+    // The cover was as wide as the screen, which on a tall phone left the card
+    // underneath hanging off the bottom edge. A square that fills the width is
+    // only right on a screen wide enough to spare the height.
+    val tallest = (LocalConfiguration.current.screenHeightDp * 0.40f).dp
+
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val cover = lerp(maxWidth, 56.dp, collapse)
+        val open = if (maxWidth < tallest) maxWidth else tallest
+        val cover = lerp(open, 56.dp, collapse)
         val corner = lerp(22.dp, 14.dp, collapse)
         val shape = RoundedCornerShape(corner)
 
@@ -322,17 +356,28 @@ private fun RoomMembers() {
             delay(20_000)
         }
     }
-    if (members.isEmpty()) return
+    if (session == null) return
 
     NeoAccentCard(fill = c.sky, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
         Label(
-            if (members.size == 1) "Listening with you" else "${members.size} listening with you",
+            when (members.size) {
+                0 -> "Your room"
+                1 -> "Listening with you"
+                else -> "${members.size} listening with you"
+            },
             color = c.onAccent,
         )
         Spacer(Modifier.size(8.dp))
+        if (members.isEmpty()) {
+            Text(
+                "Nobody is in your room.",
+                style = MaterialTheme.typography.titleMedium,
+                color = c.onAccent.copy(alpha = 0.75f),
+            )
+        }
         members.forEach { member ->
             Text(
-                "@${member.handle}",
+                member.handle,
                 style = MaterialTheme.typography.titleMedium,
                 color = c.onAccent,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -369,7 +414,7 @@ private fun ListenInbox() {
     inbox.forEach { request ->
         NeoAccentCard(fill = c.sky, radius = 16.dp) {
             Text(
-                "@${request.handle} wants to listen along",
+                "${request.handle} wants to listen along",
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
@@ -432,7 +477,7 @@ private fun FollowBar() {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
-                "Listening with @${room.handle}",
+                "Listening with ${room.handle}",
                 style = MaterialTheme.typography.titleMedium,
                 color = white,
                 maxLines = 1,

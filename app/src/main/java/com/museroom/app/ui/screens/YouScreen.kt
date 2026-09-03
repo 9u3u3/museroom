@@ -1,5 +1,11 @@
 package com.museroom.app.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -28,11 +34,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.museroom.app.media.Avatars
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ProfileRepository
 import com.museroom.app.net.Visibility
@@ -80,6 +89,30 @@ fun YouScreen() {
     val waiting by sync.pendingEvents.collectAsStateWithLifecycle(0)
 
     var confirmWipe by remember { mutableStateOf(false) }
+    var myFace by remember(profile?.avatarUrl) { mutableStateOf(Avatars.cached(profile?.avatarUrl)) }
+    var photoNote by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(profile?.avatarUrl) {
+        if (myFace == null) myFace = Avatars.fetch(profile?.avatarUrl)
+    }
+
+    // The system picker, so Museroom never asks for access to the gallery: it
+    // is handed one picture and sees nothing else.
+    val pickPhoto = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        photoNote = "Uploading"
+        scope.launch {
+            val bytes = Avatars.encode(context, uri)
+            if (bytes == null) {
+                photoNote = "That picture could not be read."
+                return@launch
+            }
+            profiles.setAvatar(bytes)
+                .onSuccess { photoNote = null; myFace = null }
+                .onFailure { photoNote = it.message }
+        }
+    }
 
     LaunchedEffect(session?.userId) { if (session != null) profiles.refresh() }
 
@@ -145,17 +178,26 @@ fun YouScreen() {
                             .size(60.dp)
                             .clip(RoundedCornerShape(16.dp))
                             .background(c.violet)
-                            .border(3.dp, c.onAccent, RoundedCornerShape(16.dp)),
+                            .border(3.dp, c.onAccent, RoundedCornerShape(16.dp))
+                            .clickable { pickPhoto.launch(PickVisualMediaRequest(ImageOnly)) },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            profile?.handle.orEmpty().take(1).uppercase().ifBlank { "?" },
-                            style = bangers(28).copy(color = Color.White),
-                        )
+                        val face = myFace
+                        if (face != null) {
+                            Image(
+                                face.asImageBitmap(), null, Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Text(
+                                profile?.handle.orEmpty().take(1).uppercase().ifBlank { "?" },
+                                style = bangers(28).copy(color = Color.White),
+                            )
+                        }
                     }
                     Column(Modifier.weight(1f)) {
                         Text(
-                            profile?.handle?.let { "@$it" } ?: "Loading",
+                            profile?.handle ?: "Loading",
                             style = MaterialTheme.typography.titleMedium, color = c.ink,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -223,8 +265,26 @@ fun YouScreen() {
         }
 
         if (session != null) {
+            photoNote?.let { Note(it) }
+
             Label("Username", color = c.ink)
             HandlePicker()
+
+            Label("Who can join your room", color = c.ink)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NeoButton(
+                    "Ask first",
+                    small = true,
+                    tone = if (profile?.openToAll == false) NeoTone.Violet else NeoTone.Paper,
+                    onClick = { scope.launch { profiles.setOpenToAll(false) } },
+                )
+                NeoButton(
+                    "Anyone",
+                    small = true,
+                    tone = if (profile?.openToAll == true) NeoTone.Violet else NeoTone.Paper,
+                    onClick = { scope.launch { profiles.setOpenToAll(true) } },
+                )
+            }
         }
 
         Label("Counted", color = c.ink)

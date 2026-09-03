@@ -90,7 +90,7 @@ fun FriendsScreen() {
                 ) {
                     Column(Modifier.weight(1f)) {
                         Label(if (request.incoming) "Wants to be friends" else "Request sent", color = c.onAccent)
-                        Text("@${request.profile.handle}", style = MaterialTheme.typography.titleMedium)
+                        Text(request.profile.handle, style = MaterialTheme.typography.titleMedium)
                     }
                     if (request.incoming) {
                         NeoButton("Accept", small = true, tone = NeoTone.Lime, enabled = !busy, onClick = {
@@ -105,26 +105,6 @@ fun FriendsScreen() {
             }
         }
 
-        if (friends.isEmpty()) {
-            NeoCard { Note("Nobody yet. Find someone by their handle below.") }
-        } else {
-            friends.forEach { friend ->
-                ListenerRow(
-                    handle = friend.profile.handle,
-                    title = friend.nowPlaying?.title.orEmpty(),
-                    artist = friend.nowPlaying?.artist.orEmpty(),
-                    durationMs = friend.nowPlaying?.durationMs ?: 0,
-                    positionMs = friend.nowPlaying?.positionMs ?: 0,
-                    isPlaying = friend.nowPlaying?.isPlaying == true,
-                    updatedAt = friend.nowPlaying?.updatedAt.orEmpty(),
-                    sourceTrackId = friend.nowPlaying?.sourceTrackId,
-                    hostId = friend.profile.id,
-                    fingerprint = friend.nowPlaying?.title.orEmpty(),
-                )
-            }
-        }
-
-        Spacer(Modifier.size(2.dp))
         Field(query, { query = it; if (it.length < 2) results = emptyList() }, "Find by handle")
         NeoButton(
             "Search",
@@ -147,7 +127,7 @@ fun FriendsScreen() {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        "@${profile.handle}",
+                        profile.handle,
                         style = MaterialTheme.typography.titleMedium,
                         color = c.ink,
                         modifier = Modifier.weight(1f),
@@ -156,12 +136,33 @@ fun FriendsScreen() {
                         busy = true
                         scope.launch {
                             repo.request(profile)
-                                .onSuccess { message = "Request sent to @${profile.handle}" }
+                                .onSuccess { message = "Request sent to ${profile.handle}" }
                                 .onFailure { message = it.message }
                             reload(); busy = false
                         }
                     })
                 }
+            }
+        }
+
+        if (friends.isEmpty()) {
+            NeoCard { Note("Nobody yet. Search for someone by their username above.") }
+        } else {
+            friends.forEach { friend ->
+                ListenerRow(
+                    handle = friend.profile.handle,
+                    title = friend.nowPlaying?.title.orEmpty(),
+                    artist = friend.nowPlaying?.artist.orEmpty(),
+                    durationMs = friend.nowPlaying?.durationMs ?: 0,
+                    positionMs = friend.nowPlaying?.positionMs ?: 0,
+                    isPlaying = friend.nowPlaying?.isPlaying == true,
+                    updatedAt = friend.nowPlaying?.updatedAt.orEmpty(),
+                    sourceTrackId = friend.nowPlaying?.sourceTrackId,
+                    hostId = friend.profile.id,
+                    fingerprint = friend.nowPlaying?.title.orEmpty(),
+                    avatarUrl = friend.profile.avatarUrl,
+                    openToAll = friend.profile.openToAll,
+                )
             }
         }
 

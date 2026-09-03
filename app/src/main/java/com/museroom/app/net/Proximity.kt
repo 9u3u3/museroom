@@ -19,6 +19,8 @@ data class NearbyListener(
     @SerialName("user_id") val userId: String,
     val handle: String,
     @SerialName("display_name") val displayName: String = "",
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("join_mode") val joinMode: String = "ask",
     val title: String = "",
     val artist: String = "",
     @SerialName("duration_ms") val durationMs: Long = 0,
@@ -27,7 +29,9 @@ data class NearbyListener(
     @SerialName("updated_at") val updatedAt: String = "",
     @SerialName("source_track_id") val sourceTrackId: String? = null,
     @SerialName("source_package") val sourcePackage: String = "",
-)
+) {
+    val openToAll: Boolean get() = joinMode == "open"
+}
 
 /**
  * The server half of proximity: publishing our own token, and turning the tokens

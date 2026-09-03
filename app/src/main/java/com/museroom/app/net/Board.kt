@@ -17,6 +17,7 @@ data class BoardEntry(
     @SerialName("user_id") val userId: String,
     @SerialName("credited_ms") val creditedMs: Long,
     val handle: String = "",
+    val avatarUrl: String? = null,
 )
 
 @Serializable
@@ -24,12 +25,18 @@ private data class BoardRow(
     val rank: Int,
     @SerialName("user_id") val userId: String,
     @SerialName("credited_ms") val creditedMs: Long,
-    val profiles: Handle? = null,
+    val profiles: Who? = null,
 ) {
-    @Serializable data class Handle(val handle: String = "")
+    @Serializable
+    data class Who(
+        val handle: String = "",
+        @SerialName("avatar_url") val avatarUrl: String? = null,
+    )
 }
 
-enum class BoardPeriod(val key: String) { Week("week"), Month("month"), All("all") }
+enum class BoardPeriod(val key: String) {
+    Day("day"), Week("week"), Month("month"), All("all")
+}
 
 /**
  * The leaderboard, read from the precomputed table rather than ranked on demand.
@@ -53,13 +60,18 @@ class BoardRepository private constructor(context: Context) {
                 val body = Supabase.select(
                     "leaderboard_entries",
                     "period=eq.${period.key}&period_key=eq.${periodKey(period)}" +
-                        "&select=rank,user_id,credited_ms,profiles(handle)" +
+                        "&select=rank,user_id,credited_ms,profiles(handle,avatar_url)" +
                         "&order=rank.asc&limit=$limit",
                     token,
                 )
                 Supabase.json
                     .decodeFromString(ListSerializer(BoardRow.serializer()), body)
-                    .map { BoardEntry(it.rank, it.userId, it.creditedMs, it.profiles?.handle.orEmpty()) }
+                    .map {
+                        BoardEntry(
+                            it.rank, it.userId, it.creditedMs,
+                            it.profiles?.handle.orEmpty(), it.profiles?.avatarUrl,
+                        )
+                    }
             }
         }
 
@@ -74,6 +86,7 @@ class BoardRepository private constructor(context: Context) {
     private fun periodKey(period: BoardPeriod): String {
         val now = Instant.now().atZone(ZoneOffset.UTC)
         return when (period) {
+            BoardPeriod.Day -> "%d-%02d-%02d".format(now.year, now.monthValue, now.dayOfMonth)
             BoardPeriod.Week ->
                 "%d-W%02d".format(
                     now.get(IsoFields.WEEK_BASED_YEAR),

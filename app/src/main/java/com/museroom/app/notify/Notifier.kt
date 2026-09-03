@@ -52,7 +52,7 @@ object Notifier {
         ensureChannel(context)
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("@$handle let you in")
+            .setContentTitle("$handle let you in")
             .setContentText("Museroom is playing what they are playing.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
@@ -68,7 +68,7 @@ object Notifier {
         val text = if (title.isBlank()) "wants to listen along" else "wants to listen to $title"
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("@$handle $text")
+            .setContentTitle("$handle $text")
             .setContentText("They hear it as soon as you say yes.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)

@@ -20,12 +20,17 @@ data class MyProfile(
     val handle: String = "",
     @SerialName("display_name") val displayName: String = "",
     val visibility: String = "friends",
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("join_mode") val joinMode: String = "ask",
     @SerialName("on_global_board") val onGlobalBoard: Boolean = true,
     @SerialName("proximity_enabled") val proximityEnabled: Boolean = false,
     @SerialName("created_at") val createdAt: String = "",
 ) {
     val who: Visibility
         get() = Visibility.entries.firstOrNull { it.key == visibility } ?: Visibility.Friends
+
+    /** Whether anybody may walk into your room, or has to ask first. */
+    val openToAll: Boolean get() = joinMode == "open"
 }
 
 private val HANDLE = Regex("^[a-z0-9_]{3,20}$")
@@ -69,7 +74,7 @@ class ProfileRepository private constructor(context: Context) {
                 // 23505 is the unique index doing its job, and "taken" is the
                 // only part of that a person needs.
                 if (clash.body.contains("23505") || clash.status == 409) {
-                    error("@$wanted is taken.")
+                    error("$wanted is taken.")
                 }
                 throw clash
             }
@@ -81,6 +86,25 @@ class ProfileRepository private constructor(context: Context) {
     suspend fun setVisibility(v: Visibility) = patch { put("visibility", v.key) }
 
     suspend fun setOnGlobalBoard(on: Boolean) = patch { put("on_global_board", on) }
+
+    suspend fun setOpenToAll(open: Boolean) = patch { put("join_mode", if (open) "open" else "ask") }
+
+    /**
+     * A picture, from this phone's gallery.
+     *
+     * Stored under a folder named after the person storing it, which is what
+     * stops anybody replacing somebody else's. The address carries a version so
+     * that a new picture is a new address: without it the old one would sit in
+     * every cache that had ever seen it.
+     */
+    suspend fun setAvatar(jpeg: ByteArray): Result<Unit> = io { token, me ->
+        val path = "$me/pic.jpg"
+        Supabase.upload("avatars", path, jpeg, "image/jpeg", token)
+        val url = "${Supabase.url}/storage/v1/object/public/avatars/$path?v=${System.currentTimeMillis()}"
+        Supabase.patch("profiles", "id=eq.$me", buildJsonObject { put("avatar_url", url) }, token)
+        refresh()
+        Unit
+    }
 
     private suspend fun patch(build: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit) =
         io { token, me ->

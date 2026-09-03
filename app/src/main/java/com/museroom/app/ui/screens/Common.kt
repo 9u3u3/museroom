@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.Artwork
+import com.museroom.app.media.Avatars
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ListenRepository
@@ -220,6 +221,8 @@ fun ListenerRow(
     sourceTrackId: String? = null,
     hostId: String? = null,
     fingerprint: String = "",
+    avatarUrl: String? = null,
+    openToAll: Boolean = false,
     tint: Color = Neo.colors.violet,
 ) {
     val context = LocalContext.current
@@ -227,6 +230,8 @@ fun ListenerRow(
     val scope = rememberCoroutineScope()
     val listen = remember { ListenRepository.get(context) }
     val following by FollowSession.following.collectAsStateWithLifecycle()
+    var face by remember(avatarUrl) { mutableStateOf(Avatars.cached(avatarUrl)) }
+    LaunchedEffect(avatarUrl) { if (face == null) face = Avatars.fetch(avatarUrl) }
     val inTheirRoom = hostId != null && following?.hostId == hostId
 
     var art by remember(title, artist) { mutableStateOf<Bitmap?>(Artwork.cached(title, artist)) }
@@ -257,6 +262,20 @@ fun ListenerRow(
                 art?.let {
                     Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 }
+                face?.let {
+                    // Their face in the corner of their music, small enough to
+                    // say who without competing with the cover.
+                    Image(
+                        it.asImageBitmap(), null,
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(3.dp)
+                            .size(22.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .border(2.dp, c.onAccent, RoundedCornerShape(7.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
             }
             Column(Modifier.weight(1f)) {
                 Row(
@@ -264,7 +283,7 @@ fun ListenerRow(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("@$handle", style = MaterialTheme.typography.titleMedium, color = c.ink)
+                    Text(handle, style = MaterialTheme.typography.titleMedium, color = c.ink)
                     Label(if (isPlaying) "listening" else "quiet", color = c.ink)
                 }
                 Text(
@@ -291,24 +310,29 @@ fun ListenerRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 MonoText("${formatClock(position)} / ${formatClock(durationMs)}", size = 11, color = c.ink)
-                // Asking, and then nothing more to do. The host is told, and
-                // when they say yes the music starts on its own, so the only
-                // states this button has are before, during and after.
+                // Two doors. Somebody who has left theirs open is walked into
+                // without a word; somebody who has not is asked, and told, and
+                // the music starts by itself when they say yes.
                 NeoButton(
                     text = when {
                         inTheirRoom -> "Listening"
                         asked -> "Waiting"
+                        openToAll -> "Join"
                         else -> "Ask to join"
                     },
                     small = true,
                     enabled = !asked && !inTheirRoom && hostId != null,
                     onClick = {
                         val host = hostId ?: return@NeoButton
+                        if (openToAll) {
+                            FollowSession.start(context, host, handle)
+                            return@NeoButton
+                        }
                         asked = true
-                        outcome = "Asking @$handle…"
+                        outcome = "Asking $handle…"
                         scope.launch {
                             listen.ask(host, title, artist, fingerprint, sourceTrackId)
-                                .onSuccess { outcome = "Asked @$handle. It starts when they say yes." }
+                                .onSuccess { outcome = "Asked $handle. It starts when they say yes." }
                                 .onFailure { asked = false; outcome = it.message }
                         }
                     },

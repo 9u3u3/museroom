@@ -140,6 +140,8 @@ fun NearbyScreen() {
                 sourceTrackId = person.sourceTrackId,
                 hostId = person.userId,
                 fingerprint = person.title,
+                avatarUrl = person.avatarUrl,
+                openToAll = person.openToAll,
                 tint = c.pink,
             )
         }

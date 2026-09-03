@@ -63,7 +63,7 @@ class RoomService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(if (handle.isBlank()) "Listening along" else "Listening with @$handle")
+            .setContentTitle(if (handle.isBlank()) "Listening along" else "Listening with $handle")
             .setContentText(line.ifBlank { "Museroom is following their music" })
             .setOngoing(true)
             .setSilent(true)

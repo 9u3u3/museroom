@@ -33,6 +33,9 @@ interface MuseroomDao {
     @Query("SELECT COALESCE(SUM(creditedMs), 0) FROM listening_sessions WHERE startedAtClock >= :sinceClock")
     fun creditedSince(sinceClock: Long): Flow<Long>
 
+    @Query("SELECT COUNT(*) FROM listening_sessions WHERE startedAtClock >= :sinceClock")
+    fun tracksSince(sinceClock: Long): Flow<Int>
+
     @Query(
         """
         SELECT artist AS artist, SUM(creditedMs) AS creditedMs

@@ -34,7 +34,7 @@ object Supabase {
     val googleConfigured: Boolean
         get() = BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank()
 
-    private val url get() = BuildConfig.SUPABASE_URL.trimEnd('/')
+    val url get() = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val anonKey get() = BuildConfig.SUPABASE_ANON_KEY
 
     val json = Json {
@@ -100,6 +100,30 @@ object Supabase {
     // -------------------------------------------------------------- postgrest --
 
     /** Inserts rows. [upsertOnConflict] names the conflict target for an upsert. */
+    /**
+     * Puts a file in a storage bucket, replacing whatever was there.
+     *
+     * Upsert rather than insert, because a person changing their picture is
+     * replacing their picture; a new name each time would leave every old one
+     * behind with nothing to ever delete it.
+     */
+    fun upload(bucket: String, path: String, bytes: ByteArray, contentType: String, accessToken: String) {
+        val request = Request.Builder()
+            .url("$url/storage/v1/object/$bucket/$path")
+            .post(bytes.toRequestBody(contentType.toMediaType()))
+            .header("apikey", anonKey)
+            .header("Authorization", "Bearer $accessToken")
+            .header("Content-Type", contentType)
+            .header("x-upsert", "true")
+            .build()
+
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw SupabaseError(response.code, response.body?.string().orEmpty())
+            }
+        }
+    }
+
     fun insert(
         table: String,
         rows: JsonElement,

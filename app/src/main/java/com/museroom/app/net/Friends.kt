@@ -16,7 +16,11 @@ data class Profile(
     val id: String,
     val handle: String,
     @SerialName("display_name") val displayName: String = "",
-)
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("join_mode") val joinMode: String = "ask",
+) {
+    val openToAll: Boolean get() = joinMode == "open"
+}
 
 @Serializable
 data class RemoteNowPlaying(
@@ -28,13 +32,37 @@ data class RemoteNowPlaying(
     @SerialName("updated_at") val updatedAt: String = "",
     @SerialName("source_track_id") val sourceTrackId: String? = null,
     @SerialName("source_package") val sourcePackage: String = "",
-)
+) {
+    /**
+     * Whether this is somebody listening now or the last thing they played.
+     *
+     * A row is only rewritten when something changes, so a phone that went
+     * quiet without saying so leaves its final second on the screen forever.
+     * A friend frozen at 2:15 of a 2:15 track is not listening to anything.
+     */
+    val isLive: Boolean
+        get() {
+            if (!isPlaying || title.isBlank()) return false
+            val takenAt = runCatching { java.time.Instant.parse(updatedAt).toEpochMilli() }
+                .getOrNull() ?: return isPlaying
+            val age = System.currentTimeMillis() - takenAt
+            if (age > STALE_AFTER_MS) return false
+            // Past the end of the track, with nothing said since, means the
+            // song finished and the report never caught up.
+            return durationMs <= 0 || positionMs + age < durationMs + 15_000
+        }
+}
+
+/** Long enough for a slow publish, short enough that a dead phone drops off. */
+private const val STALE_AFTER_MS = 90_000L
 
 @Serializable
 private data class ProfileWithPlayback(
     val id: String,
     val handle: String,
     @SerialName("display_name") val displayName: String = "",
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("join_mode") val joinMode: String = "ask",
     // PostgREST embeds this as a single object, not an array: now_playing's
     // primary key is also its foreign key, so the relationship is one-to-one.
     @SerialName("now_playing") val nowPlaying: RemoteNowPlaying? = null,
@@ -87,7 +115,7 @@ class FriendsRepository private constructor(context: Context) {
         val term = URLEncoder.encode("*${query.trim().lowercase()}*", "UTF-8")
         val body = Supabase.select(
             "profiles",
-            "handle=ilike.$term&select=id,handle,display_name&limit=20",
+            "handle=ilike.$term&select=id,handle,display_name,avatar_url,join_mode&limit=20",
             token,
         )
         Supabase.json.decodeFromString(ListSerializer(Profile.serializer()), body)
@@ -101,19 +129,21 @@ class FriendsRepository private constructor(context: Context) {
         val list = ids.joinToString(",")
         val body = Supabase.select(
             "profiles",
-            "id=in.($list)&select=id,handle,display_name,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at,source_track_id,source_package)",
+            "id=in.($list)&select=id,handle,display_name,avatar_url,join_mode,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at,source_track_id,source_package)",
             token,
         )
         Supabase.json
             .decodeFromString(ListSerializer(ProfileWithPlayback.serializer()), body)
             .map {
                 Friend(
-                    profile = Profile(it.id, it.handle, it.displayName),
-                    // Absent when they are not playing, or not sharing with you.
-                    nowPlaying = it.nowPlaying,
+                    profile = Profile(it.id, it.handle, it.displayName, it.avatarUrl, it.joinMode),
+                    // Absent when they are not playing, or not sharing with you,
+                    // and dropped when it is the last thing they played rather
+                    // than something they are playing.
+                    nowPlaying = it.nowPlaying?.takeIf { np -> np.isLive },
                 )
             }
-            .sortedByDescending { it.nowPlaying?.isPlaying == true }
+            .sortedByDescending { it.nowPlaying != null }
     }
 
     /** What one person is playing, for following them. */
@@ -156,7 +186,7 @@ class FriendsRepository private constructor(context: Context) {
         val others = rows.associateBy({ if (it.userA == me) it.userB else it.userA }, { it })
         val body = Supabase.select(
             "profiles",
-            "id=in.(${others.keys.joinToString(",")})&select=id,handle,display_name",
+            "id=in.(${others.keys.joinToString(",")})&select=id,handle,display_name,avatar_url,join_mode",
             token,
         )
         Supabase.json.decodeFromString(ListSerializer(Profile.serializer()), body).map { profile ->
