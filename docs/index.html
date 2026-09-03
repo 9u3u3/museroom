@@ -239,6 +239,14 @@
   ul.where{margin:10px 0 0}
   ul.where li{padding-left:30px; margin-bottom:8px}
   ul.where li::before{width:16px; height:16px; background:var(--sky)}
+  ol.where{counter-reset:w; list-style:none; padding-left:0; margin:10px 0 0}
+  ol.where li{counter-increment:w; position:relative; padding-left:30px;
+              margin:0 0 8px; max-width:64ch}
+  ol.where li::before{content:counter(w); position:absolute; left:0; top:4px;
+              width:18px; height:18px; border:3px solid var(--ink); border-radius:6px;
+              background:var(--sky); font-family:"Space Mono",monospace;
+              font-size:10px; font-weight:700; line-height:1;
+              display:grid; place-items:center}
 
   ul{padding-left:0; list-style:none; margin:16px 0 0}
   ul li{position:relative; padding-left:32px; margin:0 0 11px; max-width:64ch}
@@ -339,6 +347,15 @@ they take about a minute.</p>
   <p>Google flags any app not from the Play Store as unrecognised — not unsafe,
   just unseen. Tap <b>More details → Install anyway</b> (some phones say
   <b>Install without scanning</b>).</p>
+  <p><b>No "Install anyway" button?</b> Common on newer phones — then the
+  scanner has to be paused first:</p>
+  <ol class="where">
+    <li>Open the <b>Play Store</b> → tap your <b>profile picture</b>, top right</li>
+    <li><b>Play Protect</b> → the <b>⚙ settings</b> icon</li>
+    <li>Turn off <b>Scan apps with Play Protect</b></li>
+    <li>Install Museroom, then <b>turn it back on</b> — it keeps guarding
+    everything else</li>
+  </ol>
   <p>This can't be switched off from our side — only Play Store distribution
   removes it. Check the app yourself: it's <a href="https://github.com/9u3u3/museroom">open on GitHub</a>.</p>
 </div>
