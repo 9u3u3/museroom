@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -41,10 +42,13 @@ object PlaybackTracker {
     private const val KEY_WATERMARK = "credited_through_event_id"
     private const val KEY_LET_IN_THROUGH = "let_in_through_request_id"
     private const val HEARTBEAT_MS = 30_000L
-    private const val NOW_PLAYING_MS = 15_000L
 
-    /** How soon a pause or a skip reaches everybody following. */
-    private const val PUBLISH_CHECK_MS = 3_000L
+    /**
+     * The heartbeat. Changes no longer wait for a poll — they are written as
+     * the player reports them — so this only exists to stop a long track going
+     * stale to everybody watching.
+     */
+    private const val NOW_PLAYING_HEARTBEAT_MS = 15_000L
     private const val SYNC_MS = 60_000L
     private const val INBOX_MS = 20_000L
 
@@ -218,29 +222,50 @@ object PlaybackTracker {
         var lastState = ""
         var lastSentAt = 0L
         var wasPlaying = false
+        val gate = Mutex()
 
-        while (true) {
-            delay(PUBLISH_CHECK_MS)
-            val hidden = privacy?.privateSession?.value == true
-            val active = NowPlayingRepository.sessions.value.pickActive()
-                ?.takeIf { it.isTracked && !hidden }
+        suspend fun publish(heartbeat: Boolean) {
+            gate.withLock {
+                val hidden = privacy?.privateSession?.value == true
+                val active = NowPlayingRepository.sessions.value.pickActive()
+                    ?.takeIf { it.isTracked && !hidden }
 
-            val state = "${active?.fingerprint.orEmpty()}|${active?.isPlaying == true}"
-            val now = SystemClock.elapsedRealtime()
-            val due = now - lastSentAt > NOW_PLAYING_MS
-            if (state == lastState && !due) continue
+                val state = "${active?.fingerprint.orEmpty()}|${active?.isPlaying == true}"
+                val now = SystemClock.elapsedRealtime()
+                val due = now - lastSentAt > NOW_PLAYING_HEARTBEAT_MS
+                val changed = state != lastState
+                if (!changed && !(heartbeat && due)) return@withLock
 
-            if (active != null) {
-                sync.publishNowPlaying(active, active.positionAt(now))
-                wasPlaying = active.isPlaying
-            } else if (wasPlaying) {
-                // Nothing at all is playing, and the last thing anybody heard
-                // from this phone said otherwise.
-                sync.publishStopped()
-                wasPlaying = false
+                if (active != null) {
+                    sync.publishNowPlaying(active, active.positionAt(now))
+                    wasPlaying = active.isPlaying
+                } else if (wasPlaying) {
+                    // Nothing at all is playing, and the last thing anybody
+                    // heard from this phone said otherwise.
+                    sync.publishStopped()
+                    wasPlaying = false
+                }
+                lastState = state
+                lastSentAt = now
             }
-            lastState = state
-            lastSentAt = now
+        }
+
+        coroutineScope {
+            // Written the moment the player says something changed, rather
+            // than up to three seconds after the fact. Everybody following is
+            // waiting on this write, and the second half of the delay they
+            // used to feel was here.
+            launch {
+                NowPlayingRepository.sessions.collect { publish(heartbeat = false) }
+            }
+            // A track playing through unchanged still has to say so
+            // occasionally, or it goes stale and friends stop seeing it.
+            launch {
+                while (true) {
+                    delay(NOW_PLAYING_HEARTBEAT_MS)
+                    publish(heartbeat = true)
+                }
+            }
         }
     }
 

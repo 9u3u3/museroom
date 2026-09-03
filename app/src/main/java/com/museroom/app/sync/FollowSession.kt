@@ -7,7 +7,9 @@ import com.museroom.app.media.Fingerprint
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.TrackResolver
+import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.FriendsRepository
+import com.museroom.app.net.Realtime
 import com.museroom.app.net.RemoteNowPlaying
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -101,6 +103,16 @@ object FollowSession {
     private const val PRESENCE_MS = 30_000L
 
     /**
+     * How long a pushed row is preferred over asking again. Longer than a
+     * tick, so a healthy socket removes the poll entirely; short enough that
+     * a socket which quietly stopped delivering is noticed within seconds.
+     */
+    private const val PUSH_TRUSTED_MS = 6_000L
+
+    /** Between attempts to get the socket back. */
+    private const val RECONNECT_MS = 5_000L
+
+    /**
      * The package a room reports itself under. Deliberately not in the
      * allowlist: this is the one session Museroom constructs rather than
      * reads, so it should never be picked up as though somebody's own copy of
@@ -133,6 +145,58 @@ object FollowSession {
         scope = newScope
         newScope.launch { follow(app, hostId, handle) }
         newScope.launch { announcePresence(app, hostId) }
+        newScope.launch { listenForChanges(app, hostId) }
+    }
+
+    /**
+     * The host's row, pushed rather than asked for.
+     *
+     * This is what closes most of the gap. The loop below still runs and still
+     * polls, because a socket is not a promise and silence from one must never
+     * be read as "nothing changed" — but when the socket is up, a skip lands
+     * here in well under a second instead of waiting out a poll, and the loop
+     * finds the new track already waiting for it on its next tick.
+     */
+    private suspend fun listenForChanges(app: Context, hostId: String) {
+        val auth = AuthRepository.get(app)
+        while (true) {
+            val token = auth.validAccessToken()
+            if (token == null) {
+                delay(RECONNECT_MS)
+                continue
+            }
+            runCatching {
+                Realtime.nowPlayingOf(hostId, token).collect { row ->
+                    pushed = row to SystemClock.elapsedRealtime()
+                }
+            }
+            // Either the socket closed or the token expired. Both are worth
+            // another go, spaced out enough not to hammer a server that is
+            // refusing us for a reason.
+            delay(RECONNECT_MS)
+        }
+    }
+
+    /**
+     * The last row the socket pushed, and when.
+     *
+     * Held rather than acted on directly so that every decision still runs
+     * through one loop with one set of rules. A pushed row that is newer than
+     * the polled one is simply used in its place.
+     */
+    @Volatile
+    private var pushed: Pair<RemoteNowPlaying, Long>? = null
+
+    /** Whichever account of the host is freshest: the pushed one, or the asked-for one. */
+    private suspend fun hostNow(friends: FriendsRepository, hostId: String): RemoteNowPlaying? {
+        val recent = pushed?.takeIf {
+            SystemClock.elapsedRealtime() - it.second < PUSH_TRUSTED_MS
+        }?.first
+        // A push is only ever fresher than a poll, never staler: it arrives at
+        // the moment of the write. So when there is a recent one, it wins, and
+        // the poll is spared entirely.
+        if (recent != null) return recent
+        return friends.nowPlayingOf(hostId).getOrNull()
     }
 
     /**
@@ -155,6 +219,7 @@ object FollowSession {
         scope?.cancel()
         scope = null
         _following.value = null
+        pushed = null
         NowPlayingRepository.setRoomPlayback(null)
         RoomPlayer.leave()
         RoomPlayer.context?.let { context ->
@@ -176,7 +241,7 @@ object FollowSession {
         var loadedId = ""
 
         while (true) {
-            val host = friends.nowPlayingOf(hostId).getOrNull()
+            val host = hostNow(friends, hostId)
             if (host == null || !host.isPlaying || host.title.isBlank()) {
                 RoomPlayer.pause()
                 publish(hostId, handle, FollowState.HostQuiet, host)

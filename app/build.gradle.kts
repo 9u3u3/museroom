@@ -24,8 +24,8 @@ android {
         applicationId = "com.museroom.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 15
-        versionName = "4.3-rooms"
+        versionCode = 16
+        versionName = "4.4-live"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${env("SUPABASE_URL")}\"")
