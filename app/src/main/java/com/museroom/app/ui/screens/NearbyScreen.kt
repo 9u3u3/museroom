@@ -148,6 +148,8 @@ fun NearbyScreen() {
                 isPlaying = person.isPlaying,
                 updatedAt = person.updatedAt,
                 sourceTrackId = person.sourceTrackId,
+                hostId = person.userId,
+                fingerprint = person.title,
                 tint = c.pink,
             )
         }

@@ -10,6 +10,8 @@ import com.museroom.app.credit.Crediting
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.pickActive
 import com.museroom.app.privacy.PrivacyState
+import com.museroom.app.net.ListenRepository
+import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +38,12 @@ object PlaybackTracker {
     private const val HEARTBEAT_MS = 30_000L
     private const val NOW_PLAYING_MS = 15_000L
     private const val SYNC_MS = 60_000L
+    private const val INBOX_MS = 20_000L
 
     private val differ = PlaybackDiffer(heartbeatMs = HEARTBEAT_MS)
+
+    /** Ids already announced, so a pending request is not notified every 20s. */
+    private val announced = mutableSetOf<Long>()
     private val mutex = Mutex()
     private var scope: CoroutineScope? = null
 
@@ -85,6 +91,21 @@ object PlaybackTracker {
             while (true) {
                 delay(SYNC_MS)
                 sync.sync()
+            }
+        }
+
+        // Somebody asking to listen along is the only thing worth interrupting
+        // for, and it has to arrive whether or not Museroom is on screen.
+        val listen = ListenRepository.get(app)
+        newScope.launch {
+            while (true) {
+                delay(INBOX_MS)
+                listen.inbox().onSuccess { requests ->
+                    requests.filter { it.id !in announced }.forEach { request ->
+                        announced += request.id
+                        Notifier.listenRequest(app, request.handle, request.title)
+                    }
+                }
             }
         }
     }

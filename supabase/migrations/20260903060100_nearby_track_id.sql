@@ -1,6 +1,11 @@
 -- resolve_nearby now hands back the exact track, so a nearby listener can be
 -- joined the same way a friend can.
-create or replace function resolve_nearby(tokens text[])
+--
+-- Dropped rather than replaced: Postgres refuses to change a function's return
+-- columns in place, and "create or replace" fails outright rather than warning.
+drop function if exists resolve_nearby(text[]);
+
+create function resolve_nearby(tokens text[])
 returns table (
     user_id         uuid,
     handle          text,

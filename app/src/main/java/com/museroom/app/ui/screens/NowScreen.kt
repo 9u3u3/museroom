@@ -45,6 +45,10 @@ import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.Sources
 import com.museroom.app.media.pickActive
 import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.ListenRepository
+import com.museroom.app.net.ListenRequest
+import com.museroom.app.media.PlayerCommands
+import com.museroom.app.media.PlayerPreference
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.SyncEngine
 import com.museroom.app.ui.Neo
@@ -87,6 +91,7 @@ fun NowScreen() {
 
     var pending by remember { mutableStateOf<ListeningSessionEntity?>(null) }
     val active = sessions.pickActive()
+    ListenInbox()
 
     pending?.let { entry ->
         AlertDialog(
@@ -180,6 +185,87 @@ fun NowScreen() {
                 }
             }
         }
+    }
+}
+
+/**
+ * Requests to listen along: the host's side, and the answer coming back.
+ *
+ * Both live here because both are about the same moment, and because a person
+ * who just asked is most likely looking at this screen.
+ */
+@Composable
+private fun ListenInbox() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val scope = rememberCoroutineScope()
+    val listen = remember { ListenRepository.get(context) }
+    val auth = remember { AuthRepository.get(context) }
+    val session by auth.session.collectAsStateWithLifecycle()
+
+    var inbox by remember { mutableStateOf<List<ListenRequest>>(emptyList()) }
+    var accepted by remember { mutableStateOf<ListenRequest?>(null) }
+    var seenFrom by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    LaunchedEffect(session?.userId) {
+        while (session != null) {
+            listen.inbox().onSuccess { inbox = it }
+            listen.answered(seenFrom).onSuccess { answers ->
+                answers.firstOrNull()?.let { accepted = it }
+            }
+            delay(12_000)
+        }
+    }
+
+    accepted?.let { answer ->
+        NeoAccentCard(fill = c.lime, radius = 16.dp) {
+            Text("@${answer.handle} let you in", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.size(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                NeoButton("Play it", small = true, onClick = {
+                    val target = PlayerPreference.get(context).preferred
+                        ?.takeIf { PlayerCommands.isInstalled(context, it) }
+                        ?: Sources.packages.firstOrNull { PlayerCommands.isInstalled(context, it) }
+                    if (target != null) {
+                        scope.launch {
+                            PlayerCommands.play(context, target, answer.title, answer.artist, answer.sourceTrackId)
+                        }
+                    }
+                    seenFrom = System.currentTimeMillis()
+                    accepted = null
+                })
+                NeoButton("Later", small = true, tone = NeoTone.Paper, onClick = {
+                    seenFrom = System.currentTimeMillis()
+                    accepted = null
+                })
+            }
+        }
+        Spacer(Modifier.size(4.dp))
+    }
+
+    inbox.forEach { request ->
+        NeoAccentCard(fill = c.sky, radius = 16.dp) {
+            Text("@${request.handle} wants to listen along", style = MaterialTheme.typography.titleMedium)
+            if (request.title.isNotBlank()) {
+                Text(request.title, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+            }
+            Spacer(Modifier.size(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                NeoButton("Let them in", small = true, tone = NeoTone.Lime, onClick = {
+                    scope.launch {
+                        listen.respond(request.id, true)
+                        listen.inbox().onSuccess { inbox = it }
+                    }
+                })
+                NeoButton("No", small = true, tone = NeoTone.Paper, onClick = {
+                    scope.launch {
+                        listen.respond(request.id, false)
+                        listen.inbox().onSuccess { inbox = it }
+                    }
+                })
+            }
+        }
+        Spacer(Modifier.size(4.dp))
     }
 }
 

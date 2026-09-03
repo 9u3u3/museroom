@@ -118,6 +118,8 @@ fun FriendsScreen() {
                     isPlaying = friend.nowPlaying?.isPlaying == true,
                     updatedAt = friend.nowPlaying?.updatedAt.orEmpty(),
                     sourceTrackId = friend.nowPlaying?.sourceTrackId,
+                    hostId = friend.profile.id,
+                    fingerprint = friend.nowPlaying?.title.orEmpty(),
                 )
             }
         }

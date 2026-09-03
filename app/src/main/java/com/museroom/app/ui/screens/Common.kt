@@ -41,6 +41,7 @@ import com.museroom.app.media.PlayerCommands
 import com.museroom.app.media.PlayerPreference
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.ListenRepository
 import com.museroom.app.sync.SyncEngine
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
@@ -218,15 +219,19 @@ fun ListenerRow(
     isPlaying: Boolean,
     updatedAt: String,
     sourceTrackId: String? = null,
+    hostId: String? = null,
+    fingerprint: String = "",
     tint: Color = Neo.colors.violet,
 ) {
     val context = LocalContext.current
     val c = Neo.colors
     val scope = rememberCoroutineScope()
     val preference = remember { PlayerPreference.get(context) }
+    val listen = remember { ListenRepository.get(context) }
 
     var art by remember(title, artist) { mutableStateOf<Bitmap?>(Artwork.cached(title, artist)) }
     var outcome by remember { mutableStateOf<String?>(null) }
+    var asked by remember(title) { mutableStateOf(false) }
     var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(title, artist) {
@@ -286,28 +291,23 @@ fun ListenerRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 MonoText("${formatClock(position)} / ${formatClock(durationMs)}", size = 11, color = c.ink)
-                NeoButton("Listen too", small = true, onClick = {
-                    val target = preference.preferred?.takeIf { PlayerCommands.isInstalled(context, it) }
-                        ?: Sources.packages.firstOrNull { PlayerCommands.isInstalled(context, it) }
-                    if (target == null) {
-                        outcome = "No supported player installed."
-                    } else {
-                        preference.preferred = target
-                        outcome = "Asking ${Sources.label(target)}…"
+                // Asking first, rather than launching straight into another app.
+                // The host is told; playback starts when they say yes.
+                NeoButton(
+                    text = if (asked) "Asked" else "Ask to join",
+                    small = true,
+                    enabled = !asked && hostId != null,
+                    onClick = {
+                        val host = hostId ?: return@NeoButton
+                        asked = true
+                        outcome = "Asking @$handle…"
                         scope.launch {
-                            outcome = when (
-                                val r = PlayerCommands.play(context, target, title, artist, sourceTrackId)
-                            ) {
-                                is PlayOutcome.Started -> "Playing in ${Sources.label(target)}."
-                                is PlayOutcome.OpenedExact ->
-                                    "${Sources.label(target)} opened on the song. Press play."
-                                is PlayOutcome.Opened ->
-                                    "${Sources.label(target)} opened at a search for it."
-                                is PlayOutcome.Failed -> r.reason
-                            }
+                            listen.ask(host, title, artist, fingerprint, sourceTrackId)
+                                .onSuccess { outcome = "Asked @$handle. You will hear back here." }
+                                .onFailure { asked = false; outcome = it.message }
                         }
-                    }
-                })
+                    },
+                )
             }
         }
 

@@ -1,5 +1,9 @@
 package com.museroom.app.ui
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -23,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.museroom.app.media.NowPlayingRepository
+import com.museroom.app.notify.Notifier
 import com.museroom.app.tracking.PlaybackTracker
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MuseroomMark
@@ -76,6 +82,8 @@ fun MuseroomApp() {
             OnboardingScreen()
             return@Box
         }
+
+        AskForNotifications()
 
         Column(Modifier.fillMaxSize()) {
             TopBar()
@@ -204,6 +212,23 @@ private fun Modifier.tap(onClick: () -> Unit) = this.clickable(
     indication = null,
     onClick = onClick,
 )
+
+/**
+ * Android 13 needs asking before we can post anything. Requested once, on the
+ * way in, because the thing it is for is somebody wanting to listen with you and
+ * that cannot wait for a settings screen.
+ */
+@Composable
+private fun AskForNotifications() {
+    val context = LocalContext.current
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        Notifier.ensureChannel(context)
+        if (!Notifier.canPost(context)) ask.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}
 
 /** Notification access can only change outside the app, so re-read it on resume. */
 @Composable
