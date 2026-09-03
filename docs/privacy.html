@@ -1,40 +1,113 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Museroom Privacy Policy</title>
+<title>Museroom — Privacy</title>
+<meta name="description" content="Exactly what Museroom reads, what it keeps, and what other people can see.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%237B4BFF'/%3E%3Cg transform='translate(-4,-7.75)'%3E%3Cpath d='M69.37,84.77 A27,21 -20 0 1 18.63,103.23 A27,21 -20 0 1 69.37,84.77 Z' fill='%2314110D'/%3E%3Cpath d='M64,96 L64,22 L80,22 L80,96 Z' fill='%2314110D'/%3E%3Cpath d='M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z' fill='%2314110D'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700;800;900&family=Bangers&family=Space+Mono:wght@400;700&display=swap">
 <style>
-  :root { color-scheme: light dark; }
-  body {
-    max-width: 44rem; margin: 0 auto; padding: 3rem 1.25rem 6rem;
-    font: 17px/1.65 Georgia, "Times New Roman", serif;
+  :root{
+    --paper:#FBF6EA; --ink:#14110D; --card:#FFFFFF;
+    --violet:#7B4BFF; --lime:#CDFF3E; --pink:#FF4D8D; --sky:#54D6F5;
   }
-  h1 { font-family: system-ui, sans-serif; font-size: 2rem; letter-spacing: -0.02em; }
-  h2 { font-family: system-ui, sans-serif; font-size: 1.1rem; margin-top: 2.5rem; }
-  .date { opacity: 0.6; font-size: 0.9rem; }
-  ul { padding-left: 1.2rem; }
-  li { margin-bottom: 0.5rem; }
-  code { font: 0.85em ui-monospace, monospace; }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+    font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased;
+    position:relative; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:radial-gradient(var(--ink) 1.2px, transparent 1.3px);
+    background-size:9px 9px; opacity:.07;
+  }
+  .wrap{position:relative; z-index:1; max-width:720px; margin:0 auto; padding:0 20px 72px}
+
+  a{color:var(--ink); text-decoration:underline; text-decoration-thickness:2px;
+    text-underline-offset:3px}
+  a:hover{color:var(--violet)}
+
+  header{display:flex; align-items:center; gap:14px; padding:34px 0 8px; flex-wrap:wrap}
+  .mark{width:52px; height:52px; border-radius:16px; background:var(--violet);
+        border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink);
+        display:grid; place-items:center; flex:0 0 auto}
+  .word{font-family:"Bangers","Impact",sans-serif; font-size:34px; line-height:1;
+        letter-spacing:.04em; text-shadow:3px 3px 0 var(--violet)}
+  .word a{text-decoration:none; color:inherit}
+
+  h1{font-family:"Bangers","Impact",sans-serif; font-weight:400; letter-spacing:.02em;
+     font-size:clamp(36px, 8vw, 58px); line-height:1.02; margin:26px 0 6px}
+  .date{font-family:"Space Mono",monospace; font-size:13px; opacity:.65; margin:0 0 4px}
+
+  h2{font-family:"Bangers","Impact",sans-serif; font-weight:400; letter-spacing:.03em;
+     font-size:clamp(24px, 4.5vw, 32px); line-height:1; margin:52px 0 4px}
+  .rule{width:56px; height:9px; border:3px solid var(--ink); border-radius:999px;
+        background:var(--lime); margin:0 0 18px}
+
+  p{max-width:62ch}
+
+  ul{padding-left:0; list-style:none; margin:16px 0 0}
+  ul li{position:relative; padding-left:32px; margin:0 0 13px; max-width:62ch}
+  ul li::before{content:""; position:absolute; left:0; top:6px; width:16px; height:16px;
+                border:3px solid var(--ink); border-radius:5px; background:var(--sky)}
+  strong{font-weight:900}
+
+  .note{border:3px solid var(--ink); border-radius:18px; background:var(--card);
+        padding:18px 20px; margin:20px 0; box-shadow:4px 4px 0 var(--ink); max-width:none}
+  .note.key{background:var(--lime)}
+
+  footer{margin-top:60px; padding-top:22px; border-top:3px solid var(--ink);
+         font-size:15px; display:flex; gap:18px; flex-wrap:wrap}
 </style>
+</head>
+<body>
+<div class="wrap">
 
-<h1>Museroom Privacy Policy</h1>
-<p class="date">Last updated 2 September 2026</p>
+<header>
+  <span class="mark">
+    <svg width="34" height="34" viewBox="0 0 128 128" aria-hidden="true">
+      <g transform="translate(-4,-7.75)">
+        <g transform="translate(5,5)">
+          <path d="M69.37,84.77 A27,21 -20 0 1 18.63,103.23 A27,21 -20 0 1 69.37,84.77 Z" fill="#CDFF3E"/>
+          <path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/>
+          <path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/>
+        </g>
+        <path d="M69.37,84.77 A27,21 -20 0 1 18.63,103.23 A27,21 -20 0 1 69.37,84.77 Z" fill="#14110D"/>
+        <path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/>
+        <path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/>
+      </g>
+    </svg>
+  </span>
+  <span class="word"><a href="./">MUSEROOM</a></span>
+</header>
 
-<p>Museroom shows what you are listening to, shares it with friends you add, and
-counts your listening minutes for a leaderboard. This page describes exactly what
-it reads, what it keeps, and what other people can see.</p>
+<h1>Privacy</h1>
+<p class="date">Last updated 3 September 2026</p>
 
-<h2>What the app reads on your phone</h2>
-<p>Android publishes a media session for whichever app is playing audio. Museroom
-reads that session to learn the track title, artist, album, artwork, duration and
-playback position.</p>
-<p>Reading it requires notification access. Museroom does not read the contents of
-your notifications. It counts a fixed list of music players and nothing else:
-Spotify and YouTube Music, including the ReVanced and RVX builds of YouTube Music.
-Every other app on your device is ignored.</p>
-<p>Browsers are deliberately not supported. A browser plays whatever the web plays,
-so counting one would mean recording anything you happen to open.</p>
+<p>Museroom shows what you are listening to, shares it with friends you add, plays
+what they are playing, finds listeners near you, and counts your minutes. This page
+says exactly what it reads, what it keeps, and what other people can see.</p>
+
+<h2>What it reads on your phone</h2>
+<div class="rule"></div>
+<p>Android publishes a media session for whichever app is playing audio. Museroom reads
+that session to learn the track title, artist, album, artwork, duration and playback
+position.</p>
+<p>Reading it requires notification access. Museroom does not read the contents of your
+notifications. It counts a fixed list of music players and nothing else: Spotify and
+YouTube Music, including the ReVanced and RVX builds of YouTube Music. Every other app
+on your device is ignored.</p>
+<p>Browsers are deliberately not supported. A browser plays whatever the web plays, so
+counting one would mean recording anything you happen to open.</p>
 
 <h2>What is stored on your phone</h2>
+<div class="rule" style="background:var(--pink)"></div>
 <ul>
   <li>Playback events: play, pause, seek, track change, and a periodic heartbeat.</li>
   <li>Reconstructed listening sessions and the minutes credited to each.</li>
@@ -43,49 +116,94 @@ so counting one would mean recording anything you happen to open.</p>
 <p>If you never sign in, none of this leaves your device.</p>
 
 <h2>What is sent to the server</h2>
-<p>Once you sign in, the app uploads your playback events, your listening sessions
-and what you are currently playing. This is what makes friends and the leaderboard
-work. Data is stored in Supabase, hosted on Amazon Web Services.</p>
+<div class="rule" style="background:var(--violet)"></div>
+<p>Once you sign in, the app uploads your playback events, your listening sessions and
+what you are currently playing. This is what makes friends and the leaderboard work.
+Data is stored in Supabase, hosted on Amazon Web Services.</p>
 <p>Signing in with Google gives Museroom your email address and basic profile
-information. It does not give access to your Gmail, contacts, Drive or any other
-Google service.</p>
+information. It does not give access to your Gmail, contacts, Drive or any other Google
+service.</p>
+
+<div class="note key">
+  <strong>Your email address is never shown to anybody.</strong> It is not part of your
+  username, it does not appear on the leaderboard, and it is not displayed anywhere in
+  the app, including to you. Your username is a name you chose.
+</div>
+
+<h2>Your username and picture</h2>
+<div class="rule" style="background:var(--sky)"></div>
+<p>New accounts are given a meaningless name, and you can change it to anything not
+already taken. If you add a profile picture, it is cropped and shrunk on your phone
+before it is uploaded, and it is stored so that anybody who can see your name can also
+see it. That includes the public leaderboard. Do not use a picture you would not put on
+a public page.</p>
+
+<h2>Listening rooms</h2>
+<div class="rule" style="background:var(--lime)"></div>
+<p>When you listen along with somebody, Museroom plays their track itself, inside the
+app, using YouTube Music's web player. That player runs in a browser view Museroom keeps
+hidden, and it behaves like any browser: YouTube can set cookies in it and sees the
+requests it makes, exactly as it would if you opened the same site yourself.</p>
+<p>No audio travels between phones. Each side plays its own copy of the recording, and
+all that is shared is which track and which moment.</p>
+<p>Being in somebody's room is visible to that person. Nobody else is told.</p>
 
 <h2>People nearby</h2>
-<p>Proximity is off unless you switch it on. While it is on, your phone broadcasts
-a short random code over Bluetooth and listens for others doing the same. The code
-is not your name, is not derived from your account, changes every fifteen minutes
-and expires. Only Museroom can match a code to a person, and only while both people
-have the feature on.</p>
-<p>Nothing about your music travels over Bluetooth. Other phones learn only that a
-code is in range; what you are playing is looked up through this service, subject to
-the same visibility setting as everything else. Switching proximity off withdraws
-your codes immediately, and a private session pauses it.</p>
+<div class="rule" style="background:var(--pink)"></div>
+<p>This is off unless you switch it on. While it is on, your phone broadcasts a short
+random code over Bluetooth and listens for others doing the same. The code is not your
+name, is not derived from your account, changes every fifteen minutes and expires. Only
+Museroom can match a code to a person, and only while both people have the feature on.</p>
+<p>Nothing about your music travels over Bluetooth. Other phones learn only that a code
+is in range; what you are playing is looked up through this service, subject to the same
+visibility setting as everything else. Switching it off withdraws your codes
+immediately, and a private session pauses it.</p>
+<p>No location is used, requested or stored. Museroom declares to Android that scan
+results are never used to work out where you are, which is why it does not ask for
+location on Android 12 and later.</p>
 
 <h2>Who can see your listening</h2>
+<div class="rule" style="background:var(--violet)"></div>
 <ul>
   <li><strong>What you are playing right now</strong> is visible according to your
       visibility setting: everyone, friends only, or nobody. The default is friends
       only.</li>
-  <li><strong>Your handle and total minutes</strong> appear on the public leaderboard
-      if you are opted in. You can opt out and keep using everything else.</li>
+  <li><strong>Your username, picture and total minutes</strong> appear on the public
+      leaderboard if you are opted in. You can opt out and keep using everything
+      else.</li>
   <li><strong>People physically near you</strong> see what you are playing only if you
-      switch proximity on, and never if your visibility is set to nobody.</li>
+      switch that on, and never if your visibility is set to nobody.</li>
   <li><strong>Your detailed history and event log</strong> are visible only to you.
       This is enforced by database policy, not only by the app.</li>
 </ul>
 
 <h2>Deleting your data</h2>
-<p>You can clear your local history from within the app. To delete your account and
-everything associated with it on the server, email the address below and it will be
-removed. Deleting the app from your phone removes everything stored locally.</p>
+<div class="rule" style="background:var(--sky)"></div>
+<p>You can delete all of your history from within the app, which removes it from this
+phone and from the server and takes its minutes off your total. To delete your account
+and everything associated with it, email the address below and it will be removed.
+Removing the app from your phone removes everything stored locally.</p>
 
 <h2>Children</h2>
-<p>Museroom is not directed at children under 13 and does not knowingly collect
-their data.</p>
+<div class="rule" style="background:var(--lime)"></div>
+<p>Museroom is not directed at children under 13 and does not knowingly collect their
+data.</p>
 
 <h2>Changes</h2>
-<p>If this policy changes materially, the date at the top will change and the
-updated version will be published here.</p>
+<div class="rule" style="background:var(--pink)"></div>
+<p>If this policy changes materially, the date at the top will change and the updated
+version will be published here.</p>
 
 <h2>Contact</h2>
-<p>Questions or deletion requests: <a href="mailto:harshgaonkar57@gmail.com">harshgaonkar57@gmail.com</a></p>
+<div class="rule" style="background:var(--violet)"></div>
+<p>Questions or deletion requests:
+<a href="mailto:harshgaonkar57@gmail.com">harshgaonkar57@gmail.com</a></p>
+
+<footer>
+  <a href="./">Museroom</a>
+  <a href="https://github.com/9u3u3/museroom">Source on GitHub</a>
+</footer>
+
+</div>
+</body>
+</html>

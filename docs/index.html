@@ -1,123 +1,448 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Museroom</title>
+<title>Museroom — see what your friends are listening to</title>
+<meta name="description" content="Museroom reads whatever is playing on your Android phone, shows it to your friends, finds listeners in the room with you, and counts the minutes.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%237B4BFF'/%3E%3Cg transform='translate(-4,-7.75)'%3E%3Cpath d='M69.37,84.77 A27,21 -20 0 1 18.63,103.23 A27,21 -20 0 1 69.37,84.77 Z' fill='%2314110D'/%3E%3Cpath d='M64,96 L64,22 L80,22 L80,96 Z' fill='%2314110D'/%3E%3Cpath d='M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z' fill='%2314110D'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700;800;900&family=Bangers&family=Space+Mono:wght@400;700&display=swap">
 <style>
-  :root { color-scheme: light dark; }
-  body {
-    max-width: 40rem; margin: 0 auto; padding: 4rem 1.25rem 6rem;
-    font: 17px/1.65 Georgia, "Times New Roman", serif;
+  /* Surfaces and accents are lifted straight from the app, so the page and the
+     thing it is advertising are recognisably one design. Light only, because
+     the app is light by default and a site that changed skin under the reader
+     would be describing a product that does not exist. */
+  :root{
+    --paper:#FBF6EA; --ink:#14110D; --card:#FFFFFF;
+    --violet:#7B4BFF; --lime:#CDFF3E; --pink:#FF4D8D; --sky:#54D6F5;
+    --on:#14110D;
   }
-  h1 { font-family: system-ui, sans-serif; font-size: 2.6rem; letter-spacing: -0.03em; margin-bottom: 0.4rem; }
-  .tag { font-family: system-ui, sans-serif; opacity: 0.75; margin-top: 0; }
-  h2 { font-family: system-ui, sans-serif; font-size: 1.05rem; margin-top: 2.5rem; }
-  pre { background: #111; color: #eee; padding: 0.7rem 0.8rem; border-radius: 8px;
-        overflow-x: auto; font-size: 0.8rem; }
-  code { font-family: ui-monospace, Menlo, Consolas, monospace; }
-  ul { padding-left: 1.2rem; }
-  li { margin-bottom: 0.5rem; }
-  .download {
-    display: inline-block; margin: 2rem 0 0.5rem;
-    font-family: system-ui, sans-serif; font-size: 1.05rem; font-weight: 600;
-    text-decoration: none; color: #fff; background: #5B3FD6;
-    padding: 0.85rem 1.6rem; border-radius: 999px;
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Archivo","Helvetica Neue",Arial,sans-serif;
+    font-size:17px; line-height:1.55; -webkit-font-smoothing:antialiased;
+    position:relative; overflow-x:hidden;
   }
-  .download:hover { background: #4a32b5; }
-  .meta { font-family: system-ui, sans-serif; font-size: 0.85rem; opacity: 0.65; margin-top: 0.35rem; }
-  .note {
-    border-left: 3px solid currentColor; padding: 0.1rem 0 0.1rem 1rem;
-    margin: 1.5rem 0; opacity: 0.85; font-size: 0.95rem;
+  /* Ben-Day dots: the comic half of the brief, faint enough to read as paper. */
+  body::before{
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:radial-gradient(var(--ink) 1.2px, transparent 1.3px);
+    background-size:9px 9px; opacity:.07;
   }
-  footer { margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid currentColor; opacity: 0.6; font-size: 0.9rem; }
+  .wrap{position:relative; z-index:1; max-width:960px; margin:0 auto; padding:0 20px 72px}
+
+  a{color:var(--ink); text-decoration:underline; text-decoration-thickness:2px;
+    text-underline-offset:3px}
+  a:hover{color:var(--violet)}
+
+  .bang{font-family:"Bangers","Impact","Haettenschweiler",sans-serif;
+        letter-spacing:.03em; font-weight:400; line-height:1}
+  .mono{font-family:"Space Mono","Courier New",monospace}
+  .ink{border:3px solid var(--ink)}
+  .pop{box-shadow:6px 6px 0 var(--ink)}
+  .pop-sm{box-shadow:3px 3px 0 var(--ink)}
+  .pop-lg{box-shadow:9px 9px 0 var(--ink)}
+
+  /* Header -------------------------------------------------------------- */
+  header{display:flex; align-items:center; gap:14px; padding:34px 0 8px; flex-wrap:wrap}
+  .mark{width:58px; height:58px; border-radius:17px; background:var(--violet);
+        border:3px solid var(--ink); box-shadow:4px 4px 0 var(--ink);
+        display:grid; place-items:center; flex:0 0 auto}
+  .word{font-family:"Bangers","Impact",sans-serif; font-size:40px; line-height:1;
+        letter-spacing:.04em; text-shadow:3px 3px 0 var(--violet)}
+  .tag{margin:0 0 0 auto; font-size:11px; font-weight:900; letter-spacing:.16em;
+       text-transform:uppercase; border:3px solid var(--ink); border-radius:999px;
+       padding:6px 14px; background:var(--lime); box-shadow:3px 3px 0 var(--ink)}
+
+  /* Hero ---------------------------------------------------------------- */
+  h1{font-family:"Bangers","Impact",sans-serif; font-weight:400; letter-spacing:.02em;
+     font-size:clamp(38px, 8vw, 68px); line-height:1.02; margin:26px 0 0;
+     max-width:16ch}
+  h1 em{font-style:normal; color:var(--violet)}
+  .lede{font-size:clamp(17px, 2.4vw, 21px); max-width:56ch; margin:16px 0 0}
+
+  .cta{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:28px 0 0}
+  .download{
+    display:inline-flex; align-items:center; gap:12px; min-height:60px; padding:0 28px;
+    border:3px solid var(--ink); border-radius:999px; background:var(--violet);
+    color:#fff; font-weight:900; font-size:17px; letter-spacing:.02em;
+    text-decoration:none; box-shadow:6px 6px 0 var(--ink);
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  .download:hover{color:#fff}
+  .download:active{transform:translate(4px,4px); box-shadow:2px 2px 0 var(--ink)}
+  .meta{font-family:"Space Mono",monospace; font-size:13px; opacity:.7}
+
+  /* Feature cards ------------------------------------------------------- */
+  h2{font-family:"Bangers","Impact",sans-serif; font-weight:400; letter-spacing:.03em;
+     font-size:clamp(28px, 5vw, 40px); line-height:1; margin:64px 0 4px}
+  .rule{width:64px; height:9px; border:3px solid var(--ink); border-radius:999px;
+        background:var(--lime); margin:0 0 22px}
+
+  .card{border:3px solid var(--ink); border-radius:22px; background:var(--card);
+        box-shadow:6px 6px 0 var(--ink); padding:24px; margin:18px 0}
+  .card h3{font-size:22px; font-weight:900; margin:0 0 6px; letter-spacing:-.01em}
+  .card p{margin:0; max-width:60ch}
+  .card p + p{margin-top:12px}
+  .kicker{font-size:11px; font-weight:900; letter-spacing:.16em; text-transform:uppercase;
+          opacity:.6; margin:0 0 8px}
+
+  .grid{display:grid; gap:18px; grid-template-columns:1fr}
+  @media (min-width:760px){ .grid{grid-template-columns:1fr 1fr} }
+
+  .flag{background:var(--violet); color:#fff; box-shadow:9px 9px 0 var(--ink)}
+  .flag .kicker{opacity:.85}
+  .flag h3{font-size:clamp(24px, 4vw, 32px)}
+  .flag a{color:#fff}
+  .flag-inner{display:grid; gap:26px; grid-template-columns:1fr; align-items:center}
+  @media (min-width:760px){ .flag-inner{grid-template-columns:1.1fr .9fr} }
+
+  /* Radar ---------------------------------------------------------------- */
+  .radar{width:100%; max-width:320px; margin:0 auto; display:block}
+  .ring{fill:none; stroke:#fff; stroke-width:3}
+  .face{stroke:var(--ink); stroke-width:3}
+  .faceletter{font-family:"Bangers",sans-serif; font-size:20px; fill:var(--ink);
+              text-anchor:middle; dominant-baseline:central}
+
+  /* Leaderboard mock ------------------------------------------------------ */
+  .board{display:flex; flex-direction:column; gap:10px; margin-top:18px}
+  .row{display:flex; align-items:center; gap:12px; border:3px solid var(--ink);
+       border-radius:16px; background:var(--card); padding:10px 14px;
+       box-shadow:3px 3px 0 var(--ink)}
+  .row.one{background:var(--lime); box-shadow:5px 5px 0 var(--ink)}
+  .row.two{background:var(--sky); box-shadow:5px 5px 0 var(--ink)}
+  .row.three{background:var(--pink); box-shadow:5px 5px 0 var(--ink)}
+  .rank{font-family:"Space Mono",monospace; font-size:13px; opacity:.7}
+  .pfp{width:38px; height:38px; border-radius:999px; border:3px solid var(--ink);
+       display:grid; place-items:center; font-family:"Bangers",sans-serif; font-size:18px;
+       flex:0 0 auto}
+  .who{font-weight:800; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+       white-space:nowrap}
+  .mins{font-weight:900}
+
+  /* Room mock ------------------------------------------------------------- */
+  .room{border:3px solid var(--ink); border-radius:18px; background:var(--card);
+        padding:14px; box-shadow:4px 4px 0 var(--ink); margin-top:16px}
+  .room .line{display:flex; align-items:center; gap:12px}
+  .art{width:52px; height:52px; border-radius:13px; border:3px solid var(--ink);
+       background:var(--sky); flex:0 0 auto}
+  .bar{height:16px; border:3px solid var(--ink); border-radius:999px; background:#fff;
+       margin-top:12px; overflow:hidden}
+  .bar span{display:block; height:100%; width:46%; background:var(--violet)}
+  .times{display:flex; justify-content:space-between; margin-top:7px;
+         font-family:"Space Mono",monospace; font-size:12px}
+
+  /* Notes ----------------------------------------------------------------- */
+  .note{border:3px solid var(--ink); border-radius:18px; background:var(--card);
+        padding:18px 20px; margin:18px 0; box-shadow:4px 4px 0 var(--ink)}
+  .note.warn{background:var(--lime)}
+  .note.hot{background:var(--pink)}
+  .note p{margin:10px 0 0}
+  .note b{font-weight:900}
+  pre{background:var(--ink); color:#F6F0E2; padding:12px 14px; border-radius:12px;
+      overflow-x:auto; font-size:13px; margin:12px 0 0}
+  code{font-family:"Space Mono","Courier New",monospace}
+
+  .lede-sm{font-size:clamp(16px, 2vw, 19px); max-width:60ch}
+
+  ol.steps{counter-reset:step; list-style:none; padding:0; margin:24px 0 0}
+  ol.steps li{counter-increment:step; position:relative; padding-left:56px;
+              margin:0 0 18px; max-width:60ch}
+  ol.steps li::before{
+    content:counter(step); position:absolute; left:0; top:-2px;
+    width:38px; height:38px; border:3px solid var(--ink); border-radius:999px;
+    background:var(--violet); color:#fff; display:grid; place-items:center;
+    font-family:"Bangers",sans-serif; font-size:20px; box-shadow:3px 3px 0 var(--ink);
+  }
+
+  .explain{border:3px solid var(--ink); border-radius:22px; background:var(--card);
+           box-shadow:6px 6px 0 var(--ink); padding:24px; margin:26px 0}
+  .explain-head{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px}
+  .explain h3{font-size:clamp(20px, 3.2vw, 26px); font-weight:900; margin:0; letter-spacing:-.01em}
+  .explain p{margin:12px 0 0}
+  .chip{font-size:11px; font-weight:900; letter-spacing:.14em; text-transform:uppercase;
+        border:3px solid var(--ink); border-radius:999px; padding:4px 12px;
+        box-shadow:2px 2px 0 var(--ink); white-space:nowrap}
+  .chip-pink{background:var(--pink)}
+  .chip-lime{background:var(--lime)}
+  ul.where{margin:12px 0 0}
+  ul.where li::before{background:var(--sky)}
+
+  ul{padding-left:0; list-style:none; margin:18px 0 0}
+  ul li{position:relative; padding-left:34px; margin:0 0 14px; max-width:62ch}
+  ul li::before{content:""; position:absolute; left:0; top:5px; width:18px; height:18px;
+                border:3px solid var(--ink); border-radius:6px; background:var(--lime)}
+
+  footer{margin-top:64px; padding-top:22px; border-top:3px solid var(--ink);
+         font-size:15px; display:flex; gap:18px; flex-wrap:wrap}
 </style>
+</head>
+<body>
+<div class="wrap">
 
-<h1>Museroom</h1>
-<p class="tag">See what your friends are listening to, in real time.</p>
+<header>
+  <span class="mark">
+    <svg width="38" height="38" viewBox="0 0 128 128" aria-hidden="true">
+      <g transform="translate(-4,-7.75)">
+        <g transform="translate(5,5)">
+          <path d="M69.37,84.77 A27,21 -20 0 1 18.63,103.23 A27,21 -20 0 1 69.37,84.77 Z" fill="#CDFF3E"/>
+          <path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#CDFF3E"/>
+          <path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#CDFF3E"/>
+        </g>
+        <path d="M69.37,84.77 A27,21 -20 0 1 18.63,103.23 A27,21 -20 0 1 69.37,84.77 Z" fill="#14110D"/>
+        <path d="M64,96 L64,22 L80,22 L80,96 Z" fill="#14110D"/>
+        <path d="M80,22 C104,26 118,46 110,74 C109,52 98,40 80,42 Z" fill="#14110D"/>
+      </g>
+    </svg>
+  </span>
+  <span class="word">MUSEROOM</span>
+  <span class="tag">Android &middot; free</span>
+</header>
 
-<p>Museroom reads whatever is playing on your Android phone and shows it to the
-friends you add. It counts your listening minutes and ranks them on a leaderboard,
-and it can find other listeners in the room with you.</p>
+<h1>Music is better <em>when somebody else can hear it.</em></h1>
 
-<a class="download" href="museroom-latest.apk">Download for Android</a>
-<p class="meta">Version 3.8 &middot; 10 MB &middot; Android 8.0 or newer</p>
+<p class="lede">Museroom reads whatever is playing on your phone and shows it to the
+friends you add. It finds the people listening in the room around you, plays what
+they are playing, and counts every minute.</p>
 
-<h2>Installing</h2>
-<p>Museroom is not on the Play Store, so Android will ask permission before
-installing it. Tap the download above, open the file, and allow installs from your
-browser when prompted.</p>
-<p>On first launch the app asks for notification access. That permission is what
-makes detection possible: Android publishes a media session for whatever is
-playing, and reading it is the only way to know what you are listening to.</p>
-<div class="note">
-  <b>Android 13 and later: "Restricted setting".</b> Android blocks the notification
-  access switch for apps installed outside the Play Store, and nothing in the app can
-  unblock it. Open <em>App info</em> for Museroom and find <em>Allow restricted
-  settings</em>. It is behind the three dots on most phones, under <em>Advanced</em> or
-  <em>More</em> on some, and near the bottom of the page on others.
-  <p>If the option is missing entirely, uninstall Museroom, install it again, and open
-  App info within the next few minutes. The option only appears for a short while after
-  installing.</p>
-  <p>You only have to do this once. The setting survives every later update, so long as
-  you install over the top rather than uninstalling first.</p>
-  <p>If you have a computer with <a href="https://developer.android.com/tools/adb">adb</a>,
-  this does the same thing in one line, with USB debugging turned on:</p>
+<div class="cta">
+  <a class="download" href="museroom-latest.apk">Download for Android</a>
+  <span class="meta">Version 3.8 &middot; 10 MB &middot; Android 8.0 or newer</span>
+</div>
+
+<h2>Who else is in the room</h2>
+<div class="rule"></div>
+
+<div class="card flag">
+  <div class="flag-inner">
+    <div>
+      <p class="kicker">The one nothing else does</p>
+      <h3>Find the people around you, by what they are playing.</h3>
+      <p>Turn on the air and your phone puts a short code out over Bluetooth. Anybody
+      in range running Museroom hears it, and it becomes a face, a name and a song.
+      Tap one and their music becomes yours.</p>
+      <p>The code changes constantly and means nothing on its own, so nothing about
+      you is readable by anything except Museroom. No location is used, asked for,
+      or stored.</p>
+    </div>
+    <svg class="radar" viewBox="0 0 300 300" aria-label="Radar with four listeners around it">
+      <circle class="ring" cx="150" cy="150" r="56" opacity=".85"/>
+      <circle class="ring" cx="150" cy="150" r="92" opacity=".55"/>
+      <circle class="ring" cx="150" cy="150" r="128" opacity=".28"/>
+      <circle cx="150" cy="150" r="38" fill="#CDFF3E" stroke="#14110D" stroke-width="3"/>
+      <text x="150" y="151" class="faceletter" style="font-size:30px">4</text>
+      <circle class="face" cx="150" cy="42" r="24" fill="#54D6F5"/>
+      <text x="150" y="43" class="faceletter">A</text>
+      <circle class="face" cx="258" cy="150" r="24" fill="#FF4D8D"/>
+      <text x="258" y="151" class="faceletter">R</text>
+      <circle class="face" cx="150" cy="258" r="24" fill="#CDFF3E"/>
+      <text x="150" y="259" class="faceletter">J</text>
+      <circle class="face" cx="42" cy="150" r="24" fill="#FFFFFF"/>
+      <text x="42" y="151" class="faceletter">M</text>
+    </svg>
+  </div>
+</div>
+
+<h2>Everything else</h2>
+<div class="rule" style="background:var(--sky)"></div>
+
+<div class="grid">
+  <div class="card">
+    <p class="kicker">Listening rooms</p>
+    <h3>Join what a friend is playing.</h3>
+    <p>Ask, and the moment they say yes their song starts on your phone. When they
+    skip, you skip. There is nothing to press and no other app to open, because
+    Museroom plays it itself. Ad breaks are kept out, since an ad only ever happens
+    to one of you.</p>
+    <div class="room">
+      <div class="line">
+        <span class="art"></span>
+        <span>
+          <b>Listening with ankur</b><br>
+          <span class="meta">In step</span>
+        </span>
+      </div>
+      <div class="bar"><span></span></div>
+      <div class="times"><span>1:34</span><span>3:24</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="kicker">Leaderboard</p>
+    <h3>Minutes, counted honestly.</h3>
+    <p>A track counts when it finishes, not when it starts, and the totals are worked
+    out on a server rather than taken on trust from a phone. Day, week, month and all
+    time, for everyone who chooses to appear.</p>
+    <div class="board">
+      <div class="row one">
+        <span class="rank">01</span>
+        <span class="pfp" style="background:#FFFFFF">H</span>
+        <span class="who">harsh</span>
+        <span class="mins">56m</span>
+      </div>
+      <div class="row two">
+        <span class="rank">02</span>
+        <span class="pfp" style="background:#FFFFFF">H</span>
+        <span class="who">harshada</span>
+        <span class="mins">7m</span>
+      </div>
+      <div class="row three">
+        <span class="rank">03</span>
+        <span class="pfp" style="background:#FFFFFF">A</span>
+        <span class="who">ankur</span>
+        <span class="mins">1m</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="kicker">Friends</p>
+    <h3>What they are on, right now.</h3>
+    <p>Add somebody by username and their track appears with its artwork and a
+    clock that ticks. You choose who sees yours: everyone, friends only, or nobody.
+    A private session stops recording entirely.</p>
+  </div>
+
+  <div class="card">
+    <p class="kicker">Your name, your face</p>
+    <h3>Anonymous unless you decide otherwise.</h3>
+    <p>Nothing about your account is built out of your email address. Pick a username,
+    add a picture from your gallery if you want one, and that is everything anybody
+    else can see.</p>
+  </div>
+</div>
+
+<h2>What it counts</h2>
+<div class="rule" style="background:var(--pink)"></div>
+
+<p>Spotify and YouTube Music, including the ReVanced and RVX builds of YouTube Music.
+Nothing else on your device is read. Browsers are deliberately unsupported, because a
+browser plays whatever the web plays and no permission granted in advance could
+sensibly cover that.</p>
+
+<h2>How it works</h2>
+<div class="rule" style="background:var(--violet)"></div>
+
+<ul>
+  <li>Android keeps a media session for whichever app is playing audio. Museroom reads
+      the track and its position from there, which is why it works with players that
+      have no public interface of their own.</li>
+  <li>A listening room plays through YouTube Music inside the app. Your friend's track
+      is matched by name, started at the moment they are at, and kept there by nudging
+      the position. No audio travels between phones.</li>
+  <li>The ad slots are removed from the player's data before it reads them, the same way
+      the YouTube Music desktop clients do it.</li>
+  <li>Nearby listeners are found over Bluetooth Low Energy with a rotating token. Museroom
+      declares to Android that scan results are never used to work out where you are,
+      which is true, and means it never asks for location on Android 12 and up.</li>
+  <li>Nothing is shared until you sign in, and what friends can see is yours to set.</li>
+</ul>
+
+<h2>Installing it</h2>
+<div class="rule" style="background:var(--lime)"></div>
+
+<p class="lede-sm">Museroom is not on the Play Store, so Android puts two warnings in
+your way. Neither means anything is wrong with the app, and both are explained in full
+below. Together they take about a minute.</p>
+
+<ol class="steps">
+  <li>
+    <b>Download the file</b> using the button at the top of this page. Your browser will
+    ask whether to keep it, because it is an app rather than a picture. Keep it.
+  </li>
+  <li>
+    <b>Open it.</b> Android will say your browser is not allowed to install apps and
+    offer a settings screen. Turn the switch on, come back, and the install continues.
+    You can turn it off again afterwards.
+  </li>
+  <li>
+    <b>Get past Play Protect.</b> Explained just below.
+  </li>
+  <li>
+    <b>Give it notification access</b> when the app asks on first launch. If Android
+    calls this a restricted setting, that is explained below too.
+  </li>
+</ol>
+
+<div class="explain">
+  <div class="explain-head">
+    <span class="chip chip-pink">Warning 1</span>
+    <h3>"Unsafe app blocked" — Play Protect</h3>
+  </div>
+  <p>Play Protect is Google's scanner. It checks every app being installed against a list
+  of apps Google has seen before, and Museroom is not on that list, because it is
+  downloaded from here rather than from the Play Store. It has not found anything in the
+  app. It is telling you it does not recognise it.</p>
+  <p><b>What to tap.</b> The dialog usually has <b>More details</b> and then
+  <b>Install anyway</b>. On some phones the second button is <b>Install without
+  scanning</b>. Either is the same choice.</p>
+  <p><b>Why it cannot be turned off.</b> The warning belongs to Google, not to Museroom.
+  Nothing in the app can suppress it, and it will keep appearing for as long as the app
+  is downloaded from a page like this one. The only thing that removes it is publishing
+  through the Play Store.</p>
+  <p><b>How to check for yourself,</b> rather than taking that on trust: the whole app is
+  <a href="https://github.com/9u3u3/museroom">open on GitHub</a>. Every version on this
+  page is built from what is there.</p>
+</div>
+
+<div class="explain">
+  <div class="explain-head">
+    <span class="chip chip-lime">Warning 2</span>
+    <h3>"Restricted setting" — Android 13 and later</h3>
+  </div>
+  <p>Museroom needs notification access. That sounds broader than it is: it is the only
+  way Android lets an app read the media session, which is where the title, artist and
+  position of the current track live. Museroom never reads the contents of a
+  notification, and ignores every app except Spotify and YouTube Music.</p>
+  <p>On Android 13 and later, that particular switch is greyed out for any app installed
+  outside the Play Store. Tapping it shows <b>Restricted setting</b> and nothing happens.
+  This is Android's decision, taken at the moment the app was installed and based on
+  where it came from. Nothing inside the app can lift it.</p>
+  <p><b>What to do.</b> Open <b>Settings → Apps → Museroom</b>, which is the App info
+  page. The app's own <b>Open app info</b> button takes you straight there. Then find
+  <b>Allow restricted settings</b> and turn it on. Where that option sits depends on the
+  phone:</p>
+  <ul class="where">
+    <li>Behind the <b>three dots</b> in the top-right corner, on most phones.</li>
+    <li>Under <b>Advanced</b> or <b>More</b>, on some.</li>
+    <li>Near the <b>bottom of the App info page</b>, on others.</li>
+  </ul>
+  <p><b>If the option is not there at all,</b> it has expired. It only appears for a short
+  while after installing. Uninstall Museroom, install it again, and go to App info within
+  the next few minutes.</p>
+  <p><b>You only have to do this once,</b> ever. The permission survives every future
+  update, so install new versions over the top and never uninstall.</p>
+  <p><b>If you have a computer,</b> this does the same thing in one line, with the phone
+  plugged in and USB debugging turned on:</p>
   <pre><code>adb shell appops set com.museroom.app ACCESS_RESTRICTED_SETTINGS allow</code></pre>
 </div>
 
-<div class="note">
-  <b>Play Protect will warn you.</b> Google shows that warning for any app it has not
-  seen before, which means every app that is not on the Play Store. Choosing
-  <em>Install anyway</em> is the whole of it. There is no setting in the app that turns
-  it off, and there is no way to remove it while Museroom is downloaded from here
-  rather than from Google.
-</div>
-
-<div class="note">
-  <b>Version 3.8 changes the signing key, once.</b> Every earlier build was signed with
-  a development key, and Android will not install a differently signed app over one it
-  already has. Uninstall Museroom first, then install this. It is a one-time step; every
-  version after this updates in place.
-  <p><b>Update in place from now on, and never uninstall.</b> Notification access
+<div class="note hot">
+  <b>Version 3.8 changes the signing key, once.</b> Every earlier build was signed with a
+  development key, and Android will not install a differently signed app over one it
+  already has. If you have an older Museroom, uninstall it first, then install this. Every
+  version after this one updates in place.
+  <p><b>After that, update over the top and never uninstall.</b> Notification access
   survives an update and does not survive an uninstall, so uninstalling means finding
-  <em>Allow restricted settings</em> all over again.</p>
+  <b>Allow restricted settings</b> all over again.</p>
 </div>
-
-<h2>Listening together</h2>
-<p>Ask a friend to join what they are playing, and once they say yes Museroom
-plays it too. It plays it inside Museroom, not by throwing you into another app,
-so when they skip you skip with them and there is nothing to press. Ad breaks
-are kept out, because an ad only ever happens to one of you and there is nothing
-to stay in step with while it runs. You can sign in to YouTube Music from the
-You tab if you would rather listen on your own account.</p>
-
-<h2>What it counts</h2>
-<p>Spotify and YouTube Music, including the ReVanced and RVX builds of YouTube
-Music. Nothing else on your device is read. Browsers are deliberately unsupported,
-because a browser plays whatever the web plays and no permission granted in
-advance could sensibly cover that.</p>
-
-<h2>How it works</h2>
-<ul>
-  <li>Android keeps a media session for the app currently playing audio. Museroom
-      reads the track and its position from there, which is why it works with
-      players that have no public interface of their own.</li>
-  <li>A listening room plays through YouTube Music inside the app. Your friend's
-      track is matched by name, then started at the moment they are at, and kept
-      there by nudging the position rather than by streaming any audio between
-      phones.</li>
-  <li>The ad slots are removed from the player's data before it reads them, the
-      same way the YouTube Music desktop clients do it.</li>
-  <li>Minutes are counted when a track finishes, and the totals are worked out on
-      a server rather than taken on trust from the phone.</li>
-  <li>Nothing is shared until you sign in, and what friends can see is yours to
-      set. A private session stops recording entirely.</li>
-</ul>
 
 <h2>Privacy</h2>
+<div class="rule" style="background:var(--sky)"></div>
+
 <p>The full <a href="privacy.html">privacy policy</a> sets out what is stored, what
 travels over Bluetooth when you turn on proximity, and who can see what.</p>
 
 <footer>
-  <a href="https://github.com/9u3u3/museroom">Source on GitHub</a> &middot;
+  <a href="https://github.com/9u3u3/museroom">Source on GitHub</a>
+  <a href="privacy.html">Privacy</a>
   <a href="mailto:harshgaonkar57@gmail.com">harshgaonkar57@gmail.com</a>
 </footer>
+
+</div>
+</body>
+</html>
