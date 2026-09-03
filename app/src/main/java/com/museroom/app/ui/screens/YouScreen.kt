@@ -48,6 +48,7 @@ import com.museroom.app.media.Avatars
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ProfileRepository
+import com.museroom.app.net.SafetyRepository
 import com.museroom.app.net.Visibility
 import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.privacy.PrivacyState
@@ -100,6 +101,7 @@ fun YouScreen() {
     var confirmWipe by remember { mutableStateOf(false) }
     var explainPrivate by remember { mutableStateOf(false) }
     var showTour by remember { mutableStateOf(false) }
+    var confirmDeleteAccount by remember { mutableStateOf(false) }
     var photoNote by remember { mutableStateOf<String?>(null) }
 
     // The system picker, so Museroom never asks for access to the gallery: it
@@ -122,6 +124,29 @@ fun YouScreen() {
     }
 
     LaunchedEffect(session?.userId) { if (session != null) profiles.refresh() }
+
+    if (confirmDeleteAccount) {
+        ConfirmDialog(
+            title = "Delete your account?",
+            body = "Your username, picture, minutes, history, friends and every " +
+                "row about you are deleted from this phone and from the server, " +
+                "and the account itself goes with them. This cannot be undone.",
+            confirm = "DELETE ACCOUNT",
+            destructive = true,
+            onConfirm = {
+                confirmDeleteAccount = false
+                scope.launch {
+                    SafetyRepository.get(context).deleteAccount()
+                        .onSuccess {
+                            sync.deleteAllHistory()
+                            auth.signOut()
+                        }
+                        .onFailure { photoNote = it.message }
+                }
+            },
+            onDismiss = { confirmDeleteAccount = false },
+        )
+    }
 
     if (showTour) {
         FeatureTour(onDismiss = { showTour = false })
@@ -354,6 +379,8 @@ fun YouScreen() {
             }
         }
 
+        HistorySection()
+
         if (session != null) {
             photoNote?.let { Note(it) }
 
@@ -421,6 +448,10 @@ fun YouScreen() {
         Spacer(Modifier.size(2.dp))
         Note("Nothing else on your phone is read. No browsers, video or podcast apps.")
 
+        if (session != null) {
+            BlockedList()
+        }
+
         Spacer(Modifier.size(6.dp))
         NeoButton(
             "Delete all history",
@@ -428,6 +459,15 @@ fun YouScreen() {
             modifier = Modifier.fillMaxWidth(),
             onClick = { confirmWipe = true },
         )
+        if (session != null) {
+            NeoButton(
+                "Delete my account",
+                tone = NeoTone.Paper,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { confirmDeleteAccount = true },
+            )
+        }
+
         if (session != null) {
             NeoButton(
                 "Sign out",
@@ -483,6 +523,48 @@ private fun HandlePicker() {
                 },
             )
             message?.let { Note(it) }
+        }
+    }
+}
+
+/**
+ * Who you have blocked, and the way back.
+ *
+ * A block that cannot be undone is a trap rather than a tool, and the list has
+ * to live somewhere findable or the only way to undo one would be to remember
+ * the username and hope. It stays out of the way entirely when it is empty.
+ */
+@Composable
+private fun BlockedList() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val scope = rememberCoroutineScope()
+    val safety = remember { SafetyRepository.get(context) }
+    val blocked by safety.blocked.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) { safety.refresh() }
+    if (blocked.isEmpty()) return
+
+    Label("Blocked", color = c.ink)
+    blocked.forEach { person ->
+        NeoCard(radius = 14.dp, shadow = 3.dp, padding = 12.dp) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(11.dp),
+            ) {
+                Face(person.handle, person.avatarUrl, 34.dp)
+                Text(
+                    person.handle,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = c.ink,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                NeoButton("Unblock", small = true, tone = NeoTone.Paper, onClick = {
+                    scope.launch { safety.unblock(person.userId) }
+                })
+            }
         }
     }
 }

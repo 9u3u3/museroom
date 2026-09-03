@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -437,4 +439,43 @@ fun Face(
             )
         }
     }
+}
+
+/**
+ * One shape for every "are you sure" in the app.
+ *
+ * These are the moments somebody is about to do something they cannot casually
+ * undo, and each one deserves to say plainly what will happen rather than
+ * asking whether they are sure of something unstated.
+ */
+@Composable
+fun ConfirmDialog(
+    title: String,
+    body: String,
+    confirm: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    destructive: Boolean = false,
+) {
+    val c = Neo.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = c.card,
+        title = { Text(title, style = bangers(24).copy(color = c.ink)) },
+        text = { Note(body) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    confirm,
+                    color = if (destructive) c.pink else c.ink,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", color = c.ink, style = MaterialTheme.typography.labelLarge)
+            }
+        },
+    )
 }

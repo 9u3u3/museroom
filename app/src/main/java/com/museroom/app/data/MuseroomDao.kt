@@ -48,6 +48,19 @@ interface MuseroomDao {
     )
     fun topArtistsSince(sinceClock: Long, limit: Int = 10): Flow<List<ArtistTotal>>
 
+    @Query(
+        """
+        SELECT title AS title, artist AS artist,
+               SUM(creditedMs) AS creditedMs, COUNT(*) AS plays
+        FROM listening_sessions
+        WHERE startedAtClock >= :sinceClock AND title != ''
+        GROUP BY fingerprint
+        ORDER BY creditedMs DESC
+        LIMIT :limit
+        """,
+    )
+    fun topTracksSince(sinceClock: Long, limit: Int = 10): Flow<List<TrackTotal>>
+
     @Query("SELECT MAX(id) FROM play_events")
     suspend fun lastEventId(): Long?
 
@@ -81,3 +94,10 @@ interface MuseroomDao {
 }
 
 data class ArtistTotal(val artist: String, val creditedMs: Long)
+
+data class TrackTotal(
+    val title: String,
+    val artist: String,
+    val creditedMs: Long,
+    val plays: Int,
+)

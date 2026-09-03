@@ -30,6 +30,7 @@ import com.museroom.app.net.Friend
 import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.PendingRequest
 import com.museroom.app.net.Profile
+import com.museroom.app.net.SafetyRepository
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.NeoAccentCard
@@ -56,6 +57,10 @@ fun FriendsScreen() {
     var busy by remember { mutableStateOf(false) }
     val alerts = remember { FriendAlerts.get(context) }
     val mutedFriends by alerts.muted.collectAsStateWithLifecycle()
+    val safety = remember { SafetyRepository.get(context) }
+    var confirmUnfriend by remember { mutableStateOf<Profile?>(null) }
+    var confirmBlock by remember { mutableStateOf<Profile?>(null) }
+    var confirmReport by remember { mutableStateOf<Profile?>(null) }
 
     suspend fun reload() {
         repo.friends().onSuccess { friends = it }.onFailure { message = it.message }
@@ -67,6 +72,62 @@ fun FriendsScreen() {
             reload()
             delay(15_000)
         }
+    }
+
+    confirmUnfriend?.let { who ->
+        ConfirmDialog(
+            title = "Unfriend ${who.handle}?",
+            body = "They stop seeing what you play, and you stop seeing theirs. " +
+                "Either of you can send a new request afterwards.",
+            confirm = "UNFRIEND",
+            onConfirm = {
+                busy = true
+                confirmUnfriend = null
+                scope.launch {
+                    repo.remove(who).onFailure { message = it.message }
+                    reload(); busy = false
+                }
+            },
+            onDismiss = { confirmUnfriend = null },
+        )
+    }
+
+    confirmBlock?.let { who ->
+        ConfirmDialog(
+            title = "Block ${who.handle}?",
+            body = "They cannot see what you play, ask to join, or send you a " +
+                "request, and your friendship is undone. They are not told. " +
+                "You can undo this from the You tab.",
+            confirm = "BLOCK",
+            onConfirm = {
+                busy = true
+                confirmBlock = null
+                scope.launch {
+                    safety.block(who.id).onFailure { message = it.message }
+                    reload(); busy = false
+                }
+            },
+            onDismiss = { confirmBlock = null },
+        )
+    }
+
+    confirmReport?.let { who ->
+        ConfirmDialog(
+            title = "Report ${who.handle}?",
+            body = "This sends their username to whoever runs Museroom to be " +
+                "looked at by a person. Nothing happens automatically, and it " +
+                "does not block them — do that as well if you want them gone.",
+            confirm = "REPORT",
+            onConfirm = {
+                confirmReport = null
+                scope.launch {
+                    safety.report(who.id, "reported from friends")
+                        .onSuccess { message = "Reported ${who.handle}. Thank you." }
+                        .onFailure { message = it.message }
+                }
+            },
+            onDismiss = { confirmReport = null },
+        )
     }
 
     Column(
@@ -152,22 +213,35 @@ fun FriendsScreen() {
             NeoCard { Note("Nobody yet. Search for someone by their username above.") }
         } else {
             friends.forEach { friend ->
-                ListenerRow(
-                    handle = friend.profile.handle,
-                    title = friend.nowPlaying?.title.orEmpty(),
-                    artist = friend.nowPlaying?.artist.orEmpty(),
-                    durationMs = friend.nowPlaying?.durationMs ?: 0,
-                    positionMs = friend.nowPlaying?.positionMs ?: 0,
-                    isPlaying = friend.nowPlaying?.isPlaying == true,
-                    updatedAt = friend.nowPlaying?.updatedAt.orEmpty(),
-                    sourceTrackId = friend.nowPlaying?.sourceTrackId,
-                    hostId = friend.profile.id,
-                    fingerprint = friend.nowPlaying?.title.orEmpty(),
-                    avatarUrl = friend.profile.avatarUrl,
-                    openToAll = friend.profile.openToAll,
-                    muted = friend.profile.id in mutedFriends,
-                    onMutedChange = { alerts.setMuted(friend.profile.id, it) },
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ListenerRow(
+                        handle = friend.profile.handle,
+                        title = friend.nowPlaying?.title.orEmpty(),
+                        artist = friend.nowPlaying?.artist.orEmpty(),
+                        durationMs = friend.nowPlaying?.durationMs ?: 0,
+                        positionMs = friend.nowPlaying?.positionMs ?: 0,
+                        isPlaying = friend.nowPlaying?.isPlaying == true,
+                        updatedAt = friend.nowPlaying?.updatedAt.orEmpty(),
+                        sourceTrackId = friend.nowPlaying?.sourceTrackId,
+                        hostId = friend.profile.id,
+                        fingerprint = friend.nowPlaying?.title.orEmpty(),
+                        avatarUrl = friend.profile.avatarUrl,
+                        openToAll = friend.profile.openToAll,
+                        muted = friend.profile.id in mutedFriends,
+                        onMutedChange = { alerts.setMuted(friend.profile.id, it) },
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NeoButton("Unfriend", small = true, tone = NeoTone.Paper, enabled = !busy, onClick = {
+                            confirmUnfriend = friend.profile
+                        })
+                        NeoButton("Block", small = true, tone = NeoTone.Paper, enabled = !busy, onClick = {
+                            confirmBlock = friend.profile
+                        })
+                        NeoButton("Report", small = true, tone = NeoTone.Paper, enabled = !busy, onClick = {
+                            confirmReport = friend.profile
+                        })
+                    }
+                }
             }
         }
 
