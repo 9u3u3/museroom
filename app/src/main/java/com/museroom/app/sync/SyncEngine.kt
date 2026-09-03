@@ -107,6 +107,25 @@ class SyncEngine private constructor(context: Context) {
         }
     }
 
+    /** Nothing is playing here any more. Said so that a room stops with you. */
+    suspend fun publishStopped() {
+        val userId = auth.session.value?.userId ?: return
+        val token = auth.validAccessToken() ?: return
+        runCatching {
+            withContext(Dispatchers.IO) {
+                Supabase.patch(
+                    "now_playing",
+                    "user_id=eq.$userId",
+                    buildJsonObject {
+                        put("is_playing", false)
+                        put("updated_at", Instant.now().toString())
+                    },
+                    token,
+                )
+            }
+        }
+    }
+
     /**
      * Says, out loud, that you are listening along with somebody.
      *

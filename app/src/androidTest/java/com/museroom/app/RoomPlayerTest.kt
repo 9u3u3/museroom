@@ -136,6 +136,31 @@ class RoomPlayerTest {
         )
     }
 
+    /** Leaving the app for something else does not stop the music. */
+    @Test
+    fun keepsPlayingWhileTheAppIsInTheBackground() {
+        val opened = ActivityScenario.launch(MainActivity::class.java)
+        scenario = opened
+        RoomPlayer.warmUp()
+        assertTrue(waitFor(90_000) { RoomPlayer.started })
+
+        val id = runBlocking { RoomPlayer.search("Blinding Lights", "The Weeknd") }
+        assertNotNull(id)
+        RoomPlayer.load(id!!, START_MS)
+        assertTrue(waitFor(90_000) { RoomPlayer.snapshot.value.playing })
+
+        val before = RoomPlayer.snapshot.value.positionMs
+        opened.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+
+        SystemClock.sleep(8_000)
+        val after = RoomPlayer.snapshot.value
+        assertTrue("The player stopped when the app went to the background.", after.playing)
+        assertTrue(
+            "Position did not move: ${before}ms then ${after.positionMs}ms.",
+            after.positionMs > before + 3_000,
+        )
+    }
+
     private fun waitFor(timeoutMs: Long, condition: () -> Boolean): Boolean {
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
         while (SystemClock.elapsedRealtime() < deadline) {

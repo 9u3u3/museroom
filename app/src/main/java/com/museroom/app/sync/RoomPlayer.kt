@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
@@ -121,10 +122,25 @@ object RoomPlayer {
         (view.parent as? ViewGroup)?.removeView(view)
     }
 
+    /**
+     * A WebView that does not notice its window going away.
+     *
+     * Chromium suspends media the moment the window holding it stops being
+     * visible, which is the right reflex for a video somebody has navigated
+     * away from and the wrong one for a player nobody was ever looking at.
+     * Museroom's room is audio that happens to be rendered by a browser, and
+     * putting the phone in a pocket must not stop it.
+     */
+    private class AwakeWebView(context: Context) : WebView(context) {
+        override fun onWindowVisibilityChanged(visibility: Int) {
+            super.onWindowVisibilityChanged(View.VISIBLE)
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun create(context: Context): WebView {
         web?.let { return it }
-        val view = WebView(context)
+        val view = AwakeWebView(context)
         view.settings.apply {
             javaScriptEnabled = true
             domStorageEnabled = true

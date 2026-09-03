@@ -74,8 +74,10 @@ class RoomService : Service() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
-        // Swiping Museroom away is an unambiguous "stop", and music that keeps
-        // playing after that reads as the app misbehaving.
+        // Swiping Museroom out of recents destroys the window the player lives
+        // in, and Chromium will not keep audio without one. Measured, not
+        // assumed. So the room ends here rather than leaving a notification
+        // sitting over silence.
         FollowSession.stop()
         stopSelf()
     }

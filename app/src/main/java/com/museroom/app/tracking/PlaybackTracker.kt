@@ -39,6 +39,9 @@ object PlaybackTracker {
     private const val KEY_LET_IN_THROUGH = "let_in_through_request_id"
     private const val HEARTBEAT_MS = 30_000L
     private const val NOW_PLAYING_MS = 15_000L
+
+    /** How soon a pause or a skip reaches everybody following. */
+    private const val PUBLISH_CHECK_MS = 3_000L
     private const val SYNC_MS = 60_000L
     private const val INBOX_MS = 20_000L
 
@@ -76,19 +79,13 @@ object PlaybackTracker {
             }
         }
 
-        // What friends read. Overwrites one row rather than appending, and runs on
-        // its own cadence so a paused phone is not writing every fifteen seconds.
+        // What friends read, and what anybody following is steered by.
+        //
+        // Pausing has to travel, which is why this no longer skips a paused
+        // player. Somebody in your room heard the previous message, "playing",
+        // and would go on hearing it for as long as you never sent another.
         val sync = SyncEngine.get(app)
-        newScope.launch {
-            while (true) {
-                delay(NOW_PLAYING_MS)
-                val active = NowPlayingRepository.sessions.value.pickActive()
-                    ?.takeIf { it.isTracked && it.isPlaying && privacy?.privateSession?.value != true }
-                if (active != null) {
-                    sync.publishNowPlaying(active, active.positionAt(SystemClock.elapsedRealtime()))
-                }
-            }
-        }
+        newScope.launch { publishNowPlaying(sync) }
 
         // The outbox drains on a slow loop. A failed pass simply retries the same
         // rows next time, because uploads are keyed off a flag, not a clock.
@@ -147,6 +144,43 @@ object PlaybackTracker {
                     FollowSession.start(app, answer.toUser, answer.handle)
                 }
             }
+        }
+    }
+
+    /**
+     * Telling everybody else what this phone is doing.
+     *
+     * Checked often and sent rarely: a change is worth a few seconds' delay at
+     * most, and a track playing through unchanged is worth one message every
+     * fifteen seconds. Pausing, resuming and skipping all count as changes.
+     */
+    private suspend fun publishNowPlaying(sync: SyncEngine) {
+        var lastState = ""
+        var lastSentAt = 0L
+        var wasPlaying = false
+
+        while (true) {
+            delay(PUBLISH_CHECK_MS)
+            val hidden = privacy?.privateSession?.value == true
+            val active = NowPlayingRepository.sessions.value.pickActive()
+                ?.takeIf { it.isTracked && !hidden }
+
+            val state = "${active?.fingerprint.orEmpty()}|${active?.isPlaying == true}"
+            val now = SystemClock.elapsedRealtime()
+            val due = now - lastSentAt > NOW_PLAYING_MS
+            if (state == lastState && !due) continue
+
+            if (active != null) {
+                sync.publishNowPlaying(active, active.positionAt(now))
+                wasPlaying = active.isPlaying
+            } else if (wasPlaying) {
+                // Nothing at all is playing, and the last thing anybody heard
+                // from this phone said otherwise.
+                sync.publishStopped()
+                wasPlaying = false
+            }
+            lastState = state
+            lastSentAt = now
         }
     }
 

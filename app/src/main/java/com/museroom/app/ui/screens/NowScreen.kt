@@ -74,13 +74,14 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** How far you scroll before the player has finished folding itself away. */
-private val COLLAPSE_OVER = 200.dp
+/** What the player takes once it has folded: cover, bar, clock. */
+private val FOLDED_HEIGHT = 108.dp
 
 @Composable
 fun NowScreen() {
     val context = LocalContext.current
     val c = Neo.colors
+    val density = LocalDensity.current
 
     val sessions by NowPlayingRepository.sessions.collectAsStateWithLifecycle()
     val privacy = remember { PrivacyState.get(context) }
@@ -98,21 +99,17 @@ fun NowScreen() {
     val following by FollowSession.following.collectAsStateWithLifecycle()
 
     val scroll = rememberScrollState()
-    val collapseOverPx = with(LocalDensity.current) { COLLAPSE_OVER.toPx() }
-    val collapse = (scroll.value / collapseOverPx).coerceIn(0f, 1f)
 
-    Column(Modifier.fillMaxSize()) {
-        // The player stays put and folds down instead of scrolling away, so
-        // that what you are listening to is never something you have to scroll
-        // back up to check.
-        if (active != null) {
-            NowPlayingHeader(
-                track = active,
-                collapse = collapse,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-            )
-        }
+    // The player is painted over the page rather than sitting above it in a
+    // column, and the page reserves exactly the room the open player takes.
+    // That is what keeps the two from ever drawing on top of each other: the
+    // page slides underneath, and the player folds in place at the same rate.
+    var openPx by remember { mutableIntStateOf(0) }
+    val foldedPx = with(density) { FOLDED_HEIGHT.toPx() }
+    val travel = (openPx - foldedPx).coerceAtLeast(1f)
+    val collapse = if (openPx == 0) 0f else (scroll.value / travel).coerceIn(0f, 1f)
 
+    Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .fillMaxSize()
@@ -121,6 +118,10 @@ fun NowScreen() {
                 .padding(top = 14.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (active != null) {
+                Spacer(Modifier.height(with(density) { openPx.toDp() }))
+            }
+
             FollowBar()
             ListenInbox()
             RoomMembers()
@@ -153,10 +154,24 @@ fun NowScreen() {
                 SignInPanel("Your listening stays on this phone until you sign in.")
             }
 
-            // Room to scroll into. Without it, a quiet day has too little on
-            // the page to move, and the player could never be folded away on
-            // the one screen where somebody would most want to.
-            if (active != null) Spacer(Modifier.height(COLLAPSE_OVER))
+            // Room to scroll into. Without it, a quiet day has too little on the
+            // page to move, and the player could never be folded away on the one
+            // screen where somebody would most want to.
+            if (active != null) {
+                Spacer(Modifier.height(with(density) { travel.toDp() }))
+            }
+        }
+
+        if (active != null) {
+            NowPlayingHeader(
+                track = active,
+                collapse = collapse,
+                modifier = Modifier
+                    .onSizeChanged { if (collapse < 0.02f && it.height > 0) openPx = it.height }
+                    .background(c.paper)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 10.dp, bottom = 12.dp),
+            )
         }
     }
 }
@@ -189,8 +204,9 @@ private fun NowPlayingHeader(track: NowPlaying, collapse: Float, modifier: Modif
     // clip a two-line title or leave a gap under a one-line one.
     var openTextPx by remember { mutableIntStateOf(0) }
 
-    val small = ((collapse - 0.35f) / 0.65f).coerceIn(0f, 1f)
-    val large = (1f - collapse * 1.7f).coerceIn(0f, 1f)
+    // One title hands over to the other rather than both being half there.
+    val small = ((collapse - 0.55f) / 0.4f).coerceIn(0f, 1f)
+    val large = (1f - collapse / 0.45f).coerceIn(0f, 1f)
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val cover = lerp(maxWidth, 56.dp, collapse)
@@ -265,7 +281,7 @@ private fun NowPlayingHeader(track: NowPlaying, collapse: Float, modifier: Modif
                 }
             }
 
-            Spacer(Modifier.size(lerp(16.dp, 10.dp, collapse)))
+            Spacer(Modifier.size(lerp(16.dp, 11.dp, collapse)))
             NeoProgress(fraction)
             Spacer(Modifier.size(lerp(8.dp, 5.dp, collapse)))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
