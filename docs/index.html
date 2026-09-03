@@ -39,7 +39,7 @@ friends you add. It counts your listening minutes and ranks them on a leaderboar
 and it can find other listeners in the room with you.</p>
 
 <a class="download" href="museroom-latest.apk">Download for Android</a>
-<p class="meta">Version 3.8 &middot; 13 MB &middot; Android 8.0 or newer</p>
+<p class="meta">Version 3.8 &middot; 10 MB &middot; Android 8.0 or newer</p>
 
 <h2>Installing</h2>
 <p>Museroom is not on the Play Store, so Android will ask permission before
@@ -57,6 +57,8 @@ playing, and reading it is the only way to know what you are listening to.</p>
   <p>If the option is missing entirely, uninstall Museroom, install it again, and open
   App info within the next few minutes. The option only appears for a short while after
   installing.</p>
+  <p>You only have to do this once. The setting survives every later update, so long as
+  you install over the top rather than uninstalling first.</p>
   <p>If you have a computer with <a href="https://developer.android.com/tools/adb">adb</a>,
   this does the same thing in one line, with USB debugging turned on:</p>
   <pre><code>adb shell appops set com.museroom.app ACCESS_RESTRICTED_SETTINGS allow</code></pre>
@@ -71,8 +73,13 @@ playing, and reading it is the only way to know what you are listening to.</p>
 </div>
 
 <div class="note">
-  This is a test build, signed with a development key. It installs and runs
-  normally, but Android will not update it over a future release-signed version.
+  <b>Version 3.8 changes the signing key, once.</b> Every earlier build was signed with
+  a development key, and Android will not install a differently signed app over one it
+  already has. Uninstall Museroom first, then install this. It is a one-time step; every
+  version after this updates in place.
+  <p><b>Update in place from now on, and never uninstall.</b> Notification access
+  survives an update and does not survive an uninstall, so uninstalling means finding
+  <em>Allow restricted settings</em> all over again.</p>
 </div>
 
 <h2>Listening together</h2>
