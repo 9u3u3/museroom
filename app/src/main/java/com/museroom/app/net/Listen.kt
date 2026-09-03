@@ -76,18 +76,35 @@ class ListenRepository private constructor(context: Context) {
         Supabase.json.decodeFromString(ListSerializer(ListenRequest.serializer()), body)
     }
 
-    /** Requests you sent that have been answered since you last looked. */
-    suspend fun answered(sinceMs: Long): Result<List<ListenRequest>> = io { token, me ->
-        val since = Instant.ofEpochMilli(sinceMs).toString()
+    /**
+     * Requests you sent that have been let in since [afterId].
+     *
+     * Keyed off the row id rather than a time, deliberately. The answer is
+     * stamped by the host's phone and read by yours, and two phones do not
+     * agree on the clock closely enough to filter on it; an answer arriving a
+     * few seconds "before" you asked would simply never be seen.
+     */
+    suspend fun accepted(afterId: Long): Result<List<ListenRequest>> = io { token, me ->
         val body = Supabase.select(
             "listen_requests",
-            "from_user=eq.$me&status=eq.accepted&responded_at=gte.$since" +
+            "from_user=eq.$me&status=eq.accepted&id=gt.$afterId" +
                 "&select=id,from_user,to_user,status,title,artist,fingerprint,source_track_id,created_at," +
                 "profiles!listen_requests_to_user_fkey(handle)" +
-                "&order=responded_at.desc&limit=5",
+                "&order=id.asc&limit=5",
             token,
         )
         Supabase.json.decodeFromString(ListSerializer(ListenRequest.serializer()), body)
+    }
+
+    /** The newest request you have sent, whatever became of it. */
+    suspend fun lastSentId(): Result<Long> = io { token, me ->
+        val body = Supabase.select(
+            "listen_requests",
+            "from_user=eq.$me&select=id&order=id.desc&limit=1",
+            token,
+        )
+        Supabase.json.decodeFromString(ListSerializer(ListenRequest.serializer()), body)
+            .firstOrNull()?.id ?: 0L
     }
 
     suspend fun respond(id: Long, accept: Boolean): Result<Unit> = io { token, _ ->

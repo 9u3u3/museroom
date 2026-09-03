@@ -5,9 +5,9 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,8 +42,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.notify.Notifier
+import com.museroom.app.sync.FollowSession
 import com.museroom.app.tracking.PlaybackTracker
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MuseroomMark
@@ -70,6 +72,14 @@ enum class Tab(val label: String, val icon: String) {
 fun MuseroomApp() {
     val granted = rememberAccessGranted()
     var tab by remember { mutableStateOf(Tab.Now) }
+
+    // Being let into somebody's room starts the music by itself, so the screen
+    // that shows the room should come to meet it. Otherwise the first sign of
+    // a room is sound with no picture.
+    val following by FollowSession.following.collectAsStateWithLifecycle()
+    LaunchedEffect(following?.hostId) {
+        if (following != null) tab = Tab.Now
+    }
     val c = Neo.colors
 
     Box(

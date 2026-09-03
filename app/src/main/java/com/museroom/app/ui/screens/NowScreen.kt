@@ -193,10 +193,11 @@ fun NowScreen() {
 }
 
 /**
- * Requests to listen along: the host's side, and the answer coming back.
+ * Requests to listen along, from the host's side.
  *
- * Both live here because both are about the same moment, and because a person
- * who just asked is most likely looking at this screen.
+ * Only the host's side. Being let in no longer needs a screen: the answer is
+ * watched for in the background and the music simply starts, which is the
+ * whole point of asking rather than being handed a link.
  */
 @Composable
 private fun ListenInbox() {
@@ -208,36 +209,12 @@ private fun ListenInbox() {
     val session by auth.session.collectAsStateWithLifecycle()
 
     var inbox by remember { mutableStateOf<List<ListenRequest>>(emptyList()) }
-    var accepted by remember { mutableStateOf<ListenRequest?>(null) }
-    var seenFrom by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(session?.userId) {
         while (session != null) {
             listen.inbox().onSuccess { inbox = it }
-            listen.answered(seenFrom).onSuccess { answers ->
-                answers.firstOrNull()?.let { accepted = it }
-            }
             delay(12_000)
         }
-    }
-
-    accepted?.let { answer ->
-        NeoAccentCard(fill = c.lime, radius = 16.dp) {
-            Text("@${answer.handle} let you in", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.size(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                NeoButton("Listen with them", small = true, onClick = {
-                    FollowSession.start(context, answer.toUser, answer.handle)
-                    seenFrom = System.currentTimeMillis()
-                    accepted = null
-                })
-                NeoButton("Later", small = true, tone = NeoTone.Paper, onClick = {
-                    seenFrom = System.currentTimeMillis()
-                    accepted = null
-                })
-            }
-        }
-        Spacer(Modifier.size(4.dp))
     }
 
     inbox.forEach { request ->

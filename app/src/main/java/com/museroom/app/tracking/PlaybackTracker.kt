@@ -11,6 +11,7 @@ import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.pickActive
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.net.ListenRepository
+import com.museroom.app.sync.FollowSession
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
@@ -35,10 +36,14 @@ object PlaybackTracker {
 
     private const val PREFS = "museroom.tracking"
     private const val KEY_WATERMARK = "credited_through_event_id"
+    private const val KEY_LET_IN_THROUGH = "let_in_through_request_id"
     private const val HEARTBEAT_MS = 30_000L
     private const val NOW_PLAYING_MS = 15_000L
     private const val SYNC_MS = 60_000L
     private const val INBOX_MS = 20_000L
+
+    /** Faster than the inbox, because somebody is waiting on this one. */
+    private const val ANSWER_MS = 8_000L
 
     private val differ = PlaybackDiffer(heartbeatMs = HEARTBEAT_MS)
 
@@ -103,8 +108,43 @@ object PlaybackTracker {
                 listen.inbox().onSuccess { requests ->
                     requests.filter { it.id !in announced }.forEach { request ->
                         announced += request.id
-                        Notifier.listenRequest(app, request.handle, request.title)
+                        Notifier.listenRequest(app, request.id, request.handle, request.title)
                     }
+                }
+            }
+        }
+
+        // Being let in starts the music, here, without anybody pressing
+        // anything. Asking and then having to find a second button on a screen
+        // you are not looking at is the same manual step this was meant to end.
+        newScope.launch { watchForBeingLetIn(app, listen, prefs) }
+    }
+
+    /**
+     * The other half of asking: noticing you were let in.
+     *
+     * A watermark rather than a clock, and one that starts at whatever you have
+     * already sent, so signing in does not replay every room you were ever
+     * admitted to.
+     */
+    private suspend fun watchForBeingLetIn(
+        app: Context,
+        listen: ListenRepository,
+        prefs: android.content.SharedPreferences,
+    ) {
+        if (!prefs.contains(KEY_LET_IN_THROUGH)) {
+            val latest = listen.lastSentId().getOrNull() ?: return
+            prefs.edit().putLong(KEY_LET_IN_THROUGH, latest).apply()
+        }
+        while (true) {
+            delay(ANSWER_MS)
+            val through = prefs.getLong(KEY_LET_IN_THROUGH, 0L)
+            listen.accepted(through).onSuccess { answers ->
+                answers.forEach { answer ->
+                    prefs.edit().putLong(KEY_LET_IN_THROUGH, answer.id).apply()
+                    if (FollowSession.following.value?.hostId == answer.toUser) return@forEach
+                    Notifier.letIn(app, answer.handle)
+                    FollowSession.start(app, answer.toUser, answer.handle)
                 }
             }
         }

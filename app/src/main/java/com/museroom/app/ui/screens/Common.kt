@@ -35,10 +35,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.Artwork
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ListenRepository
+import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.SyncEngine
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
@@ -224,6 +226,8 @@ fun ListenerRow(
     val c = Neo.colors
     val scope = rememberCoroutineScope()
     val listen = remember { ListenRepository.get(context) }
+    val following by FollowSession.following.collectAsStateWithLifecycle()
+    val inTheirRoom = hostId != null && following?.hostId == hostId
 
     var art by remember(title, artist) { mutableStateOf<Bitmap?>(Artwork.cached(title, artist)) }
     var outcome by remember { mutableStateOf<String?>(null) }
@@ -287,19 +291,24 @@ fun ListenerRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 MonoText("${formatClock(position)} / ${formatClock(durationMs)}", size = 11, color = c.ink)
-                // Asking first, rather than launching straight into another app.
-                // The host is told; playback starts when they say yes.
+                // Asking, and then nothing more to do. The host is told, and
+                // when they say yes the music starts on its own, so the only
+                // states this button has are before, during and after.
                 NeoButton(
-                    text = if (asked) "Asked" else "Ask to join",
+                    text = when {
+                        inTheirRoom -> "Listening"
+                        asked -> "Waiting"
+                        else -> "Ask to join"
+                    },
                     small = true,
-                    enabled = !asked && hostId != null,
+                    enabled = !asked && !inTheirRoom && hostId != null,
                     onClick = {
                         val host = hostId ?: return@NeoButton
                         asked = true
                         outcome = "Asking @$handle…"
                         scope.launch {
                             listen.ask(host, title, artist, fingerprint, sourceTrackId)
-                                .onSuccess { outcome = "Asked @$handle. You will hear back on Now." }
+                                .onSuccess { outcome = "Asked @$handle. It starts when they say yes." }
                                 .onFailure { asked = false; outcome = it.message }
                         }
                     },
