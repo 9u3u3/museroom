@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,9 +45,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.Avatars
+import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ProfileRepository
 import com.museroom.app.net.Visibility
+import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.proximity.ProximityManager
 import com.museroom.app.sync.SyncEngine
@@ -72,6 +75,7 @@ import kotlinx.coroutines.launch
  * is a fact about that player rather than something to assume. Shown here so a
  * failure to follow has an explanation on screen.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun YouScreen() {
     val context = LocalContext.current
@@ -83,16 +87,19 @@ fun YouScreen() {
     val privacy = remember { PrivacyState.get(context) }
     val sync = remember { SyncEngine.get(context) }
     val theme = remember { com.museroom.app.ui.ThemeState.get(context) }
+    val alerts = remember { FriendAlerts.get(context) }
 
     val session by auth.session.collectAsStateWithLifecycle()
     val profile by profiles.profile.collectAsStateWithLifecycle()
     val isPrivate by privacy.privateSession.collectAsStateWithLifecycle()
     val isDark by theme.dark.collectAsStateWithLifecycle()
+    val friendAlertsOn by alerts.enabled.collectAsStateWithLifecycle()
     val syncState by sync.state.collectAsStateWithLifecycle()
     val waiting by sync.pendingEvents.collectAsStateWithLifecycle(0)
 
     var confirmWipe by remember { mutableStateOf(false) }
     var explainPrivate by remember { mutableStateOf(false) }
+    var showTour by remember { mutableStateOf(false) }
     var photoNote by remember { mutableStateOf<String?>(null) }
 
     // The system picker, so Museroom never asks for access to the gallery: it
@@ -115,6 +122,10 @@ fun YouScreen() {
     }
 
     LaunchedEffect(session?.userId) { if (session != null) profiles.refresh() }
+
+    if (showTour) {
+        FeatureTour(onDismiss = { showTour = false })
+    }
 
     if (explainPrivate) {
         AlertDialog(
@@ -323,6 +334,26 @@ fun YouScreen() {
             }
         }
 
+        // The only notification here that answers no question. Pleasant with
+        // three friends, a phone that buzzes all evening with thirty.
+        NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Tell me when friends listen",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.ink,
+                    )
+                    Note("Silent. Mute one friend from the Friends tab.")
+                }
+                NeoSwitch(checked = friendAlertsOn, onCheckedChange = alerts::setEnabled)
+            }
+        }
+
         if (session != null) {
             photoNote?.let { Note(it) }
 
@@ -370,12 +401,25 @@ fun YouScreen() {
             }
         }
 
+        NeoButton(
+            "What's in Museroom",
+            tone = NeoTone.Paper,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { showTour = true },
+        )
+
         Label("Counted", color = c.ink)
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NeoPill("Spotify", fill = c.lime, accent = true)
-            NeoPill("YouTube Music", fill = c.lime, accent = true)
+        // Read from the list itself rather than typed out here, so this can
+        // never quietly disagree with what is actually being counted.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Sources.labels.forEach { NeoPill(it, fill = c.lime, accent = true) }
         }
+        Spacer(Modifier.size(2.dp))
+        Note("Nothing else on your phone is read. No browsers, video or podcast apps.")
 
         Spacer(Modifier.size(6.dp))
         NeoButton(

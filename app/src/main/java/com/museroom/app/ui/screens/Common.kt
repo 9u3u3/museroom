@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,8 +36,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.Artwork
@@ -227,6 +231,9 @@ fun ListenerRow(
     fingerprint: String = "",
     avatarUrl: String? = null,
     openToAll: Boolean = false,
+    /** Null on a row where muting means nothing, like somebody merely nearby. */
+    muted: Boolean? = null,
+    onMutedChange: ((Boolean) -> Unit)? = null,
     tint: Color = Neo.colors.violet,
 ) {
     val context = LocalContext.current
@@ -278,8 +285,44 @@ fun ListenerRow(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(handle, style = MaterialTheme.typography.titleMedium, color = c.ink)
-                    Label(if (isPlaying) "listening" else "quiet", color = c.ink)
+                    Text(
+                        handle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = c.ink,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        // Only ever offered where it means something, and it
+                        // silences the messages about this person rather than
+                        // hiding them: they still appear here, still playing.
+                        if (muted != null && onMutedChange != null) {
+                            Text(
+                                if (muted) "MUTED" else "MUTE",
+                                style = TextStyle(
+                                    fontFamily = com.museroom.app.ui.Archivo,
+                                    fontWeight = FontWeight.W900,
+                                    fontSize = 9.sp,
+                                    letterSpacing = 1.1.sp,
+                                    color = if (muted) c.onAccent else c.ink.copy(alpha = 0.55f),
+                                ),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(if (muted) c.pink else Color.Transparent)
+                                    .border(
+                                        2.dp,
+                                        if (muted) c.onAccent else c.ink.copy(alpha = 0.35f),
+                                        RoundedCornerShape(50),
+                                    )
+                                    .clickable { onMutedChange(!muted) }
+                                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                            )
+                        }
+                        Label(if (isPlaying) "listening" else "quiet", color = c.ink)
+                    }
                 }
                 Text(
                     title.ifBlank { "Nothing shared" },

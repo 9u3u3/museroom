@@ -60,10 +60,12 @@ import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.halftone
 import com.museroom.app.ui.screens.BoardScreen
+import com.museroom.app.ui.screens.FeatureTour
 import com.museroom.app.ui.screens.FriendsScreen
 import com.museroom.app.ui.screens.NearbyScreen
 import com.museroom.app.ui.screens.NowScreen
 import com.museroom.app.ui.screens.OnboardingScreen
+import com.museroom.app.ui.screens.TourState
 import com.museroom.app.ui.screens.YouScreen
 import com.museroom.app.util.NotificationAccess
 import com.museroom.app.util.formatMinutes
@@ -105,6 +107,18 @@ fun MuseroomApp() {
         }
 
         AskForNotifications()
+
+        // Once, on the way in. Most of what this app does only happens if
+        // somebody switches it on, and none of that is discoverable by
+        // pressing around a screen showing one song.
+        val context = LocalContext.current
+        var showTour by remember { mutableStateOf(!TourState.seen(context)) }
+        if (showTour) {
+            FeatureTour(onDismiss = {
+                TourState.markSeen(context)
+                showTour = false
+            })
+        }
 
         Column(Modifier.fillMaxSize()) {
             TopBar()

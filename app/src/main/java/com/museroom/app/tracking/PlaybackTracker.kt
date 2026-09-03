@@ -13,6 +13,7 @@ import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.sync.FollowSession
+import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.RoomPresence
 import com.museroom.app.sync.SyncEngine
@@ -138,21 +139,38 @@ object PlaybackTracker {
      */
     private suspend fun watchFriendsListening(app: Context) {
         val friends = FriendsRepository.get(app)
+        val alerts = FriendAlerts.get(app)
         var playing = emptySet<String>()
         var first = true
 
         while (true) {
             delay(FRIENDS_MS)
+            // Switched off means no request at all, not a request whose answer
+            // gets thrown away. Nothing here is worth a minute of radio.
+            if (!alerts.enabled.value) {
+                first = true
+                playing = emptySet()
+                continue
+            }
             friends.friends().onSuccess { list ->
                 val nowPlaying = list.filter { it.nowPlaying != null }
                 if (!first) {
-                    nowPlaying.filter { it.profile.id !in playing }.forEach { friend ->
-                        val track = friend.nowPlaying?.let { np ->
-                            listOf(np.title, np.artist).filter { it.isNotBlank() }.joinToString(" · ")
-                        }.orEmpty()
-                        Notifier.friendListening(app, friend.profile.id, friend.profile.handle, track)
-                    }
+                    nowPlaying
+                        .filter { it.profile.id !in playing }
+                        .filter { alerts.shouldAnnounce(it.profile.id) }
+                        .forEach { friend ->
+                            val track = friend.nowPlaying?.let { np ->
+                                listOf(np.title, np.artist)
+                                    .filter { it.isNotBlank() }
+                                    .joinToString(" · ")
+                            }.orEmpty()
+                            Notifier.friendListening(
+                                app, friend.profile.id, friend.profile.handle, track,
+                            )
+                        }
                 }
+                // Muted friends still count as seen, so unmuting somebody
+                // mid-song does not announce a track they started an hour ago.
                 playing = nowPlaying.map { it.profile.id }.toSet()
                 first = false
             }

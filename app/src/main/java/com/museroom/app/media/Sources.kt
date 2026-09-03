@@ -43,6 +43,9 @@ object Sources {
 
     val packages: Set<String> get() = SUPPORTED.keys
 
+    /** Every app counted, named once each, for showing somebody the list. */
+    val labels: List<String> get() = SUPPORTED.values.distinct()
+
     fun isSupported(packageName: String): Boolean = packageName in SUPPORTED
 
     /** The player's name, for a supported package. */

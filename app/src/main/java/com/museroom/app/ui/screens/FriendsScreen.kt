@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.Friend
 import com.museroom.app.net.FriendsRepository
@@ -53,6 +54,8 @@ fun FriendsScreen() {
     var query by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    val alerts = remember { FriendAlerts.get(context) }
+    val mutedFriends by alerts.muted.collectAsStateWithLifecycle()
 
     suspend fun reload() {
         repo.friends().onSuccess { friends = it }.onFailure { message = it.message }
@@ -162,6 +165,8 @@ fun FriendsScreen() {
                     fingerprint = friend.nowPlaying?.title.orEmpty(),
                     avatarUrl = friend.profile.avatarUrl,
                     openToAll = friend.profile.openToAll,
+                    muted = friend.profile.id in mutedFriends,
+                    onMutedChange = { alerts.setMuted(friend.profile.id, it) },
                 )
             }
         }
