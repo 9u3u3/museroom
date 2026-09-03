@@ -61,6 +61,8 @@ object RoomPlayer {
         val durationMs: Long = 0,
         val state: Int = -1,
         val ad: Boolean = false,
+        /** What the player is doing, in one line, for when it is doing nothing. */
+        val detail: String = "",
         /** When this was taken, so a stale reading is recognisable as one. */
         val takenAt: Long = 0,
     ) {
@@ -92,12 +94,26 @@ object RoomPlayer {
      * Gives the player a window to live in. Safe to call repeatedly; the
      * WebView itself is created once and survives the activity being recreated,
      * because a rotation is not a reason for the music to stop.
+     *
+     * Full size, and underneath everything. It was one pixel to begin with,
+     * which is tidier and does not work: a video player given a viewport that
+     * small can decline to start, and the failure is silence rather than an
+     * error. Museroom's own screen is opaque and sits on top, so the page is
+     * laid out properly and still never seen.
      */
     fun attach(activity: Activity) = onMain {
         appContext = activity.applicationContext
         val view = create(activity.applicationContext)
         (view.parent as? ViewGroup)?.removeView(view)
-        activity.addContentView(view, ViewGroup.LayoutParams(1, 1))
+        val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return@onMain
+        content.addView(
+            view,
+            0,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
     }
 
     fun detach() = onMain {
@@ -301,6 +317,7 @@ object RoomPlayer {
                 durationMs = o.optLong("durationMs"),
                 state = o.optInt("state", -1),
                 ad = o.optBoolean("ad"),
+                detail = o.optString("detail"),
                 takenAt = SystemClock.elapsedRealtime(),
             )
         }

@@ -93,6 +93,7 @@ fun NowScreen() {
 
     var pending by remember { mutableStateOf<ListeningSessionEntity?>(null) }
     val active = sessions.pickActive()
+    val following by FollowSession.following.collectAsStateWithLifecycle()
 
     pending?.let { entry ->
         AlertDialog(
@@ -141,14 +142,16 @@ fun NowScreen() {
             }
         }
 
-        if (active == null) {
+        // While a room is running, this phone playing nothing of its own is
+        // the normal case, not news.
+        if (active != null) {
+            NowPlayingCard(active)
+        } else if (following == null) {
             NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
                 Text("Nothing playing", style = MaterialTheme.typography.titleLarge, color = c.ink)
                 Spacer(Modifier.size(4.dp))
                 Note("Start a song in Spotify or YouTube Music.")
             }
-        } else {
-            NowPlayingCard(active)
         }
 
         NeoAccentCard(fill = c.lime, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
@@ -351,6 +354,7 @@ private fun FollowBar() {
                     if (kotlin.math.abs(s.offMs) < 1000) "In step"
                     else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"
                 is FollowState.Advert -> "Ad break — back in a moment"
+                is FollowState.Silent -> "The player will not start"
                 is FollowState.HostQuiet -> "They stopped playing"
                 is FollowState.Stuck -> s.reason
             },
@@ -359,6 +363,13 @@ private fun FollowBar() {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+
+        // What the player says about itself, shown only when it is not doing
+        // the one thing it is for. Unlovely, and better than a guess.
+        (session.state as? FollowState.Silent)?.detail?.takeIf { it.isNotBlank() }?.let {
+            Spacer(Modifier.size(4.dp))
+            MonoText(it, size = 10, color = white.copy(alpha = 0.7f))
+        }
     }
     Spacer(Modifier.size(4.dp))
 }

@@ -45,6 +45,9 @@ sealed interface FollowState {
     /** An ad is playing here that the host is not hearing. */
     data object Advert : FollowState
 
+    /** Loaded, but the player will not start. Carries what it says about itself. */
+    data class Silent(val detail: String) : FollowState
+
     data object HostQuiet : FollowState
 
     data class Stuck(val reason: String) : FollowState
@@ -79,6 +82,15 @@ object FollowSession {
      * which waits, and locked, which measures.
      */
     private const val ACQUIRE_MS = 7_000L
+
+    /**
+     * How long a loaded track is given to make a sound before we say so.
+     *
+     * A stopped player reads as position zero, and the arithmetic will happily
+     * call that "behind by a minute" and keep seeking a track nobody is
+     * hearing. Silence has to be its own answer, not a large number.
+     */
+    private const val SILENT_MS = 12_000L
 
     private const val TICK_MS = 2_000L
 
@@ -121,6 +133,7 @@ object FollowSession {
         val friends = FriendsRepository.get(context)
         var lastCorrection = 0L
         var acquireUntil = 0L
+        var silentSince = 0L
         var loadedFingerprint = ""
         var loadedId = ""
 
@@ -137,19 +150,23 @@ object FollowSession {
             if (fingerprint != loadedFingerprint) {
                 publish(hostId, handle, FollowState.Finding, host)
                 val id = resolve(context, host)
-                loadedFingerprint = fingerprint
                 if (id == null) {
+                    // Not remembered as loaded. The page may simply not have
+                    // been up yet, and a track given up on once would never be
+                    // tried again for as long as the host played it.
                     publish(
                         hostId, handle,
-                        FollowState.Stuck("Could not find \"${host.title}\" to play."), host,
+                        FollowState.Stuck("Still looking for \"${host.title}\"."), host,
                     )
                     delay(TICK_MS)
                     continue
                 }
+                loadedFingerprint = fingerprint
                 loadedId = id
                 publish(hostId, handle, FollowState.Loading(host.title), host)
                 RoomPlayer.load(id, hostPosition(host))
                 acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
+                silentSince = 0L
                 lastCorrection = 0L
                 delay(TICK_MS)
                 continue
@@ -180,6 +197,7 @@ object FollowSession {
                 publish(hostId, handle, FollowState.Loading(host.title), host)
                 RoomPlayer.load(loadedId, hostPosition(host))
                 acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
+                silentSince = 0L
                 delay(TICK_MS)
                 continue
             }
@@ -191,7 +209,27 @@ object FollowSession {
                 continue
             }
 
-            if (!snapshot.playing) RoomPlayer.play()
+            // A player that is not playing has no position worth comparing.
+            // Reporting an offset here is how "behind by 68s" came to mean
+            // "silent", which is the least useful thing it could have meant.
+            if (!snapshot.playing) {
+                RoomPlayer.play()
+                if (silentSince == 0L) silentSince = now
+                if (now - silentSince < SILENT_MS) {
+                    publish(hostId, handle, FollowState.CatchingUp, host)
+                } else {
+                    // Say so, and try loading it again. A load that landed
+                    // badly recovers from this; one that cannot will keep the
+                    // player's own account of itself on screen.
+                    publish(hostId, handle, FollowState.Silent(snapshot.detail), host)
+                    RoomPlayer.load(loadedId, hostPosition(host))
+                    acquireUntil = now + ACQUIRE_MS
+                    silentSince = now
+                }
+                delay(TICK_MS)
+                continue
+            }
+            silentSince = 0L
 
             val off = hostPosition(host) - localPosition(snapshot)
             if (abs(off) > TOLERANCE_MS && now - lastCorrection > MIN_CORRECTION_GAP_MS) {

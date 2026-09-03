@@ -15,6 +15,7 @@
   var bridge = window.MuseroomBridge;
   var wanted = '';
   var api = null;
+  var lastError = '';
 
   /** The player, or null while the page is still assembling itself. */
   function player() {
@@ -49,6 +50,24 @@
     var data = {};
     try { data = p.getVideoData() || {}; } catch (e) {}
     var payload = { ready: true, wanted: wanted, ad: adPlaying() };
+    /*
+     * A one-line account of what the player is actually doing. The room is
+     * invisible, so when it does not play there is otherwise nothing to look
+     * at, and "behind by 68 seconds" is what a stopped player looks like from
+     * the outside.
+     */
+    try {
+      var v = document.querySelector('video');
+      payload.detail =
+        'state=' + (function () { try { return p.getPlayerState(); } catch (e) { return '?'; } })() +
+        ' video=' + (v ? (v.paused ? 'paused' : 'running') : 'none') +
+        ' ready=' + (v ? v.readyState : '-') +
+        ' muted=' + (function () { try { return p.isMuted() ? 1 : 0; } catch (e) { return '?'; } })() +
+        ' vol=' + (function () { try { return p.getVolume(); } catch (e) { return '?'; } })() +
+        (lastError ? ' err=' + lastError : '');
+    } catch (e) {
+      payload.detail = 'unreadable';
+    }
     try { payload.videoId = data.video_id || data.videoId || ''; } catch (e) { payload.videoId = ''; }
     try { payload.title = data.title || ''; } catch (e) { payload.title = ''; }
     try { payload.author = data.author || ''; } catch (e) { payload.author = ''; }
@@ -65,12 +84,18 @@
      */
     load: function (id, startSeconds) {
       wanted = id || '';
+      lastError = '';
       var p = player();
       if (!p || typeof p.loadVideoById !== 'function') return false;
       try {
+        // Nothing else in Museroom sets the volume, so a player left muted by
+        // the page is silence with no way for anybody to notice or fix it.
+        try { p.unMute(); } catch (e) {}
+        try { p.setVolume(100); } catch (e) {}
         p.loadVideoById(id, startSeconds || 0);
         return true;
       } catch (e) {
+        lastError = String(e && e.name ? e.name : e);
         return false;
       }
     },
@@ -87,11 +112,29 @@
      * all, so the media element is asked first and the player is the fallback.
      */
     play: function () {
-      var v = document.querySelector('video');
-      if (v) { try { v.play(); return true; } catch (e) {} }
       var p = player();
+      if (p) {
+        try { p.unMute(); } catch (e) {}
+        try { p.setVolume(100); } catch (e) {}
+      }
+      var v = document.querySelector('video');
+      if (v) {
+        try {
+          var started = v.play();
+          // play() rejects rather than throwing, and the rejection carries the
+          // only explanation there is for a player that will not start.
+          if (started && started.catch) {
+            started
+              .then(function () { lastError = ''; })
+              .catch(function (e) { lastError = String(e && e.name ? e.name : e); });
+          }
+          return true;
+        } catch (e) {
+          lastError = String(e && e.name ? e.name : e);
+        }
+      }
       if (!p) return false;
-      try { p.playVideo(); return true; } catch (e) { return false; }
+      try { p.playVideo(); return true; } catch (e) { lastError = String(e); return false; }
     },
 
     pause: function () {
