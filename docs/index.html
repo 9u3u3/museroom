@@ -31,8 +31,8 @@
   }
   /* Wide enough that a desktop window is actually used rather than framed by
      two columns of empty paper either side of a narrow strip of text. */
-  .wrap{position:relative; z-index:1; max-width:1240px; margin:0 auto;
-        padding:0 clamp(20px,4vw,56px) 80px}
+  .wrap{position:relative; z-index:1; max-width:1600px; margin:0 auto;
+        padding:0 clamp(20px,5vw,80px) 80px}
 
   a{color:var(--ink); text-decoration:underline; text-decoration-thickness:2px;
     text-underline-offset:3px}
@@ -76,9 +76,9 @@
         padding-top:14px}
   @media (min-width:900px){ .hero{grid-template-columns:1.15fr .85fr; gap:48px} }
   h1{font-family:"Bangers","Impact",sans-serif; font-weight:400; letter-spacing:.02em;
-     font-size:clamp(38px, 5.6vw, 72px); line-height:1.02; margin:10px 0 0}
+     font-size:clamp(38px, 4.6vw, 84px); line-height:1.02; margin:10px 0 0; max-width:17ch}
   h1 em{font-style:normal; color:var(--violet)}
-  .lede{font-size:clamp(17px, 1.6vw, 20px); max-width:52ch; margin:16px 0 0}
+  .lede{font-size:clamp(17px, 1.3vw, 21px); max-width:54ch; margin:16px 0 0}
 
   .cta{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:26px 0 0}
   .download{
@@ -96,6 +96,7 @@
   .phone{--rot:-3deg; justify-self:center; width:min(100%,290px); background:var(--card);
          border:3px solid var(--ink); border-radius:30px; padding:16px;
          box-shadow:9px 9px 0 var(--ink); transform:rotate(var(--rot))}
+  @media (min-width:1300px){ .phone{width:min(100%,340px)} }
   .phone-top{display:flex; align-items:center; gap:8px; margin-bottom:12px}
   .phone-top .mini-mark{width:22px; height:22px; border-radius:7px; background:var(--violet);
         border:2px solid var(--ink)}
@@ -274,14 +275,14 @@
       <div class="room">
         <div class="line">
           <span class="art"></span>
-          <span><b>Listening with ankur</b><br><span class="meta">In step</span></span>
+          <span><b>Listening with nova</b><br><span class="meta">In step</span></span>
         </div>
         <div class="bar"><span style="width:46%"></span></div>
         <div class="times"><span>1:34</span><span>3:24</span></div>
       </div>
       <div class="board">
         <div class="row one"><span class="rank">01</span><span class="pfp" style="background:#fff">H</span><span class="who">harsh</span><span class="mins">56m</span></div>
-        <div class="row two"><span class="rank">02</span><span class="pfp" style="background:#fff">A</span><span class="who">ankur</span><span class="mins">7m</span></div>
+        <div class="row two"><span class="rank">02</span><span class="pfp" style="background:#fff">N</span><span class="who">nova</span><span class="mins">7m</span></div>
       </div>
     </div>
   </div>
@@ -329,7 +330,7 @@
     <div class="room">
       <div class="line">
         <span class="art"></span>
-        <span><b>Listening with ankur</b><br><span class="meta">In step</span></span>
+        <span><b>Listening with nova</b><br><span class="meta">In step</span></span>
       </div>
       <div class="bar"><span></span></div>
       <div class="times"><span>1:34</span><span>3:24</span></div>
@@ -343,8 +344,7 @@
     it. Day, week, month, or all time.</p>
     <div class="board">
       <div class="row one"><span class="rank">01</span><span class="pfp" style="background:#fff">H</span><span class="who">harsh</span><span class="mins">56m</span></div>
-      <div class="row two"><span class="rank">02</span><span class="pfp" style="background:#fff">H</span><span class="who">harshada</span><span class="mins">7m</span></div>
-      <div class="row three"><span class="rank">03</span><span class="pfp" style="background:#fff">A</span><span class="who">ankur</span><span class="mins">1m</span></div>
+      <div class="row two"><span class="rank">02</span><span class="pfp" style="background:#fff">N</span><span class="who">nova</span><span class="mins">7m</span></div>
     </div>
   </div>
 
