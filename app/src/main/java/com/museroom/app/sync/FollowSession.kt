@@ -151,6 +151,14 @@ object FollowSession {
                 publish(hostId, handle, FollowState.Finding, host)
                 val id = resolve(context, host)
                 if (id == null) {
+                    // Two different problems wear the same face here, so they
+                    // are told apart: a page that has not come up yet is not
+                    // the same as a song that cannot be found.
+                    if (!RoomPlayer.started) {
+                        publish(hostId, handle, FollowState.Starting, host)
+                        delay(TICK_MS)
+                        continue
+                    }
                     // Not remembered as loaded. The page may simply not have
                     // been up yet, and a track given up on once would never be
                     // tried again for as long as the host played it.

@@ -101,10 +101,14 @@ class SessionDetectionTest {
     @Test
     fun theTimestampAdvancesWithoutAskingThePlayer() {
         val track = awaitTrack()
-        val first = track.positionAt(SystemClock.elapsedRealtime())
+        // One reading of the clock, used twice. Taking it twice measured the
+        // milliseconds between the two lines as well as the five seconds under
+        // test, which is a flake rather than a finding.
+        val now = SystemClock.elapsedRealtime()
+        val first = track.positionAt(now)
 
         // No second read from the session. The same snapshot, a later clock.
-        val later = track.positionAt(SystemClock.elapsedRealtime() + 5_000)
+        val later = track.positionAt(now + 5_000)
 
         assertTrue("position should start near 30s, was $first", first in 29_000..40_000)
         assertEquals(

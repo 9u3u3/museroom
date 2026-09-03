@@ -243,6 +243,17 @@ object RoomPlayer {
         if (appContext == null) appContext = context.applicationContext
     }
 
+    /** Waits for the page to be up, within reason. */
+    private suspend fun awaitReady(timeoutMs: Long = 25_000): Boolean {
+        if (booted) return true
+        warmUp()
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        while (!booted && SystemClock.elapsedRealtime() < deadline) {
+            kotlinx.coroutines.delay(300)
+        }
+        return booted
+    }
+
     private fun watchUrl(videoId: String, startSeconds: Double): String =
         "${HOME}watch?v=$videoId&t=${startSeconds.toInt()}"
 
@@ -269,7 +280,10 @@ object RoomPlayer {
      * rather than a cover of it, and costs nothing.
      */
     suspend fun search(title: String, artist: String): String? {
-        if (!booted) return null
+        // Waiting, rather than failing. The first thing a room does is ask what
+        // to play, and at that moment the page has had a second or two to
+        // exist. Answering "no" then is answering the wrong question.
+        if (!awaitReady()) return null
         val query = listOf(title, artist).filter { it.isNotBlank() }.joinToString(" ")
         if (query.isBlank()) return null
 

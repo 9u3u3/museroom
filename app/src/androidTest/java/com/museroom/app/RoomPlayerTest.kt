@@ -35,6 +35,24 @@ class RoomPlayerTest {
     }
 
     /**
+     * The first tick of a room, which is where this went wrong in the field.
+     *
+     * A room asks what to play the moment it starts, before the page can
+     * possibly be up. Answering "not found" then is answering the wrong
+     * question, and the answer used to be remembered, so the song was never
+     * looked up again for as long as the host played it.
+     */
+    @Test
+    fun resolvesATrackAskedForBeforeThePageIsUp() {
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+
+        // Deliberately no warm-up and no waiting.
+        val id = runBlocking { RoomPlayer.search("Say What", "Rampa, Adam Port, &ME") }
+        assertNotNull("Nothing came back for a track asked for on a cold page.", id)
+        assertEquals("That is not a video id: $id", 11, id!!.length)
+    }
+
+    /**
      * Ad breaks are the one interruption a room cannot absorb: the host never
      * pauses, so while an ad runs there is no shared moment to hold. Both
      * routes ad slots arrive by are checked, because closing one is no use.

@@ -32,7 +32,8 @@ import java.util.concurrent.TimeUnit
  */
 object TrackResolver {
 
-    private val memory = mutableMapOf<String, String?>()
+    /** Answers, once found. Only answers: a miss is never stored. */
+    private val memory = mutableMapOf<String, String>()
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -67,7 +68,11 @@ object TrackResolver {
             val shared = fromCatalogue(context, fingerprint)
             if (shared != null) return@withContext remember(fingerprint, shared)
 
-            val found = search(title, artist) ?: return@withContext remember(fingerprint, null)
+            // A miss is not remembered. The reasons a lookup comes back empty
+            // are nearly all temporary — the page still starting, a request
+            // that timed out — and remembering the first one turned a slow
+            // answer into a permanent "still looking" for the whole song.
+            val found = search(title, artist) ?: return@withContext null
             publish(context, fingerprint, title, artist, durationMs, found)
             remember(fingerprint, found)
         }
@@ -158,7 +163,7 @@ object TrackResolver {
     private fun tokenOf(context: Context): String? =
         AuthRepository.get(context).session.value?.accessToken
 
-    private fun remember(fingerprint: String, value: String?): String? {
+    private fun remember(fingerprint: String, value: String): String {
         synchronized(memory) { memory[fingerprint] = value }
         return value
     }
