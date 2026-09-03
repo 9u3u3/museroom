@@ -50,6 +50,8 @@ import com.museroom.app.net.ListenRequest
 import com.museroom.app.media.PlayerCommands
 import com.museroom.app.media.PlayerPreference
 import com.museroom.app.privacy.PrivacyState
+import com.museroom.app.sync.FollowSession
+import com.museroom.app.sync.FollowState
 import com.museroom.app.sync.SyncEngine
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
@@ -91,7 +93,6 @@ fun NowScreen() {
 
     var pending by remember { mutableStateOf<ListeningSessionEntity?>(null) }
     val active = sessions.pickActive()
-    ListenInbox()
 
     pending?.let { entry ->
         AlertDialog(
@@ -130,6 +131,9 @@ fun NowScreen() {
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
+        FollowBar()
+        ListenInbox()
+
         if (isPrivate) {
             NeoAccentCard(fill = c.pink, radius = 16.dp) {
                 Text("Private session — nothing is being recorded",
@@ -222,15 +226,8 @@ private fun ListenInbox() {
             Text("@${answer.handle} let you in", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.size(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                NeoButton("Play it", small = true, onClick = {
-                    val target = PlayerPreference.get(context).preferred
-                        ?.takeIf { PlayerCommands.isInstalled(context, it) }
-                        ?: Sources.packages.firstOrNull { PlayerCommands.isInstalled(context, it) }
-                    if (target != null) {
-                        scope.launch {
-                            PlayerCommands.play(context, target, answer.title, answer.artist, answer.sourceTrackId)
-                        }
-                    }
+                NeoButton("Listen with them", small = true, onClick = {
+                    FollowSession.start(context, answer.toUser, answer.handle)
                     seenFrom = System.currentTimeMillis()
                     accepted = null
                 })
@@ -267,6 +264,51 @@ private fun ListenInbox() {
         }
         Spacer(Modifier.size(4.dp))
     }
+}
+
+/**
+ * Following somebody: what it is doing, and how far off you are.
+ *
+ * The offset is shown because "in sync" is a claim, and a number is checkable.
+ */
+@Composable
+private fun FollowBar() {
+    val c = Neo.colors
+    val following by FollowSession.following.collectAsStateWithLifecycle()
+    val session = following ?: return
+
+    NeoAccentCard(fill = c.violet, radius = 16.dp) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Following @${session.handle}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = androidx.compose.ui.graphics.Color.White,
+                    maxLines = 1,
+                )
+                Text(
+                    when (val s = session.state) {
+                        is FollowState.Starting -> "Getting in step"
+                        is FollowState.InStep ->
+                            if (kotlin.math.abs(s.offMs) < 1000) "In step"
+                            else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"
+                        is FollowState.Changing -> "Moving to ${s.title}"
+                        is FollowState.HostQuiet -> "They stopped playing"
+                        is FollowState.Stuck -> s.reason
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
+                    maxLines = 2,
+                )
+            }
+            NeoButton("Stop", small = true, tone = NeoTone.Paper, onClick = { FollowSession.stop() })
+        }
+    }
+    Spacer(Modifier.size(4.dp))
 }
 
 @Composable

@@ -303,7 +303,7 @@ fun ListenerRow(
                         outcome = "Asking @$handle…"
                         scope.launch {
                             listen.ask(host, title, artist, fingerprint, sourceTrackId)
-                                .onSuccess { outcome = "Asked @$handle. You will hear back here." }
+                                .onSuccess { outcome = "Asked @$handle. You will hear back on Now." }
                                 .onFailure { asked = false; outcome = it.message }
                         }
                     },

@@ -105,6 +105,19 @@ class FriendsRepository private constructor(context: Context) {
             .sortedByDescending { it.nowPlaying?.isPlaying == true }
     }
 
+    /** What one person is playing, for following them. */
+    suspend fun nowPlayingOf(userId: String): Result<RemoteNowPlaying?> = call { token, _ ->
+        val body = Supabase.select(
+            "now_playing",
+            "user_id=eq.$userId&select=title,artist,duration_ms,position_ms,is_playing,updated_at," +
+                "source_track_id,source_package",
+            token,
+        )
+        Supabase.json
+            .decodeFromString(ListSerializer(RemoteNowPlaying.serializer()), body)
+            .firstOrNull()
+    }
+
     suspend fun pending(): Result<List<PendingRequest>> = call { token, me ->
         val rows = friendshipRows(token, me).filter { it.status == "pending" }
         if (rows.isEmpty()) return@call emptyList()

@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.museroom.app.media.PlayerCommands
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ProfileRepository
@@ -53,6 +54,38 @@ import com.museroom.app.ui.kit.NeoSwitch
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.formatAgo
 import kotlinx.coroutines.launch
+
+/**
+ * What each installed player will let Museroom do to it.
+ *
+ * Following somebody rests entirely on seeking, and whether a player accepts one
+ * is a fact about that player rather than something to assume. Shown here so a
+ * failure to follow has an explanation on screen.
+ */
+@Composable
+private fun PlayerControlReport() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val caps = remember { PlayerCommands.capabilities(context).filter { it.installed } }
+
+    if (caps.isEmpty()) {
+        Note("No supported player installed.")
+        return
+    }
+    NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
+        caps.forEach { cap ->
+            MonoText(
+                Sources.label(cap.packageName) + ": " + when {
+                    !cap.hasLiveSession -> "idle, unknown until it plays"
+                    cap.canSeek && cap.canPlayFromSearch -> "can follow and start songs"
+                    cap.canSeek -> "can follow"
+                    else -> "will not take a seek"
+                },
+                size = 11, color = c.ink,
+            )
+        }
+    }
+}
 
 @Composable
 fun YouScreen() {
@@ -216,7 +249,11 @@ fun YouScreen() {
             }
         }
 
+        Label("Player control", color = c.ink)
+        PlayerControlReport()
+
         Label("Counted", color = c.ink)
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NeoPill("Spotify", fill = c.lime, accent = true)
             NeoPill("YouTube Music", fill = c.lime, accent = true)

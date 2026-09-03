@@ -8,6 +8,7 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.net.Uri
+import android.os.SystemClock
 import androidx.core.net.toUri
 import com.museroom.app.listener.MediaListenerService
 import kotlinx.coroutines.delay
@@ -20,6 +21,8 @@ data class PlayerCapability(
     /** The session accepts "play this search query", which is the interesting one. */
     val canPlayFromSearch: Boolean,
     val canPlayFromUri: Boolean,
+    /** Whether it will follow somebody else's position. */
+    val canSeek: Boolean = false,
 )
 
 /**
@@ -54,6 +57,7 @@ object PlayerCommands {
                 hasLiveSession = controller != null,
                 canPlayFromSearch = actions and PlaybackState.ACTION_PLAY_FROM_SEARCH != 0L,
                 canPlayFromUri = actions and PlaybackState.ACTION_PLAY_FROM_URI != 0L,
+                canSeek = actions and PlaybackState.ACTION_SEEK_TO != 0L,
             )
         }
     }
@@ -111,6 +115,37 @@ object PlayerCommands {
         return PlayOutcome.Failed(
             "Could not open ${Sources.label(packageName)}. Is it installed?",
         )
+    }
+
+    /**
+     * Where the local player is right now, extrapolated the same way every other
+     * position in this app is.
+     */
+    fun localPosition(context: Context, packageName: String): Long? {
+        val state = controllerFor(context, packageName)?.playbackState ?: return null
+        val drift = SystemClock.elapsedRealtime() - state.lastPositionUpdateTime
+        val speed = if (state.state == PlaybackState.STATE_PLAYING) state.playbackSpeed else 0f
+        return (state.position + drift * speed).toLong().coerceAtLeast(0L)
+    }
+
+    fun localTitle(context: Context, packageName: String): String? =
+        controllerFor(context, packageName)?.currentTitle()
+
+    /**
+     * Moves the local player to [positionMs].
+     *
+     * Seeking is what makes following somebody possible without any of the
+     * machinery that playing their audio would need, and it is far more widely
+     * supported than the commands for starting a specific song: every player
+     * whose notification has a scrubber accepts it.
+     */
+    fun seekTo(context: Context, packageName: String, positionMs: Long): Boolean {
+        val controller = controllerFor(context, packageName) ?: return false
+        val actions = controller.playbackState?.actions ?: 0L
+        if (actions and PlaybackState.ACTION_SEEK_TO == 0L) return false
+        return runCatching {
+            controller.transportControls.seekTo(positionMs.coerceAtLeast(0))
+        }.isSuccess
     }
 
     /**
