@@ -52,11 +52,14 @@ object NowPlayingRepository {
      * point on it is an ordinary session: the same crediting, the same minutes,
      * the same thing friends can see.
      */
-    private var room: NowPlaying? = null
+    private val _room = MutableStateFlow<NowPlaying?>(null)
+
+    /** Readable on its own, because the room's notification wants exactly this. */
+    val room: StateFlow<NowPlaying?> = _room.asStateFlow()
 
     fun setRoomPlayback(track: NowPlaying?) {
-        if (room == track) return
-        room = track
+        if (_room.value == track) return
+        _room.value = track
         publish()
     }
 
@@ -97,7 +100,7 @@ object NowPlayingRepository {
         manager = null
         component = null
         started = false
-        room = null
+        _room.value = null
         _sessions.value = emptyList()
     }
 
@@ -139,7 +142,7 @@ object NowPlayingRepository {
 
     private fun publish() {
         val live = bound.mapNotNull { (controller, _) -> controller.toNowPlaying() }
-        _sessions.value = live + listOfNotNull(room)
+        _sessions.value = live + listOfNotNull(_room.value)
         _lastEventAt.value = System.currentTimeMillis()
     }
 }

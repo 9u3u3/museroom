@@ -74,7 +74,18 @@ private data class ProfileWithPlayback(
 )
 
 /** Somebody listening along with you. */
-data class RoomMember(val userId: String, val handle: String)
+data class RoomMember(
+    val userId: String,
+    val handle: String,
+    val avatarUrl: String? = null,
+)
+
+@Serializable
+private data class RosterRow(
+    @SerialName("user_id") val userId: String = "",
+    val handle: String = "",
+    @SerialName("avatar_url") val avatarUrl: String? = null,
+)
 
 @Serializable
 private data class RoomMemberRow(
@@ -181,6 +192,22 @@ class FriendsRepository private constructor(context: Context) {
         )
         Supabase.json.decodeFromString(ListSerializer(RoomMemberRow.serializer()), body)
             .map { RoomMember(it.userId, it.profiles?.handle.orEmpty()) }
+            .filter { it.handle.isNotBlank() }
+    }
+
+    /**
+     * Everybody in somebody else's room, including you.
+     *
+     * A joiner used to be told "Nobody is in your room", which is true and
+     * beside the point: they are in a room, with whoever else turned up, and
+     * the roster was something only the host could see. Read through a
+     * function so that being present is all that travels — not what anybody
+     * in the room is playing.
+     */
+    suspend fun roomMembersOf(hostId: String): Result<List<RoomMember>> = call { token, _ ->
+        val body = Supabase.rpc("room_members", buildJsonObject { put("host", hostId) }, token)
+        Supabase.json.decodeFromString(ListSerializer(RosterRow.serializer()), body)
+            .map { RoomMember(it.userId, it.handle, it.avatarUrl) }
             .filter { it.handle.isNotBlank() }
     }
 

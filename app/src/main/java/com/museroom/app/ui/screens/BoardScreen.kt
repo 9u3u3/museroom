@@ -170,8 +170,10 @@ private fun BoardRow(entry: BoardEntry, mine: Boolean, sort: BoardSort) {
         content = ink,
         radius = 16.dp, shadow = if (mine || onLead) 5.dp else 3.dp, padding = 11.dp,
         // Everybody on this list is a person with a page, including the ones
-        // you have never met. That is most of what a leaderboard is for.
-        modifier = Modifier.clickable(enabled = !mine) { Person.show(entry.userId, entry.handle) },
+        // you have never met and including you: your own page is the only
+        // place your likes are counted up, and it was the one row that would
+        // not open.
+        modifier = Modifier.clickable { Person.show(entry.userId, entry.handle) },
     ) {
         Row(
             Modifier.fillMaxWidth(),

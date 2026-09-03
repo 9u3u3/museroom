@@ -48,6 +48,7 @@ import com.museroom.app.media.Avatars
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.ProfileRepository
+import com.museroom.app.net.Updates
 import com.museroom.app.net.SafetyRepository
 import com.museroom.app.net.Visibility
 import com.museroom.app.notify.FriendAlerts
@@ -67,6 +68,7 @@ import com.museroom.app.ui.kit.NeoSwitch
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.StayAwake
 import com.museroom.app.util.formatAgo
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -103,6 +105,7 @@ fun YouScreen() {
     var showTour by remember { mutableStateOf(false) }
     var confirmDeleteAccount by remember { mutableStateOf(false) }
     var photoNote by remember { mutableStateOf<String?>(null) }
+    var updateNote by remember { mutableStateOf<String?>(null) }
 
     // The system picker, so Museroom never asks for access to the gallery: it
     // is handed one picture and sees nothing else.
@@ -445,6 +448,30 @@ fun YouScreen() {
             tone = NeoTone.Paper,
             modifier = Modifier.fillMaxWidth(),
             onClick = { showTour = true },
+        )
+
+        // Nothing here updates itself, so there has to be somewhere to ask.
+        NeoButton(
+            updateNote ?: "Check for an update",
+            tone = NeoTone.Paper,
+            enabled = updateNote == null,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                updateNote = "Looking"
+                scope.launch {
+                    Updates.check(context, force = true)
+                        .onSuccess { found ->
+                            updateNote = if (found == null) {
+                                "You are on the newest build"
+                            } else {
+                                "Museroom ${found.versionName} is out — see the Now tab"
+                            }
+                        }
+                        .onFailure { updateNote = "Could not reach the site" }
+                    delay(4_000)
+                    updateNote = null
+                }
+            },
         )
 
         Label("Counted", color = c.ink)

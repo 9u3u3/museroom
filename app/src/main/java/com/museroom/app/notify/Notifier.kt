@@ -35,7 +35,15 @@ object Notifier {
      */
     private const val CHANNEL_ASK = "listen_requests_v2"
     private const val CHANNEL_ASK_OLD = "listen_requests"
-    private const val CHANNEL_ROOM = "room_activity"
+
+    /**
+     * Version two of the room channel, for the same reason as the asking one.
+     * Being let in and somebody walking into your room are both moments people
+     * were finding hours later in a silent pile, because the channel was made
+     * at ordinary importance and an importance cannot be raised in place.
+     */
+    private const val CHANNEL_ROOM = "room_activity_v2"
+    private const val CHANNEL_ROOM_OLD = "room_activity"
     private const val CHANNEL_FRIENDS = "friend_activity"
 
     private const val ID_LET_IN = 4203
@@ -51,6 +59,7 @@ object Notifier {
     fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         runCatching { manager.deleteNotificationChannel(CHANNEL_ASK_OLD) }
+        runCatching { manager.deleteNotificationChannel(CHANNEL_ROOM_OLD) }
 
         if (manager.getNotificationChannel(CHANNEL_ASK) == null) {
             manager.createNotificationChannel(
@@ -79,8 +88,18 @@ object Notifier {
                 NotificationChannel(
                     CHANNEL_ROOM,
                     "Your room",
-                    NotificationManager.IMPORTANCE_DEFAULT,
-                ).apply { description = "When somebody joins or lets you into a room" },
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = "When somebody joins or lets you into a room"
+                    setSound(
+                        RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                            .build(),
+                    )
+                    enableVibration(true)
+                },
             )
         }
         if (manager.getNotificationChannel(CHANNEL_FRIENDS) == null) {
@@ -149,7 +168,8 @@ object Notifier {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("$handle let you in")
             .setContentText("Museroom is playing what they are playing.")
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
             .setAutoCancel(true)
             .setContentIntent(openApp(context, 3))
@@ -175,7 +195,8 @@ object Notifier {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("$handle joined your room")
             .setContentText(text)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
             .setAutoCancel(true)
             .setContentIntent(openApp(context, 4))
@@ -184,11 +205,18 @@ object Notifier {
     }
 
     /** A friend has put something on. Silent, and grouped under one channel. */
-    fun friendListening(context: Context, userId: String, handle: String, track: String) {
+    fun friendListening(
+        context: Context,
+        userId: String,
+        handle: String,
+        track: String,
+        art: android.graphics.Bitmap? = null,
+    ) {
         if (!canPost(context)) return
         ensureChannel(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_FRIENDS)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(art)
             .setContentTitle("$handle is listening")
             .setContentText(track.ifBlank { "Something is playing." })
             .setPriority(NotificationCompat.PRIORITY_LOW)

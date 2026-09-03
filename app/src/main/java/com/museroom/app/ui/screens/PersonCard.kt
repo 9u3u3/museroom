@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,18 +23,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.PeopleRepository
+import com.museroom.app.net.Profile
 import com.museroom.app.net.PublicProfile
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MonoText
+import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.util.formatMinutes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -80,6 +86,7 @@ fun PersonCard() {
     val c = Neo.colors
     val people = remember { PeopleRepository.get(context) }
 
+    val me = remember { AuthRepository.get(context) }.session.value?.userId
     var profile by remember(userId) { mutableStateOf<PublicProfile?>(null) }
     var failed by remember(userId) { mutableStateOf<String?>(null) }
 
@@ -113,7 +120,7 @@ fun PersonCard() {
             when {
                 failed != null -> Note(failed!!)
                 p == null -> Note("Looking them up.")
-                else -> PersonBody(p)
+                else -> PersonBody(p, me)
             }
         },
         confirmButton = {
@@ -125,14 +132,41 @@ fun PersonCard() {
 }
 
 @Composable
-private fun PersonBody(p: PublicProfile) {
+private fun PersonBody(p: PublicProfile, me: String?) {
+    val context = LocalContext.current
     val c = Neo.colors
+    val scope = rememberCoroutineScope()
+    val friends = remember { FriendsRepository.get(context) }
+    var asked by remember(p.id) { mutableStateOf(false) }
+    var note by remember(p.id) { mutableStateOf<String?>(null) }
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Accent pills carry the dark ink whatever the theme. Left to take
+        // their colour from the theme, a lime pill in dark mode was pale text
+        // on a pale ground, which is to say no text at all.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (p.isFriend) NeoPill("Friends", fill = c.lime)
-            if (p.openToAll) NeoPill("Room open to all", fill = c.sky)
+            if (p.isFriend) NeoPill("Friends", fill = c.lime, accent = true)
+            if (p.openToAll) NeoPill("Room open to all", fill = c.sky, accent = true)
             if (!p.sharesWithMe) NeoPill("Not sharing", fill = c.card)
         }
+
+        // Finding somebody worth listening to and then having to go and type
+        // their name into a search box is the long way round.
+        if (!p.isFriend && p.id != me) {
+            NeoButton(
+                text = if (asked) "Request sent" else "Add friend",
+                small = true,
+                enabled = !asked,
+                onClick = {
+                    asked = true
+                    scope.launch {
+                        friends.request(Profile(p.id, p.handle, "", p.avatarUrl, p.joinMode))
+                            .onFailure { asked = false; note = it.message }
+                    }
+                },
+            )
+        }
+        note?.let { Note(it) }
 
         // Likes first. Minutes say how long somebody sat there; this is the
         // only number on the page that other people decided.
@@ -166,11 +200,6 @@ private fun PersonBody(p: PublicProfile) {
             // and this page has to hold to that or the opt-out is decorative.
             Note("They have kept their totals off the leaderboard.")
         }
-
-        Note(
-            "What they have listened to stays private. This page shows only their " +
-                "name, their board totals and the likes other people gave them.",
-        )
     }
 }
 

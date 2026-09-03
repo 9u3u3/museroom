@@ -203,8 +203,14 @@ object PlaybackTracker {
                                     .filter { it.isNotBlank() }
                                     .joinToString(" · ")
                             }.orEmpty()
+                            // The cover, if it is already to hand. Not worth
+                            // holding up the message for, so a miss simply
+                            // means the message arrives without a picture.
+                            val art = friend.nowPlaying?.let {
+                                com.museroom.app.media.Artwork.cached(it.title, it.artist)
+                            }
                             Notifier.friendListening(
-                                app, friend.profile.id, friend.profile.handle, track,
+                                app, friend.profile.id, friend.profile.handle, track, art,
                             )
                         }
                 }

@@ -3,6 +3,7 @@ package com.museroom.app.sync
 import android.content.Context
 import android.media.AudioAttributes
 import android.os.SystemClock
+import com.museroom.app.media.Artwork
 import com.museroom.app.media.Fingerprint
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
@@ -129,6 +130,18 @@ object FollowSession {
     /** A YouTube video id, which is the only thing the player can be handed. */
     private val VIDEO_ID = Regex("^[A-Za-z0-9_-]{11}$")
 
+    /**
+     * The cover for whatever the room is playing.
+     *
+     * A joiner's track comes out of Museroom rather than out of a music app,
+     * so there is no artwork in a media session for anyone to read, and the
+     * big card at the top of their screen was a flat purple square while the
+     * strip underneath — which looks the picture up by name — had it. Looked
+     * up once per track and carried on the session itself, so everything that
+     * draws the room draws the same picture.
+     */
+    @Volatile private var cover: android.graphics.Bitmap? = null
+
     private val _following = MutableStateFlow<Following?>(null)
     val following: StateFlow<Following?> = _following.asStateFlow()
 
@@ -145,7 +158,7 @@ object FollowSession {
         RoomPlayer.prime(app)
         RoomPlayer.warmUp()
         TrackResolver.searcher = { title, artist -> RoomPlayer.search(title, artist) }
-        RoomService.start(app, handle, "Getting in step")
+        RoomService.start(app, handle)
 
         val newScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = newScope
@@ -226,6 +239,7 @@ object FollowSession {
         scope = null
         _following.value = null
         pushed = null
+        cover = null
         NowPlayingRepository.setRoomPlayback(null)
         RoomPlayer.leave()
         RoomPlayer.context?.let { context ->
@@ -292,8 +306,12 @@ object FollowSession {
                 }
                 loadedFingerprint = fingerprint
                 loadedId = id
+                cover = Artwork.cached(host.title, host.artist)
                 publish(hostId, handle, FollowState.Loading(host.title), host)
                 RoomPlayer.load(id, hostPosition(host))
+                // After the load rather than before it: the music matters more
+                // than the picture, and this can take a moment.
+                if (cover == null) cover = Artwork.fetch(host.title, host.artist)
                 acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
                 silentSince = 0L
                 lastCorrection = 0L
@@ -414,18 +432,30 @@ object FollowSession {
                 playbackSpeed = 1f,
                 isPlaying = true,
                 audioContentType = AudioAttributes.CONTENT_TYPE_MUSIC,
-                artwork = null,
+                artwork = cover,
                 rawMetadata = emptyMap(),
             ),
         )
     }
 
-    /** Their position now, projected from the snapshot and when it was taken. */
-    private fun hostPosition(host: RemoteNowPlaying): Long {
+    /**
+     * Their position now, projected from the snapshot and when it was taken.
+     *
+     * Only while they are actually playing. A paused player is where it was
+     * left, and projecting one forward is how a host pausing at 0:22 showed
+     * up on a joiner's phone as a clock climbing to 0:35, snapping back on the
+     * next heartbeat, and climbing again — a sawtooth over a track that had
+     * stopped.
+     */
+    internal fun hostPosition(host: RemoteNowPlaying): Long {
+        if (!host.isPlaying) return host.positionMs
         val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
             ?: return host.positionMs
         val elapsed = (System.currentTimeMillis() - takenAt).coerceIn(0, 60_000)
-        return host.positionMs + elapsed
+        val projected = host.positionMs + elapsed
+        // A row that went stale near the end would otherwise project past the
+        // end of the track and sit there, still counting.
+        return if (host.durationMs > 0) projected.coerceAtMost(host.durationMs) else projected
     }
 
     /** Ours now, projected the same way, because the reading is a moment old. */
@@ -454,7 +484,25 @@ object FollowSession {
             title = known?.title ?: previous.title,
             artist = known?.artist ?: previous.artist,
             durationMs = known?.durationMs ?: previous.durationMs,
-            positionMs = known?.let { hostPosition(it) } ?: previous.positionMs,
+            positionMs = shownPosition(state, known) ?: previous.positionMs,
         )
+    }
+
+    /**
+     * The number on the joiner's screen.
+     *
+     * Their own player, whenever it is playing, rather than arithmetic on the
+     * host's last message. The player is the thing they are actually hearing
+     * and the loop already holds it in step, so reading it is both smoother
+     * and truer: the host's projection jumped forward between heartbeats and
+     * snapped back on each one, which is the jitter people were seeing.
+     *
+     * Anything else falls back to where the host says they are, unprojected.
+     */
+    private fun shownPosition(state: FollowState, host: RemoteNowPlaying?): Long? {
+        val snapshot = RoomPlayer.snapshot.value
+        val ours = state is FollowState.InStep && snapshot.playing && !snapshot.ad
+        if (ours) return localPosition(snapshot)
+        return host?.let { hostPosition(it) }
     }
 }

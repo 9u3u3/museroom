@@ -12,3 +12,6 @@ captures/
 supabase/.temp/
 keystore/
 design/museroom-ui.html
+
+# Working notes, not part of the product
+todo.md

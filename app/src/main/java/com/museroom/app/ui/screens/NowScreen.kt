@@ -58,6 +58,7 @@ import com.museroom.app.net.ListenRepository
 import com.museroom.app.net.ListenRequest
 import com.museroom.app.net.PendingRequest
 import com.museroom.app.net.RoomMember
+import com.museroom.app.net.Updates
 import com.museroom.app.notify.Notifier
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.FollowSession
@@ -141,6 +142,7 @@ fun NowScreen() {
                 Spacer(Modifier.height(with(density) { openPx.toDp() }))
             }
 
+            UpdateCard()
             FollowBar()
             FriendRequests()
             ListenInbox()
@@ -340,11 +342,66 @@ private fun NowPlayingHeader(track: NowPlaying, collapse: Float, modifier: Modif
 }
 
 /**
- * Who is listening along with you.
+ * A newer build exists.
  *
- * A joiner's music comes out of Museroom rather than out of a player, so there
- * is nothing on their phone for anybody to notice. They say they are here, and
- * this is where the host sees it.
+ * Not being on the Play Store means nothing updates itself and nobody is told,
+ * so somebody who installed once would sit on that build for ever. This is the
+ * telling. It opens the page and they decide, the same way they did the first
+ * time — nothing downloads itself, and saying no to a version means no.
+ */
+@Composable
+private fun UpdateCard() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val release by Updates.available.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) { Updates.check(context) }
+    val update = release ?: return
+
+    NeoAccentCard(fill = c.pink, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
+        Label("Update", color = c.onAccent)
+        Spacer(Modifier.size(4.dp))
+        Text(
+            "Museroom ${update.versionName} is out",
+            style = MaterialTheme.typography.titleMedium,
+            color = c.onAccent,
+        )
+        if (update.notes.isNotBlank()) {
+            Spacer(Modifier.size(3.dp))
+            Text(
+                update.notes,
+                style = MaterialTheme.typography.bodySmall,
+                color = c.onAccent.copy(alpha = 0.85f),
+            )
+        }
+        Spacer(Modifier.size(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            NeoButton("Get it", small = true, tone = NeoTone.Lime, onClick = {
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse(update.url),
+                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            })
+            NeoButton("Not now", small = true, tone = NeoTone.Paper, onClick = {
+                Updates.skip(context, update)
+            })
+        }
+    }
+}
+
+/**
+ * Who is in the room.
+ *
+ * Which room depends on where you are. A host sees their own: people say they
+ * are there on a stamp of their own, because a joiner's music comes out of
+ * Museroom rather than out of a player and there is nothing on their phone to
+ * notice. A joiner sees the host's, which is the room they are actually in —
+ * they used to be told "nobody is in your room", which is true and beside the
+ * point.
  */
 @Composable
 private fun RoomMembers() {
@@ -352,16 +409,32 @@ private fun RoomMembers() {
     val c = Neo.colors
     val auth = remember { AuthRepository.get(context) }
     val session by auth.session.collectAsStateWithLifecycle()
+    val friends = remember { FriendsRepository.get(context) }
+    val following by FollowSession.following.collectAsStateWithLifecycle()
+    val host = following?.hostId
 
     LaunchedEffect(Unit) { RoomPresence.start(context) }
-    val members by RoomPresence.members.collectAsStateWithLifecycle()
+    val mine by RoomPresence.members.collectAsStateWithLifecycle()
+
+    var theirs by remember(host) { mutableStateOf<List<RoomMember>>(emptyList()) }
+    LaunchedEffect(host) {
+        val inRoom = host ?: return@LaunchedEffect
+        while (true) {
+            friends.roomMembersOf(inRoom).onSuccess { theirs = it }
+            delay(20_000)
+        }
+    }
+
     if (session == null) return
+    val me = session?.userId
+    val members = if (host != null) theirs else mine
 
     NeoAccentCard(fill = c.sky, radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
         Label(
-            when (members.size) {
-                0 -> "Your room"
-                1 -> "Listening with you"
+            when {
+                host != null -> "In ${following?.handle.orEmpty()}'s room"
+                members.isEmpty() -> "Your room"
+                members.size == 1 -> "Listening with you"
                 else -> "${members.size} listening with you"
             },
             color = c.onAccent,
@@ -369,18 +442,25 @@ private fun RoomMembers() {
         Spacer(Modifier.size(8.dp))
         if (members.isEmpty()) {
             Text(
-                "Nobody is in your room.",
+                if (host != null) "Just you, so far." else "Nobody is in your room.",
                 style = MaterialTheme.typography.titleMedium,
                 color = c.onAccent.copy(alpha = 0.75f),
             )
         }
         members.forEach { member ->
-            Text(
-                member.handle,
-                style = MaterialTheme.typography.titleMedium,
-                color = c.onAccent,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                Face(member.handle, member.avatarUrl, 28.dp, border = c.onAccent)
+                Text(
+                    member.handle + if (member.userId == me) " · you" else "",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = c.onAccent,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -528,11 +608,13 @@ private fun FriendRequests() {
 }
 
 /**
- * A listening room: what Museroom is playing, and how far off the host it is.
+ * The strip that says whose room you are in.
  *
- * This is the joiner's whole player. There is nothing to press because there
- * is nothing to decide; the host decides, and this follows. The offset is
- * shown because "in sync" is a claim and a number is checkable.
+ * Deliberately not a player. It used to carry a cover, a title, a progress bar
+ * and a clock, all of which the card above it was already showing — the same
+ * track drawn twice, once with artwork and once without. The joiner gets the
+ * same one player the host gets; this only says whose music it is, offers the
+ * one thing there is to decide, and reports how the following is going.
  */
 @Composable
 private fun FollowBar() {
@@ -541,26 +623,7 @@ private fun FollowBar() {
     val room = following ?: return
     val white = androidx.compose.ui.graphics.Color.White
 
-    var cover by remember(room.title, room.artist) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(room.title, room.artist) {
-        if (room.title.isNotBlank()) {
-            cover = com.museroom.app.media.Artwork.fetch(room.title, room.artist)
-        }
-    }
-
-    var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
-    val stampedAt = remember(room.positionMs) { SystemClock.elapsedRealtime() }
-    LaunchedEffect(Unit) {
-        while (true) {
-            tick = SystemClock.elapsedRealtime()
-            delay(400)
-        }
-    }
-    val moving = room.state is FollowState.InStep
-    val position = room.positionMs + if (moving) (tick - stampedAt).coerceAtLeast(0) else 0
-    val fraction = if (room.durationMs > 0) position.toFloat() / room.durationMs else 0f
-
-    NeoAccentCard(fill = c.violet, radius = 20.dp, shadow = 6.dp, padding = 18.dp) {
+    NeoAccentCard(fill = c.violet, radius = 20.dp, shadow = 6.dp, padding = 16.dp) {
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -589,53 +652,7 @@ private fun FollowBar() {
             NeoButton("Leave", small = true, tone = NeoTone.Paper, onClick = { FollowSession.stop() })
         }
 
-        if (room.title.isNotBlank()) {
-            Spacer(Modifier.size(14.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(13.dp),
-            ) {
-                Box(
-                    Modifier
-                        .size(62.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(white.copy(alpha = 0.18f))
-                        .border(3.dp, c.onAccent, RoundedCornerShape(14.dp)),
-                ) {
-                    cover?.let {
-                        Image(
-                            it.asImageBitmap(), null, Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop,
-                        )
-                    }
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        room.title, style = MaterialTheme.typography.titleMedium,
-                        color = white, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        room.artist.ifBlank { "Unknown artist" },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = white.copy(alpha = 0.8f),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Spacer(Modifier.size(14.dp))
-            NeoProgress(fraction, fill = c.lime)
-            Spacer(Modifier.size(7.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                MonoText(formatClock(position), color = white)
-                MonoText(
-                    if (room.durationMs > 0) formatClock(room.durationMs) else "--:--",
-                    color = white,
-                )
-            }
-        }
-
-        Spacer(Modifier.size(10.dp))
+        Spacer(Modifier.size(9.dp))
         Text(
             when (val s = room.state) {
                 is FollowState.Starting -> "Warming up the player"
