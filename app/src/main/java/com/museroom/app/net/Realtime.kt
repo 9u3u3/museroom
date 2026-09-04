@@ -3,6 +3,9 @@ package com.museroom.app.net
 import android.util.Log
 import com.museroom.app.BuildConfig
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.mapNotNull
@@ -104,7 +107,6 @@ object Realtime {
             "/realtime/v1/websocket?apikey=${BuildConfig.SUPABASE_ANON_KEY}&vsn=1.0.0"
 
         var socket: WebSocket? = null
-        var beating = true
 
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -136,31 +138,44 @@ object Realtime {
 
         socket = http.newWebSocket(Request.Builder().url(url).build(), listener)
 
-        // Phoenix drops a connection it has not heard from. The library's own
-        // ping frames are not the same thing as this heartbeat.
-        val beat = Thread {
-            while (beating) {
-                Thread.sleep(HEARTBEAT_MS)
-                if (!beating) break
-                socket?.send(
-                    Supabase.json.encodeToString(
-                        JsonObject.serializer(),
-                        buildJsonObject {
-                            put("topic", "phoenix")
-                            put("event", "heartbeat")
-                            put("payload", buildJsonObject { })
-                            put("ref", refs.incrementAndGet().toString())
-                        },
-                    ),
-                )
+        /*
+         * Phoenix drops a connection it has not heard from, and the library's
+         * own ping frames are not the same thing as this heartbeat.
+         *
+         * A coroutine rather than a thread, and that is not a matter of taste.
+         * This was a thread sleeping between beats, and closing the flow woke
+         * it by interrupting it — which throws out of the thread's own body,
+         * where nothing was catching it, and an uncaught exception on any
+         * thread takes the whole app down. Leaving a room closes this flow.
+         * That was the crash on leaving a room: it needed a live socket to
+         * happen at all, so it could only ever be seen by somebody signed in
+         * and actually in a room, which is the one situation no test here can
+         * reach.
+         *
+         * Cancelling a coroutine is not an error. It unwinds quietly, and it
+         * happens automatically when the flow closes, so there is nothing left
+         * to remember to interrupt.
+         */
+        launch {
+            while (isActive) {
+                delay(HEARTBEAT_MS)
+                runCatching {
+                    socket?.send(
+                        Supabase.json.encodeToString(
+                            JsonObject.serializer(),
+                            buildJsonObject {
+                                put("topic", "phoenix")
+                                put("event", "heartbeat")
+                                put("payload", buildJsonObject { })
+                                put("ref", refs.incrementAndGet().toString())
+                            },
+                        ),
+                    )
+                }
             }
-        }.apply { isDaemon = true; start() }
-
-        awaitClose {
-            beating = false
-            beat.interrupt()
-            runCatching { socket?.close(1000, null) }
         }
+
+        awaitClose { runCatching { socket?.close(1000, null) } }
     }
 
     /**

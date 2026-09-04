@@ -179,6 +179,69 @@
      * again, which is heard as a listener scrubbing back and forth and never
      * arriving.
      */
+    /*
+     * Fetch a track and hold it, silent.
+     *
+     * Everybody in a room begins a song at the same moment, worked out from
+     * the host's own position rather than sent to anybody, so the fetching has
+     * to be finished before that moment and must not make a sound when it
+     * lands. cueVideoById is the player's own word for this; where it is
+     * missing, loading and stopping at once gets to the same place, and the
+     * volume is taken down across the join so nothing escapes if the stop
+     * lands a frame late.
+     */
+    cue: function (id, startSeconds) {
+      wanted = id || '';
+      lastError = '';
+      var p = player();
+      if (!p) return false;
+      try {
+        try {
+          var v = video();
+          if (v) v.playbackRate = 1;
+        } catch (e) {}
+        try { p.setVolume(0); } catch (e) {}
+        if (typeof p.cueVideoById === 'function') {
+          p.cueVideoById(id, startSeconds || 0);
+        } else if (typeof p.loadVideoById === 'function') {
+          p.loadVideoById(id, startSeconds || 0);
+        } else {
+          return false;
+        }
+        try { p.pauseVideo(); } catch (e) {}
+        return true;
+      } catch (e) {
+        lastError = String(e && e.name ? e.name : e);
+        return false;
+      }
+    },
+
+    /* The shared moment: put where everybody else is, then let go. */
+    begin: function (seconds) {
+      var p = player();
+      if (!p) return false;
+      try {
+        try { p.seekTo(seconds, true); } catch (e) {}
+        try { p.unMute(); } catch (e) {}
+        try { p.setVolume(100); } catch (e) {}
+        var v = video();
+        if (v) {
+          var started = v.play();
+          if (started && started.catch) {
+            started
+              .then(function () { lastError = ''; })
+              .catch(function (e) { lastError = String(e && e.name ? e.name : e); });
+          }
+        } else if (typeof p.playVideo === 'function') {
+          p.playVideo();
+        }
+        return true;
+      } catch (e) {
+        lastError = String(e && e.name ? e.name : e);
+        return false;
+      }
+    },
+
     seek: function (seconds) {
       var p = player();
       if (!p) return false;

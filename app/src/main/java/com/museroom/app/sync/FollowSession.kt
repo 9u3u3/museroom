@@ -186,6 +186,28 @@ object FollowSession {
     private const val ROOM_LAG_MS = 3_000L
 
     /**
+     * How long everybody is given to fetch a song before the room starts it.
+     *
+     * Listeners used to begin a new track the moment their own download
+     * finished, so a quick phone and a slow one started a second or two apart
+     * and only drew level again over the following half-minute. They begin on
+     * a moment now, and the moment has to be one every phone can meet, so it
+     * sits this far past the point where the previous track's tail runs out.
+     *
+     * A phone that misses it anyway starts late rather than skipping, and
+     * closes the gap by speed exactly as before.
+     */
+    private const val FETCH_ALLOWANCE_MS = 2_500L
+
+    /**
+     * The longest the last song is allowed to hold up the next one.
+     *
+     * A tail that never ends is a player that has stopped saying anything, and
+     * waiting on it forever would mean the room simply never moves on.
+     */
+    private const val LONGEST_TAIL_MS = 20_000L
+
+    /**
      * The longest a track may be left settling before it is corrected anyway.
      *
      * The settling window used to end either when its clock ran out or when
@@ -532,6 +554,12 @@ object FollowSession {
          */
         var heardFrom = ""
 
+        /**
+         * The moment the room begins the track now in hand, or zero once it
+         * has begun. Held silent until then.
+         */
+        var beginAt = 0L
+
         while (true) {
             val host = hostNow(friends, hostId)
 
@@ -571,11 +599,21 @@ object FollowSession {
                  * minute and nobody hears it happen.
                  */
                 val snapshotNow = RoomPlayer.snapshot.value
-                val stillFinishing = loadedFingerprint.isNotBlank() &&
-                    hostPosition(host) < ROOM_LAG_MS &&
+                // Judged by our own player, not by where the host has got to.
+                // The tail is however much of the last song is left here, and
+                // if the room has drifted a little further back that is more
+                // than the delay, not exactly the delay. Fetching the next
+                // song stops this one, so it waits until this one is genuinely
+                // done rather than until a number says it ought to be.
+                val nearlyOver = snapshotNow.durationMs > 0 &&
+                    snapshotNow.positionMs >= snapshotNow.durationMs - END_OF_TRACK_MS / 4
+                val stillFinishing = beginAt == 0L &&
+                    loadedFingerprint.isNotBlank() &&
+                    hostPosition(host) < ROOM_LAG_MS + LONGEST_TAIL_MS &&
                     snapshotNow.playing &&
                     snapshotNow.onWantedTrack &&
-                    !snapshotNow.strayed
+                    !snapshotNow.strayed &&
+                    !nearlyOver
                 if (stillFinishing) {
                     publish(hostId, handle, FollowState.InStep(ROOM_LAG_MS), host)
                     delay(SETTLING_TICK_MS)
@@ -635,10 +673,15 @@ object FollowSession {
                 loaded = fingerprint
                 loadedId = id
                 heardFrom = if (walkedIn) "" else fingerprint
+                // Somebody who walked in has nothing to wait for; the song is
+                // already running and they join it. A song that started while
+                // we were here is begun by the whole room at once, so it is
+                // fetched silently and held until that moment.
+                beginAt = if (walkedIn) 0L else roomStartMoment(host)
                 cover = Artwork.cached(host.title, host.artist)
                 publish(hostId, handle, FollowState.Loading(host.title), host)
                 RoomPlayer.setRate(1.0)
-                RoomPlayer.load(id, from)
+                if (beginAt > 0L) RoomPlayer.cue(id, from) else RoomPlayer.load(id, from)
                 // After the load rather than before it: the music matters more
                 // than the picture, and this can take a moment.
                 if (cover == null) cover = Artwork.fetch(host.title, host.artist)
@@ -649,6 +692,27 @@ object FollowSession {
                 settleUntil = 0L
                 reloads = 0
                 pendingFirstSync = true
+                delay(SETTLING_TICK_MS)
+                continue
+            }
+
+            // Fetched, silent, waiting for the moment the room begins it.
+            // Every phone works the moment out for itself from the host's own
+            // row, so they let go together rather than each starting whenever
+            // its own download happened to finish.
+            if (beginAt > 0L) {
+                val wait = beginAt - ServerClock.nowMs()
+                if (wait > 0) {
+                    publish(hostId, handle, FollowState.CatchingUp, host)
+                    delay(wait.coerceAtMost(SETTLING_TICK_MS))
+                    continue
+                }
+                RoomPlayer.begin(0L)
+                beginAt = 0L
+                lastCorrection = SystemClock.elapsedRealtime()
+                acquireUntil = SystemClock.elapsedRealtime() + SETTLE_MS
+                acquireSince = SystemClock.elapsedRealtime()
+                pendingFirstSync = false
                 delay(SETTLING_TICK_MS)
                 continue
             }
@@ -907,6 +971,25 @@ object FollowSession {
         val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
             ?: return Long.MAX_VALUE
         return (ServerClock.nowMs() - takenAt).coerceAtLeast(0)
+    }
+
+    /**
+     * The moment the whole room begins the host's current track.
+     *
+     * Worked out rather than announced. The host's row says where they are and
+     * when that was true, so the track began at the difference between them,
+     * and every phone reading the same row in the same clock arrives at the
+     * same number without anybody having to send it. That is what makes the
+     * room start together: nobody is waiting on a message, so nobody is late
+     * by however long their message took.
+     *
+     * Zero when the row cannot be read, which means start when ready.
+     */
+    internal fun roomStartMoment(host: RemoteNowPlaying): Long {
+        val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
+            ?: return 0L
+        val began = takenAt - host.positionMs
+        return began + ROOM_LAG_MS + FETCH_ALLOWANCE_MS
     }
 
     /**

@@ -176,6 +176,21 @@ Invariants that were each learned from a real bug. Do not undo them:
   not worth it. `now_playing.starts_at`, `start_position_ms`, `room_ready_for`
   and `room_late_ms` are the leftover columns, still present and now unused, and
   `room_members` still returns two of them. Do not build on them without asking.
+- **Every listener begins a new song on the same computed moment.**
+  `roomStartMoment` derives it from the host's own row (position and when that
+  was true give the instant the track began) plus the lag and a fetch
+  allowance. Nothing is sent: every phone reading the same row in the same clock
+  gets the same number, so nobody is late by however long a message took. A new
+  track is fetched with `RoomPlayer.cue` (silent) and released with `begin`.
+- **Never cut the tail of the previous song.** Fetching the next track stops the
+  current one, so the switch waits until *our own player* has finished, judged
+  by its position against its duration, not by where the host has got to.
+- **The Realtime heartbeat must never be a bare thread.** It was, sleeping
+  between beats, and closing the flow interrupted it; the InterruptedException
+  unwound out of the thread's own body where nothing caught it, and an uncaught
+  exception on any thread kills the app. That was the crash on leaving a room,
+  and it needed a live socket, so only a signed-in user in a real room could
+  ever see it. It is a coroutine in the flow's scope now.
 - **One shared clock.** `net/ServerClock.kt` asks the database
   (`server_now()`), halves the round trip, and keeps the *tightest* sample
   rather than the newest. Both ends stamp and project in that time. Two

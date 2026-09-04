@@ -1,6 +1,6 @@
 {
-  "version_code": 27,
-  "version_name": "5.5",
+  "version_code": 28,
+  "version_name": "5.6",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Rooms now run a few seconds behind whoever is hosting, on purpose. Nothing is skipped and nothing is cut off: a song that starts while you are listening along starts from its first second, and your music is never jumped forward to catch up. The host is no longer paused between tracks."
+  "notes": "Fixes the crash when leaving a room. Everybody listening along now starts each song at the same moment instead of whenever their own phone finished loading it, and the end of a song is never cut short to fetch the next one."
 }

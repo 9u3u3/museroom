@@ -97,6 +97,70 @@ class RoomDelayTest {
         assertTrue("expected about 15s, got ${recent}ms", recent in 14_000..16_500)
     }
 
+    // ------------------------------------------------- starting together --
+
+    /**
+     * Every phone works the moment out for itself, from the host's own row, so
+     * two of them holding the same row arrive at the same answer without
+     * anybody sending anything. That is what makes a room start together
+     * rather than each phone beginning whenever its own download finished.
+     */
+    @Test
+    fun `two phones reading the same row agree on the moment`() {
+        val row = host(positionMs = 1_200, secondsAgo = 0)
+        assertEquals(FollowSession.roomStartMoment(row), FollowSession.roomStartMoment(row))
+    }
+
+    /**
+     * The moment is a property of the song, not of when it was asked about. A
+     * later reading of the same song has to name the same instant, or a phone
+     * that read it twice would move the goalposts on itself.
+     */
+    @Test
+    fun `a later reading of the same song names the same moment`() {
+        val began = Instant.now().minusSeconds(4)
+        val early = RemoteNowPlaying(
+            title = "Passionfruit", artist = "Drake", durationMs = 298_000,
+            positionMs = 1_000, isPlaying = true,
+            updatedAt = began.plusMillis(1_000).toString(),
+        )
+        val later = RemoteNowPlaying(
+            title = "Passionfruit", artist = "Drake", durationMs = 298_000,
+            positionMs = 3_500, isPlaying = true,
+            updatedAt = began.plusMillis(3_500).toString(),
+        )
+        val drift = Math.abs(
+            FollowSession.roomStartMoment(early) - FollowSession.roomStartMoment(later),
+        )
+        assertTrue("the moment moved by ${drift}ms between readings", drift < 50)
+    }
+
+    /**
+     * It has to sit past the point the previous track's tail runs out, or the
+     * room would be asked to start a song while it is still finishing the last
+     * one — and one player cannot do both.
+     */
+    @Test
+    fun `the moment leaves room for the tail and the fetch`() {
+        val began = Instant.now()
+        val row = RemoteNowPlaying(
+            title = "Passionfruit", artist = "Drake", durationMs = 298_000,
+            positionMs = 0, isPlaying = true, updatedAt = began.toString(),
+        )
+        val after = FollowSession.roomStartMoment(row) - began.toEpochMilli()
+        assertTrue("only ${after}ms after the song began", after >= 3_000)
+    }
+
+    /** A row nobody can read is a reason to start when ready, not to wait. */
+    @Test
+    fun `an unreadable row means no moment at all`() {
+        val broken = RemoteNowPlaying(
+            title = "Passionfruit", artist = "Drake", durationMs = 298_000,
+            positionMs = 0, isPlaying = true, updatedAt = "not a time",
+        )
+        assertEquals(0L, FollowSession.roomStartMoment(broken))
+    }
+
     /** How old a reading is, which is what decides whether to trust it. */
     @Test
     fun `the age of a reading is measured`() {
