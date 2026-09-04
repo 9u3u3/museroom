@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -129,6 +130,14 @@ fun NearbyScreen() {
     // A permission granted is only half of it: the radio may still be off.
     LaunchedEffect(status) {
         if (wanted && status is ProximityStatus.BluetoothOff) askForBluetooth()
+    }
+
+    // Both radios run flat out only while this screen is the one being looked
+    // at. Somebody waiting for a friend's name to appear is exactly who the
+    // battery is worth spending on, and nobody else is waiting for anything.
+    DisposableEffect(Unit) {
+        manager.setForeground(true)
+        onDispose { manager.setForeground(false) }
     }
 
     Column(

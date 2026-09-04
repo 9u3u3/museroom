@@ -3,17 +3,14 @@ package com.museroom.app.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,16 +25,14 @@ import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.Friend
 import com.museroom.app.net.FriendsRepository
-import com.museroom.app.net.PendingRequest
 import com.museroom.app.net.Profile
+import com.museroom.app.net.RelationState
 import com.museroom.app.net.SafetyRepository
+import com.museroom.app.ui.Refreshing
 import com.museroom.app.ui.Neo
-import com.museroom.app.ui.kit.Label
-import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoTone
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -50,7 +45,6 @@ fun FriendsScreen() {
     val session by auth.session.collectAsStateWithLifecycle()
 
     var friends by remember { mutableStateOf<List<Friend>>(emptyList()) }
-    var pending by remember { mutableStateOf<List<PendingRequest>>(emptyList()) }
     var results by remember { mutableStateOf<List<Profile>>(emptyList()) }
     var query by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
@@ -62,16 +56,18 @@ fun FriendsScreen() {
     var confirmBlock by remember { mutableStateOf<Profile?>(null) }
     var confirmReport by remember { mutableStateOf<Profile?>(null) }
 
+    var relations by remember { mutableStateOf<Map<String, RelationState>>(emptyMap()) }
+
     suspend fun reload() {
         repo.friends().onSuccess { friends = it }.onFailure { message = it.message }
-        repo.pending().onSuccess { pending = it }
+        // Whatever is on screen has a button on it, and a button drawn from a
+        // stale answer is the bug this screen is being fixed for.
+        val shown = results.map { it.id }
+        if (shown.isNotEmpty()) repo.relationships(shown).onSuccess { relations = it }
     }
 
-    LaunchedEffect(session?.userId) {
-        while (session != null) {
-            reload()
-            delay(15_000)
-        }
+    Refreshing(session?.userId, everyMs = 15_000) {
+        if (session != null) reload()
     }
 
     confirmUnfriend?.let { who ->
@@ -145,30 +141,6 @@ fun FriendsScreen() {
             return@Column
         }
 
-        pending.forEach { request ->
-            NeoAccentCard(fill = c.sky, radius = 16.dp) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Label(if (request.incoming) "Wants to be friends" else "Request sent", color = c.onAccent)
-                        Text(request.profile.handle, style = MaterialTheme.typography.titleMedium)
-                    }
-                    if (request.incoming) {
-                        NeoButton("Accept", small = true, tone = NeoTone.Lime, enabled = !busy, onClick = {
-                            busy = true
-                            scope.launch {
-                                repo.accept(request.profile).onFailure { message = it.message }
-                                reload(); busy = false
-                            }
-                        })
-                    }
-                }
-            }
-        }
-
         Field(query, { query = it; if (it.length < 2) results = emptyList() }, "Find by handle")
         NeoButton(
             "Search",
@@ -177,7 +149,13 @@ fun FriendsScreen() {
             onClick = {
                 busy = true; message = null
                 scope.launch {
-                    repo.search(query).onSuccess { results = it }.onFailure { message = it.message }
+                    repo.search(query)
+                        .onSuccess { found ->
+                            results = found
+                            repo.relationships(found.map { it.id })
+                                .onSuccess { relations = it }
+                        }
+                        .onFailure { message = it.message }
                     busy = false
                 }
             },
@@ -196,15 +174,13 @@ fun FriendsScreen() {
                         color = c.ink,
                         modifier = Modifier.weight(1f),
                     )
-                    NeoButton("Add", small = true, enabled = !busy, onClick = {
-                        busy = true
-                        scope.launch {
-                            repo.request(profile)
-                                .onSuccess { message = "Request sent to ${profile.handle}" }
-                                .onFailure { message = it.message }
-                            reload(); busy = false
-                        }
-                    })
+                    FriendButton(
+                        person = profile,
+                        state = relations[profile.id] ?: RelationState.Stranger,
+                        busy = busy,
+                        onMessage = { message = it },
+                        onChanged = { scope.launch { reload() } },
+                    )
                 }
             }
         }

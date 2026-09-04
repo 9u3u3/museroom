@@ -30,7 +30,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,19 +50,15 @@ import com.museroom.app.data.MuseroomDatabase
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
 import com.museroom.app.media.pickActive
-import com.museroom.app.net.AnsweredListenRequests
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.FriendsRepository
-import com.museroom.app.net.ListenRepository
-import com.museroom.app.net.ListenRequest
-import com.museroom.app.net.PendingRequest
 import com.museroom.app.net.RoomMember
 import com.museroom.app.net.Updates
-import com.museroom.app.notify.Notifier
 import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.FollowState
 import com.museroom.app.sync.RoomPresence
+import com.museroom.app.ui.Refreshing
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
@@ -76,7 +71,6 @@ import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.formatClock
 import com.museroom.app.util.formatMinutes
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -144,8 +138,6 @@ fun NowScreen() {
 
             UpdateCard()
             FollowBar()
-            FriendRequests()
-            ListenInbox()
             RoomMembers()
 
             if (isPrivate) {
@@ -410,12 +402,9 @@ private fun RoomMembers() {
     val mine by RoomPresence.members.collectAsStateWithLifecycle()
 
     var theirs by remember(host) { mutableStateOf<List<RoomMember>>(emptyList()) }
-    LaunchedEffect(host) {
-        val inRoom = host ?: return@LaunchedEffect
-        while (true) {
-            friends.roomMembersOf(inRoom).onSuccess { theirs = it }
-            delay(20_000)
-        }
+    Refreshing(host, everyMs = 20_000) {
+        val inRoom = host ?: return@Refreshing
+        friends.roomMembersOf(inRoom).onSuccess { theirs = it }
     }
 
     if (session == null) return
@@ -453,148 +442,6 @@ private fun RoomMembers() {
                     color = c.onAccent,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-            }
-        }
-    }
-}
-
-/**
- * Requests to listen along, from the host's side.
- *
- * Only the host's side. Being let in no longer needs a screen: the answer is
- * watched for in the background and the music simply starts, which is the
- * whole point of asking rather than being handed a link.
- */
-@Composable
-private fun ListenInbox() {
-    val context = LocalContext.current
-    val c = Neo.colors
-    val scope = rememberCoroutineScope()
-    val listen = remember { ListenRepository.get(context) }
-    val auth = remember { AuthRepository.get(context) }
-    val session by auth.session.collectAsStateWithLifecycle()
-
-    var inbox by remember { mutableStateOf<List<ListenRequest>>(emptyList()) }
-    val answered by AnsweredListenRequests.ids.collectAsStateWithLifecycle()
-
-    LaunchedEffect(session?.userId) {
-        while (session != null) {
-            listen.inbox().onSuccess { inbox = it }
-            delay(12_000)
-        }
-    }
-
-    // Anything answered from the shade drops out of here at once rather than
-    // waiting for the next poll to notice.
-    val waiting = inbox.filter { it.id !in answered }
-    if (waiting.isEmpty()) return
-
-    fun answer(request: ListenRequest, accept: Boolean) {
-        AnsweredListenRequests.mark(request.id)
-        Notifier.clearRequest(context, request.id)
-        scope.launch {
-            listen.respond(request.id, accept)
-            listen.inbox().onSuccess { inbox = it }
-        }
-    }
-
-    Label("Asking to join", color = c.ink)
-    waiting.forEach { request ->
-        NeoAccentCard(fill = c.sky, radius = 16.dp) {
-            Text(
-                "${request.handle} wants to listen along",
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2, overflow = TextOverflow.Ellipsis,
-            )
-            if (request.title.isNotBlank()) {
-                Text(
-                    request.title,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.onAccent.copy(alpha = 0.75f),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.size(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                NeoButton("Let them in", small = true, tone = NeoTone.Lime, onClick = {
-                    answer(request, true)
-                })
-                NeoButton("No", small = true, tone = NeoTone.Paper, onClick = {
-                    answer(request, false)
-                })
-            }
-        }
-    }
-}
-
-/**
- * People asking to be friends, on the screen you actually open.
- *
- * It lived only on the Friends tab, which is a tab nobody opens unless they
- * already suspect there is something there. A request nobody sees is a request
- * nobody answers.
- */
-@Composable
-private fun FriendRequests() {
-    val context = LocalContext.current
-    val c = Neo.colors
-    val scope = rememberCoroutineScope()
-    val friends = remember { FriendsRepository.get(context) }
-    val auth = remember { AuthRepository.get(context) }
-    val session by auth.session.collectAsStateWithLifecycle()
-
-    var pending by remember { mutableStateOf<List<PendingRequest>>(emptyList()) }
-    var busy by remember { mutableStateOf(false) }
-
-    suspend fun reload() {
-        friends.pending().onSuccess { pending = it }
-    }
-
-    LaunchedEffect(session?.userId) {
-        while (session != null) {
-            reload()
-            delay(15_000)
-        }
-    }
-
-    val incoming = pending.filter { it.incoming }
-    if (incoming.isEmpty()) return
-
-    Label("Wants to be friends", color = c.ink)
-    incoming.forEach { request ->
-        NeoAccentCard(fill = c.lime, radius = 16.dp) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Face(request.profile.handle, request.profile.avatarUrl, 38.dp)
-                Text(
-                    request.profile.handle,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = c.onAccent,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            Spacer(Modifier.size(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                NeoButton("Accept", small = true, tone = NeoTone.Violet, enabled = !busy, onClick = {
-                    busy = true
-                    scope.launch {
-                        friends.accept(request.profile)
-                        reload()
-                        busy = false
-                    }
-                })
-                NeoButton("Decline", small = true, tone = NeoTone.Paper, enabled = !busy, onClick = {
-                    busy = true
-                    scope.launch {
-                        friends.remove(request.profile)
-                        reload()
-                        busy = false
-                    }
-                })
             }
         }
     }
@@ -652,6 +499,12 @@ private fun FollowBar() {
                 is FollowState.Finding -> "Finding the track"
                 is FollowState.Loading -> "Loading ${s.title}"
                 is FollowState.CatchingUp -> "Catching up"
+                // Worth saying out loud. The music is stopped and nothing is
+                // wrong, which is a combination people otherwise read as a
+                // fault, and it lasts a couple of seconds every song.
+                is FollowState.Ready ->
+                    if (s.inMs > 300) "Starting together in ${(s.inMs + 499) / 1000}s"
+                    else "Starting together"
                 is FollowState.InStep ->
                     if (kotlin.math.abs(s.offMs) < 1000) "In step"
                     else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"

@@ -49,6 +49,14 @@ sealed interface FollowState {
 
     data class InStep(val offMs: Long) : FollowState
 
+    /**
+     * Loaded, silent, and waiting for the moment the whole room begins.
+     *
+     * The only state in here that is not a problem. Everything else that stops
+     * the music is something going wrong; this is the music being on time.
+     */
+    data class Ready(val inMs: Long) : FollowState
+
     /** An ad is playing here that the host is not hearing. */
     data object Advert : FollowState
 
@@ -147,6 +155,24 @@ object FollowSession {
 
     /** Below this, a seek would cost more in stutter than it buys in accuracy. */
     private const val FIRST_SYNC_TOLERANCE_MS = 700L
+
+    /**
+     * How long after the agreed moment a schedule is still worth acting on.
+     *
+     * Past this it belongs to a track that has been playing for a while, and
+     * acting on it would restart a song somebody is halfway through.
+     */
+    private const val SCHEDULE_FORGOTTEN_MS = 30_000L
+
+    /**
+     * How long the host is allowed to still look stopped after the room began.
+     *
+     * We stopped them, so their row says stopped, and it keeps saying so until
+     * their phone notices being started again and writes it down. In that gap
+     * the truthful reading of the row is the wrong one, and acting on it would
+     * pause a room in the first second of a song.
+     */
+    private const val RESUME_GRACE_MS = 8_000L
 
     /** Long enough for one seek to land before anything measures the result. */
     private const val SETTLE_MS = 2_500L
@@ -419,6 +445,18 @@ object FollowSession {
          */
         var pendingFirstSync = false
 
+        /** The track we have fetched and are holding for an agreed start. */
+        var scheduledFor = ""
+
+        /** The one we have already begun, so a schedule is acted on once. */
+        var startedFor = ""
+
+        /** When we began it, by this phone's clock. */
+        var startedAt = 0L
+
+        /** When we were ready, in the shared clock, for reporting afterwards. */
+        var readyAtMs = 0L
+
         while (true) {
             val host = hostNow(friends, hostId)
 
@@ -430,6 +468,77 @@ object FollowSession {
                 RoomPlayer.pause()
                 publish(hostId, handle, FollowState.HostAdvert, host)
                 delay(TICK_MS)
+                continue
+            }
+
+            // Everybody begins together, on a moment rather than on a
+            // message. The host is stopped while this is pending, so this has
+            // to come before anything that reads a stopped host as a host who
+            // gave up.
+            val startAt = host?.let { startsAtMs(it) } ?: 0L
+            if (host != null && startAt > 0L && host.title.isNotBlank()) {
+                val fingerprint = Fingerprint.of(host.title, host.artist, host.durationMs)
+                if (startedFor != fingerprint) {
+                    if (scheduledFor != fingerprint) {
+                        publish(hostId, handle, FollowState.Finding, host)
+                        val id = resolve(context, host)
+                        if (id != null) {
+                            scheduledFor = fingerprint
+                            loadedFingerprint = fingerprint
+                            loaded = fingerprint
+                            loadedId = id
+                            RoomPlayer.setRate(1.0)
+                            // Fetched and held silent. This is the whole point
+                            // of the wait: the seconds a listener used to
+                            // spend fetching after the song had already begun
+                            // are spent before it begins instead.
+                            RoomPlayer.preload(id, host.startPositionMs)
+                            readyAtMs = ServerClock.nowMs()
+                            cover = Artwork.cached(host.title, host.artist)
+                                ?: Artwork.fetch(host.title, host.artist)
+                        }
+                    }
+
+                    val until = startAt - ServerClock.nowMs()
+                    if (until > 0) {
+                        publish(hostId, handle, FollowState.Ready(until), host)
+                        delay(until.coerceAtMost(SETTLING_TICK_MS))
+                        continue
+                    }
+
+                    // Only if there is actually something to start. A track we
+                    // never managed to find falls through to the ordinary path
+                    // and is loaded late, which is worse but is not nothing.
+                    if (scheduledFor == fingerprint && loadedId.isNotBlank()) {
+                        RoomPlayer.begin(host.startPositionMs)
+                        startedFor = fingerprint
+                        startedAt = SystemClock.elapsedRealtime()
+                        // Being early is as much worth saying as being late:
+                        // it is what lets a quick room stop waiting so long.
+                        val late = ((if (readyAtMs > 0) readyAtMs else ServerClock.nowMs()) - startAt)
+                        report(context, late)
+                        // Started exactly where we were told, at the moment we
+                        // were told. There is nothing to catch up to.
+                        pendingFirstSync = false
+                        lastCorrection = SystemClock.elapsedRealtime()
+                        acquireUntil = SystemClock.elapsedRealtime() + SETTLE_MS
+                        publish(hostId, handle, FollowState.CatchingUp, host)
+                        delay(SETTLING_TICK_MS)
+                        continue
+                    }
+                }
+            }
+
+            // A room that has just begun together spends a moment with the
+            // host's row still saying stopped, because we are the ones who
+            // stopped them and their phone has not written down being started
+            // again. Reading that literally would pause everybody one second
+            // into the song they just all started.
+            val justBegan = startedAt > 0L &&
+                SystemClock.elapsedRealtime() - startedAt < RESUME_GRACE_MS
+            if (host != null && !host.isPlaying && justBegan) {
+                publish(hostId, handle, FollowState.InStep(0), host)
+                delay(SETTLING_TICK_MS)
                 continue
             }
 
@@ -688,6 +797,34 @@ object FollowSession {
      * next heartbeat, and climbing again — a sawtooth over a track that had
      * stopped.
      */
+    /**
+     * The moment this room begins the host's current track, or zero.
+     *
+     * In the shared clock, so it can be compared against [ServerClock.nowMs].
+     * A start far in the past belongs to a track that has been running for a
+     * while and is not a schedule anybody is still waiting on.
+     */
+    /**
+     * Tell the host how we did against the moment they gave us.
+     *
+     * Negative is early. Written on our own row and read back through the
+     * roster, because the host is the one who decides how long the next wait
+     * is and this is the only evidence they have.
+     */
+    private fun report(context: Context, lateMs: Long) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            SyncEngine.get(context).publishRoomLateness(
+                lateMs.coerceIn(-30_000, 30_000).toInt(),
+            )
+        }
+    }
+
+    internal fun startsAtMs(host: RemoteNowPlaying): Long {
+        val stamp = host.startsAt?.takeIf { it.isNotBlank() } ?: return 0L
+        val at = runCatching { Instant.parse(stamp).toEpochMilli() }.getOrNull() ?: return 0L
+        return if (ServerClock.nowMs() - at > SCHEDULE_FORGOTTEN_MS) 0L else at
+    }
+
     internal fun hostPosition(host: RemoteNowPlaying): Long {
         if (!host.isPlaying) return host.positionMs
         val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()

@@ -15,7 +15,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,18 +27,18 @@ import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.PeopleRepository
 import com.museroom.app.net.Profile
 import com.museroom.app.net.PublicProfile
+import com.museroom.app.net.RelationState
+import com.museroom.app.ui.Refreshing
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MonoText
-import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.util.formatMinutes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -90,7 +89,7 @@ fun PersonCard() {
     var profile by remember(userId) { mutableStateOf<PublicProfile?>(null) }
     var failed by remember(userId) { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(userId) {
+    Refreshing(userId, everyMs = 30_000) {
         people.profile(userId)
             .onSuccess { profile = it; if (it == null) failed = "This page is not available." }
             .onFailure { failed = it.message }
@@ -135,10 +134,22 @@ fun PersonCard() {
 private fun PersonBody(p: PublicProfile, me: String?) {
     val context = LocalContext.current
     val c = Neo.colors
-    val scope = rememberCoroutineScope()
     val friends = remember { FriendsRepository.get(context) }
-    var asked by remember(p.id) { mutableStateOf(false) }
     var note by remember(p.id) { mutableStateOf<String?>(null) }
+
+    // Seeded from the page itself, which already knows whether you are friends,
+    // so an existing friend never flashes an "Add friend" button on the way in.
+    // The lookup that follows is only here to tell a pending request apart from
+    // a stranger, which the page has no opinion about.
+    var relation by remember(p.id) {
+        mutableStateOf(if (p.isFriend) RelationState.Friends else RelationState.Stranger)
+    }
+    var reread by remember(p.id) { mutableStateOf(0) }
+
+    LaunchedEffect(p.id, reread) {
+        friends.relationships(listOf(p.id))
+            .onSuccess { states -> states[p.id]?.let { relation = it } }
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Accent pills carry the dark ink whatever the theme. Left to take
@@ -151,19 +162,15 @@ private fun PersonBody(p: PublicProfile, me: String?) {
         }
 
         // Finding somebody worth listening to and then having to go and type
-        // their name into a search box is the long way round.
-        if (!p.isFriend && p.id != me) {
-            NeoButton(
-                text = if (asked) "Request sent" else "Add friend",
-                small = true,
-                enabled = !asked,
-                onClick = {
-                    asked = true
-                    scope.launch {
-                        friends.request(Profile(p.id, p.handle, "", p.avatarUrl, p.joinMode))
-                            .onFailure { asked = false; note = it.message }
-                    }
-                },
+        // their name into a search box is the long way round. Nothing is
+        // offered to a friend: the pill above already says so, and a disabled
+        // button repeating it is furniture.
+        if (p.id != me && relation != RelationState.Friends) {
+            FriendButton(
+                person = Profile(p.id, p.handle, "", p.avatarUrl, p.joinMode),
+                state = relation,
+                onMessage = { note = it },
+                onChanged = { reread++ },
             )
         }
         note?.let { Note(it) }

@@ -21,7 +21,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +42,7 @@ import com.museroom.app.net.BoardEntry
 import com.museroom.app.net.BoardPeriod
 import com.museroom.app.net.BoardRepository
 import com.museroom.app.net.BoardSort
+import com.museroom.app.ui.Refreshing
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
@@ -76,8 +76,11 @@ fun BoardScreen() {
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
 
-    LaunchedEffect(period, sort, session?.userId) {
-        if (session == null) return@LaunchedEffect
+    // Half a minute is fine for a board that is recomputed in bulk anyway.
+    // What matters more is that coming back to the app re-reads it, which is
+    // when somebody is most likely to be looking for their own name.
+    Refreshing(period, sort, session?.userId, everyMs = 30_000) {
+        if (session == null) return@Refreshing
         loading = true
         repo.top(period, sort)
             .onSuccess { entries = it; error = null }

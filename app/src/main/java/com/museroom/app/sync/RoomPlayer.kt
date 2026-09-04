@@ -265,6 +265,21 @@ object RoomPlayer {
         }
     }
 
+    /**
+     * Fetch a track and hold it, silent, until the room's agreed moment.
+     *
+     * The id is remembered exactly as [load] remembers it, so the guard
+     * against the page playing something of its own choosing covers a track
+     * that is waiting as well as one that is running.
+     */
+    fun preload(videoId: String, startMs: Long) = onMain {
+        wantedId = videoId
+        js("window.__museroom.preload(${videoId.quoted()}, ${startMs / 1000.0})")
+    }
+
+    /** The agreed moment. */
+    fun begin(positionMs: Long) = js("window.__museroom.begin(${positionMs / 1000.0})")
+
     fun seekTo(positionMs: Long) = js("window.__museroom.seek(${positionMs / 1000.0})")
 
     fun play() = js("window.__museroom.play()")

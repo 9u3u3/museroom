@@ -59,6 +59,10 @@ import com.museroom.app.sync.RoomPresence
 import com.museroom.app.tracking.PlaybackTracker
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MuseroomMark
+import com.museroom.app.ui.Refreshing
+import androidx.activity.compose.BackHandler
+import com.museroom.app.net.RequestsRepository
+import com.museroom.app.ui.screens.RequestsScreen
 import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoDot
 import com.museroom.app.ui.kit.NeoIcons
@@ -74,7 +78,6 @@ import com.museroom.app.ui.screens.TourState
 import com.museroom.app.ui.screens.YouScreen
 import com.museroom.app.util.NotificationAccess
 import com.museroom.app.util.formatMinutes
-import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -95,8 +98,18 @@ fun MuseroomApp() {
     // that shows the room should come to meet it. Otherwise the first sign of
     // a room is sound with no picture.
     val following by FollowSession.following.collectAsStateWithLifecycle()
+
+    // Not a tab. Requests are somewhere you go and come back from, and giving
+    // them a sixth sticker on the rail would put a thing you visit twice a week
+    // beside the four you live on.
+    var requestsOpen by remember { mutableStateOf(false) }
+    BackHandler(enabled = requestsOpen) { requestsOpen = false }
+
     LaunchedEffect(following?.hostId) {
-        if (following != null) tab = Tab.Now
+        if (following != null) {
+            tab = Tab.Now
+            requestsOpen = false
+        }
     }
     val c = Neo.colors
 
@@ -130,9 +143,9 @@ fun MuseroomApp() {
         PersonCard()
 
         Column(Modifier.fillMaxSize()) {
-            TopBar()
-            Box(Modifier.weight(1f)) {
-                when (tab) {
+            TopBar(openRequests = { requestsOpen = true })
+                    Box(Modifier.weight(1f)) {
+                if (requestsOpen) RequestsScreen() else when (tab) {
                     Tab.Now -> NowScreen()
                     Tab.Friends -> FriendsScreen()
                     Tab.Nearby -> NearbyScreen()
@@ -140,13 +153,13 @@ fun MuseroomApp() {
                     Tab.You -> YouScreen()
                 }
             }
-            BottomNav(tab) { tab = it }
+            BottomNav(tab) { tab = it; requestsOpen = false }
         }
     }
 }
 
 @Composable
-private fun TopBar() {
+private fun TopBar(openRequests: () -> Unit) {
     val c = Neo.colors
     val context = LocalContext.current
     val auth = remember { AuthRepository.get(context) }
@@ -175,7 +188,49 @@ private fun TopBar() {
             style = bangers(26).copy(color = c.ink),
         )
         Spacer(Modifier.weight(1f))
+        if (session != null) RequestsButton(open = openRequests)
         HeaderStats(signedIn = session != null)
+    }
+}
+
+/**
+ * The way in to anything waiting on an answer.
+ *
+ * A dot rather than a number. The exact count of people asking things of you is
+ * not a fact worth reading at a glance, and a badge that says 3 invites you to
+ * work out which three; a mark that says "something" gets somebody to the page,
+ * which is where the answer lives anyway.
+ *
+ * Hidden entirely when signed out, since nobody can ask an anonymous phone
+ * anything.
+ */
+@Composable
+private fun RequestsButton(open: () -> Unit) {
+    val c = Neo.colors
+    val context = LocalContext.current
+    val requests = remember { RequestsRepository.get(context) }
+    val waiting by requests.count.collectAsStateWithLifecycle()
+
+    Box {
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(if (waiting > 0) c.sky else c.card)
+                .border(2.5.dp, c.onAccent, RoundedCornerShape(11.dp))
+                .tap { open() },
+            contentAlignment = Alignment.Center,
+        ) {
+            NeoIcon(NeoIcons.Requests, size = 20.dp, color = c.onAccent)
+        }
+        if (waiting > 0) {
+            NeoDot(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 3.dp, y = (-3).dp),
+                ring = c.card,
+            )
+        }
     }
 }
 
@@ -201,6 +256,8 @@ private fun HeaderStats(signedIn: Boolean) {
     val todayTracks by dao.tracksSince(startOfToday).collectAsStateWithLifecycle(0)
 
     LaunchedEffect(context) { RoomPresence.start(context) }
+    // One object owns both inboxes, so the dot and the page cannot disagree.
+    LaunchedEffect(context) { RequestsRepository.get(context).start() }
     // What this phone has already liked, so a heart is filled the first time
     // a list is drawn rather than filling in a moment later.
     val likes = remember { LikesRepository.get(context) }
@@ -210,12 +267,12 @@ private fun HeaderStats(signedIn: Boolean) {
     // A rank a minute stale is still worth showing; nothing here needs the
     // fresh-to-the-second board read that the Board screen pays for itself.
     var rank by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(session?.userId) {
-        rank = null
-        while (session != null) {
-            board.myRank(BoardPeriod.All).onSuccess { rank = it?.rank }
-            delay(60_000)
+    Refreshing(session?.userId, everyMs = 60_000) {
+        if (session == null) {
+            rank = null
+            return@Refreshing
         }
+        board.myRank(BoardPeriod.All).onSuccess { rank = it?.rank }
     }
 
     Column(horizontalAlignment = Alignment.End) {

@@ -5,6 +5,7 @@ import com.museroom.app.BuildConfig
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -36,6 +37,15 @@ import java.util.concurrent.atomic.AtomicInteger
  * larger thing to reason about. Measured end to end from Singapore, a commit
  * reaches the phone in well under a second.
  */
+/**
+ * One table, filtered to the rows worth being told about.
+ *
+ * The filter is a single equality and the service takes no more than that, so
+ * a condition with two halves — being either side of a stored pair, say — is
+ * two of these rather than one cleverer one.
+ */
+data class Watch(val table: String, val filter: String)
+
 object Realtime {
 
     private const val TAG = "MuseroomRealtime"
@@ -51,12 +61,43 @@ object Realtime {
     /**
      * Every change to one person's now-playing row, for as long as this is
      * collected. Closing the flow closes the socket.
+     */
+    fun nowPlayingOf(userId: String, accessToken: String): Flow<RemoteNowPlaying> =
+        changes(
+            "now_playing:$userId",
+            listOf(Watch("now_playing", "user_id=eq.$userId")),
+            accessToken,
+        )
+            .mapNotNull { record ->
+                runCatching {
+                    Supabase.json.decodeFromJsonElement(RemoteNowPlaying.serializer(), record)
+                }.getOrNull()
+            }
+
+    /**
+     * The rows of one table that match one filter, pushed as they change.
      *
      * The socket is not a promise. If it never connects, or drops and cannot
      * come back, this simply emits nothing — callers are expected to keep a
      * slow poll running underneath rather than treat silence as "unchanged".
+     *
+     * What arrives is the row, and callers are not expected to trust it as the
+     * new state of anything. For a single row being followed it happens to be
+     * exactly that; for a list it is only the news that the list changed, and
+     * re-reading through the normal query keeps row-level security and every
+     * other filter in one place instead of two.
+     *
+     * Realtime takes one equality filter per subscription and no more, so
+     * anything needing two conditions needs two [Watch]es. They belong on one
+     * channel rather than one each: a socket costs a connection, a thread and
+     * a heartbeat every twenty-five seconds, and three of those sitting idle
+     * on a phone for the sake of one dot is not a trade worth making.
      */
-    fun nowPlayingOf(userId: String, accessToken: String): Flow<RemoteNowPlaying> = callbackFlow {
+    fun changes(
+        topic: String,
+        watching: List<Watch>,
+        accessToken: String,
+    ): Flow<JsonObject> = callbackFlow {
         val url = BuildConfig.SUPABASE_URL.trimEnd('/')
             .replaceFirst("https://", "wss://")
             .replaceFirst("http://", "ws://") +
@@ -67,7 +108,7 @@ object Realtime {
 
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                webSocket.send(joinMessage(userId, accessToken))
+                webSocket.send(joinMessage(topic, watching, accessToken))
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -80,9 +121,7 @@ object Realtime {
                     ?.get("data")?.jsonObject
                     ?.get("record") as? JsonObject ?: return
 
-                runCatching {
-                    Supabase.json.decodeFromJsonElement(RemoteNowPlaying.serializer(), record)
-                }.onSuccess { trySend(it) }
+                trySend(record)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -129,9 +168,13 @@ object Realtime {
      * accepts a wrong join message and then sends nothing, which on a phone
      * looks exactly like a host who stopped playing.
      */
-    internal fun joinMessage(userId: String, accessToken: String): String {
+    internal fun joinMessage(
+        topic: String,
+        watching: List<Watch>,
+        accessToken: String,
+    ): String {
         val body = buildJsonObject {
-            put("topic", "realtime:now_playing:$userId")
+            put("topic", "realtime:$topic")
             put("event", "phx_join")
             putJsonObject("payload") {
                 putJsonObject("config") {
@@ -140,14 +183,16 @@ object Realtime {
                     put(
                         "postgres_changes",
                         buildJsonArray {
-                            add(
-                                buildJsonObject {
-                                    put("event", "*")
-                                    put("schema", "public")
-                                    put("table", "now_playing")
-                                    put("filter", "user_id=eq.$userId")
-                                },
-                            )
+                            watching.forEach { watch ->
+                                add(
+                                    buildJsonObject {
+                                        put("event", "*")
+                                        put("schema", "public")
+                                        put("table", watch.table)
+                                        put("filter", watch.filter)
+                                    },
+                                )
+                            }
                         },
                     )
                 }

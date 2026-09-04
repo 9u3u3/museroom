@@ -20,6 +20,7 @@ import com.museroom.app.sync.FollowSession
 import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.RoomPresence
+import com.museroom.app.sync.RoomStart
 import com.museroom.app.sync.SyncEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -350,11 +351,16 @@ object PlaybackTracker {
      */
     private suspend fun publishNowPlaying(sync: SyncEngine) {
         var lastState = ""
+        var lastFingerprint = ""
         var lastSentAt = 0L
         var wasPlaying = false
         val gate = Mutex()
 
         suspend fun publish(heartbeat: Boolean) {
+            // Our own hand is on their pause button. Everything below would
+            // describe that as the host having stopped, and a room told that
+            // lets the track go — moments before it is told to start it.
+            if (RoomStart.holding) return
             gate.withLock {
                 val hidden = privacy?.privateSession?.value == true
                 val sessions = NowPlayingRepository.sessions.value
@@ -368,6 +374,35 @@ object PlaybackTracker {
                 val due = now - lastSentAt > NOW_PLAYING_HEARTBEAT_MS
                 val changed = state != lastState
                 if (!changed && !(heartbeat && due)) return@withLock
+
+                // A new song, with somebody in the room to hear it. This is
+                // the one moment worth making the host wait: everybody is
+                // given the same instant to begin, so nobody arrives late and
+                // nobody has to be dragged into place afterwards.
+                val fingerprint = active?.fingerprint.orEmpty()
+                val newTrack = fingerprint.isNotBlank() && fingerprint != lastFingerprint
+                val room = RoomPresence.members.value
+                if (newTrack && active != null && RoomStart.worthHolding(active, room.size)) {
+                    lastState = state
+                    lastFingerprint = fingerprint
+                    lastSentAt = now
+                    wasPlaying = true
+                    val conducting = active
+                    // Off this lock, because it waits seconds by design and
+                    // the heartbeat still has to run underneath it.
+                    scope?.launch {
+                        val held = RoomStart.conduct(appContext, conducting, room.map { it.lateMs })
+                        // A player that will not be stopped is not a failure,
+                        // it is a host who stays a little ahead of their room.
+                        if (!held) {
+                            sync.publishNowPlaying(
+                                conducting,
+                                conducting.positionAt(SystemClock.elapsedRealtime()),
+                            )
+                        }
+                    }
+                    return@withLock
+                }
 
                 when {
                     active != null -> {
@@ -388,6 +423,7 @@ object PlaybackTracker {
                     }
                 }
                 lastState = state
+                lastFingerprint = fingerprint
                 lastSentAt = now
             }
         }
@@ -436,6 +472,7 @@ object PlaybackTracker {
 
             // A track change should reach friends now, not up to fifteen seconds
             // later. The periodic publish only exists to keep the position fresh.
+            if (RoomStart.holding) return@withLock
             if (events.any { it.type == PlayEventType.TRACK_CHANGE || it.type == PlayEventType.PLAY }) {
                 active?.let {
                     SyncEngine.get(appContext).publishNowPlaying(

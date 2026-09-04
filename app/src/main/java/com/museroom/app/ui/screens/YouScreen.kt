@@ -56,6 +56,7 @@ import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.proximity.ProximityManager
 import com.museroom.app.sync.SyncEngine
 import com.museroom.app.sync.SyncState
+import com.museroom.app.ui.Refreshing
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
@@ -128,7 +129,7 @@ fun YouScreen() {
         }
     }
 
-    LaunchedEffect(session?.userId) { if (session != null) profiles.refresh() }
+    Refreshing(session?.userId, everyMs = 30_000) { if (session != null) profiles.refresh() }
 
     if (confirmDeleteAccount) {
         ConfirmDialog(

@@ -50,7 +50,11 @@ import com.museroom.app.media.Avatars
 import com.museroom.app.media.Sources
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.LikesRepository
+import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.ListenRepository
+import com.museroom.app.net.Profile
+import com.museroom.app.net.RelationState
+import com.museroom.app.net.RequestOutcome
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.RoomPresence
 import com.museroom.app.sync.SyncEngine
@@ -70,6 +74,79 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.absoluteValue
 import java.time.Instant
+
+/**
+ * The one thing there is to do about a person, whatever that happens to be.
+ *
+ * A search result used to offer "Add" to everybody, including people you were
+ * already friends with, which is how a friendship came to be demoted by a tap.
+ * The state is read before the button is drawn, so the button can only offer
+ * what is actually available.
+ *
+ * Somebody who asked you first gets Accept rather than a second request. Two
+ * people each sending the other a request would otherwise sit there, both
+ * waiting, with one row between them saying only one of them asked.
+ */
+@Composable
+fun FriendButton(
+    person: Profile,
+    state: RelationState,
+    busy: Boolean = false,
+    onMessage: (String) -> Unit = {},
+    onChanged: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val friends = remember { FriendsRepository.get(context) }
+    val scope = rememberCoroutineScope()
+
+    val label = when (state) {
+        RelationState.Stranger -> "Add friend"
+        RelationState.PendingByMe -> "Requested"
+        RelationState.PendingByThem -> "Accept"
+        RelationState.Friends -> "Friends"
+    }
+    val tone = when (state) {
+        RelationState.Stranger -> NeoTone.Violet
+        RelationState.PendingByThem -> NeoTone.Lime
+        else -> NeoTone.Paper
+    }
+    // Nothing to do about either of these, and a button that does nothing is
+    // worse than a label that says so.
+    val actionable = state == RelationState.Stranger || state == RelationState.PendingByThem
+
+    NeoButton(
+        text = label,
+        small = true,
+        tone = tone,
+        enabled = actionable && !busy,
+        onClick = {
+            scope.launch {
+                when (state) {
+                    RelationState.PendingByThem ->
+                        friends.accept(person)
+                            .onSuccess { onMessage("You and ${person.handle} are friends.") }
+                            .onFailure { onMessage(it.message.orEmpty()) }
+                    RelationState.Stranger ->
+                        friends.request(person)
+                            .onSuccess { onMessage(saying(it, person.handle)) }
+                            .onFailure { onMessage(it.message.orEmpty()) }
+                    else -> return@launch
+                }
+                onChanged()
+            }
+        },
+    )
+}
+
+/** What to tell somebody about an answer only the server could give. */
+private fun saying(outcome: RequestOutcome, handle: String): String = when (outcome) {
+    RequestOutcome.Sent -> "Asked $handle to be friends."
+    RequestOutcome.AlreadyFriends -> "You are already friends with $handle."
+    RequestOutcome.AlreadyRequested -> "You have already asked $handle."
+    RequestOutcome.TheyAskedYou -> "$handle asked you first. Accept instead."
+    RequestOutcome.Blocked -> "That is not possible."
+    RequestOutcome.Self -> "That is you."
+}
 
 /** A screen title, in the display face with a hard coloured drop. */
 @Composable

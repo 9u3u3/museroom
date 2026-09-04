@@ -1,6 +1,6 @@
 {
-  "version_code": 24,
-  "version_name": "5.2",
+  "version_code": 25,
+  "version_name": "5.3",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Both phones now work in one shared clock, so a room holds together far more closely. Resuming after a pause is immediate."
+  "notes": "A room now starts every song together. The host waits with everybody else, so nobody loses the opening of a track. Requests moved to their own page, Nearby finds people far faster, and screens update while you are looking at them."
 }

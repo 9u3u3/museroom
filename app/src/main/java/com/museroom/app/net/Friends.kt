@@ -6,7 +6,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.net.URLEncoder
@@ -37,6 +36,16 @@ data class RemoteNowPlaying(
      * is coming back, so a room holds rather than letting go.
      */
     @SerialName("is_advert") val isAdvert: Boolean = false,
+    /**
+     * The moment, in the database's clock, that everybody starts this track.
+     *
+     * Blank in the ordinary case. Present only when the host held their own
+     * music so the room could begin together, which is worth doing solely
+     * when there is a room.
+     */
+    @SerialName("starts_at") val startsAt: String? = null,
+    /** Where that start begins, which is where the host's player was stopped. */
+    @SerialName("start_position_ms") val startPositionMs: Long = 0,
 ) {
     /**
      * Whether this is somebody listening now or the last thing they played.
@@ -78,6 +87,12 @@ data class RoomMember(
     val userId: String,
     val handle: String,
     val avatarUrl: String? = null,
+    /**
+     * How late they were for the last start they were given, in milliseconds.
+     * Negative means they were ready with time to spare. Null means they have
+     * not been given one yet.
+     */
+    val lateMs: Int? = null,
 )
 
 @Serializable
@@ -85,6 +100,7 @@ private data class RosterRow(
     @SerialName("user_id") val userId: String = "",
     val handle: String = "",
     @SerialName("avatar_url") val avatarUrl: String? = null,
+    @SerialName("late_ms") val lateMs: Int? = null,
 )
 
 /** A friend, and whatever they were last heard playing. */
@@ -106,6 +122,61 @@ data class PendingRequest(
     val profile: Profile,
     val incoming: Boolean,
 )
+
+/**
+ * What came of asking to be friends.
+ *
+ * The server decides, and it decides by looking rather than by being told, so
+ * asking twice is answered rather than obeyed. Every one of these except [Sent]
+ * means nothing was written.
+ */
+enum class RequestOutcome {
+    Sent,
+    AlreadyFriends,
+    AlreadyRequested,
+
+    /** They asked you first. The answer to this is Accept, not another request. */
+    TheyAskedYou,
+    Blocked,
+    Self,
+}
+
+/**
+ * Where you stand with somebody, as far as a button needs to know.
+ *
+ * Read before the button is drawn rather than after it is pressed. A search
+ * result that offers "Add" to somebody you are already friends with is the
+ * whole bug this exists to close.
+ */
+enum class RelationState {
+    Stranger,
+    Friends,
+    PendingByMe,
+    PendingByThem,
+}
+
+/**
+ * What one friendship row means to one of the two people in it.
+ *
+ * Null for a row that means nothing to a button: a status nobody asked about.
+ */
+internal fun relationOf(status: String, requestedBy: String, me: String): RelationState? = when {
+    status == "accepted" -> RelationState.Friends
+    status != "pending" -> null
+    requestedBy == me -> RelationState.PendingByMe
+    else -> RelationState.PendingByThem
+}
+
+/** The server's word for what it did, as something the app can act on. */
+internal fun outcomeOf(raw: String): RequestOutcome = when (raw.trim().trim('"')) {
+    "sent" -> RequestOutcome.Sent
+    "already_friends" -> RequestOutcome.AlreadyFriends
+    "already_requested" -> RequestOutcome.AlreadyRequested
+    "they_asked_you" -> RequestOutcome.TheyAskedYou
+    "blocked" -> RequestOutcome.Blocked
+    "self" -> RequestOutcome.Self
+    else -> error("The server answered a friend request with \"$raw\".")
+}
 
 /**
  * Friends, over PostgREST.
@@ -159,7 +230,7 @@ class FriendsRepository private constructor(context: Context) {
         val body = Supabase.select(
             "now_playing",
             "user_id=eq.$userId&select=title,artist,duration_ms,position_ms,is_playing,updated_at," +
-                "source_track_id,source_package,is_advert",
+                "source_track_id,source_package,is_advert,starts_at,start_position_ms",
             token,
         )
         Supabase.json
@@ -180,7 +251,7 @@ class FriendsRepository private constructor(context: Context) {
     suspend fun roomMembersOf(hostId: String): Result<List<RoomMember>> = call { token, _ ->
         val body = Supabase.rpc("room_members", buildJsonObject { put("host", hostId) }, token)
         Supabase.json.decodeFromString(ListSerializer(RosterRow.serializer()), body)
-            .map { RoomMember(it.userId, it.handle, it.avatarUrl) }
+            .map { RoomMember(it.userId, it.handle, it.avatarUrl, it.lateMs) }
             .filter { it.handle.isNotBlank() }
     }
 
@@ -202,20 +273,20 @@ class FriendsRepository private constructor(context: Context) {
         }
     }
 
-    suspend fun request(other: Profile): Result<Unit> = call { token, me ->
-        // The pair is stored in a fixed order, which is what stops two rows from
-        // ever disagreeing about whether two people are friends.
-        val rows = buildJsonArray {
-            add(
-                buildJsonObject {
-                    put("user_a", minOf(me, other.id))
-                    put("user_b", maxOf(me, other.id))
-                    put("status", "pending")
-                    put("requested_by", me)
-                },
-            )
-        }
-        Supabase.insert("friendships", rows, token, upsertOnConflict = "user_a,user_b")
+    /**
+     * Ask to be friends, and be told what actually happened.
+     *
+     * Through a function rather than by writing the row. The pair is stored in
+     * one fixed order under one primary key, so an upsert from the client was
+     * not a second request at all — it overwrote whatever was there, which
+     * turned "add a friend you already have" into "quietly demote a friendship
+     * back to pending" for both people. The client no longer has the reach to
+     * do that; see the migration.
+     */
+    suspend fun request(other: Profile): Result<RequestOutcome> = call { token, _ ->
+        val body = buildJsonObject { put("target", other.id) }
+        // A function returning a scalar comes back as a bare JSON string.
+        outcomeOf(Supabase.rpc("request_friendship", body, token))
     }
 
     suspend fun accept(other: Profile): Result<Unit> = call { token, me ->
@@ -234,6 +305,34 @@ class FriendsRepository private constructor(context: Context) {
             token,
         )
     }
+
+    /**
+     * Where you stand with each of these people.
+     *
+     * Every row involving you comes back in one request, which is the same
+     * request [friends] and [pending] already make, so asking about twenty
+     * search results costs no more than asking about one. Anybody with no row
+     * is a stranger.
+     *
+     * Blocking is not represented here. A block deletes the friendship
+     * outright, so a blocked person is indistinguishable from a stranger by
+     * these rows alone, and the server says so plainly when the request is
+     * actually made.
+     */
+    suspend fun relationships(otherIds: List<String>): Result<Map<String, RelationState>> =
+        call { token, me ->
+            if (otherIds.isEmpty()) return@call emptyMap()
+            val wanted = otherIds.toSet()
+            val known = friendshipRows(token, me)
+                .mapNotNull { row ->
+                    val other = if (row.userA == me) row.userB else row.userA
+                    if (other !in wanted) return@mapNotNull null
+                    val state = relationOf(row.status, row.requestedBy, me) ?: return@mapNotNull null
+                    other to state
+                }
+                .toMap()
+            wanted.associateWith { known[it] ?: RelationState.Stranger }
+        }
 
     private fun acceptedFriendIds(token: String, me: String): List<String> =
         friendshipRows(token, me)

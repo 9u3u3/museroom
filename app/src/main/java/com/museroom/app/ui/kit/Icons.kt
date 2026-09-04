@@ -39,6 +39,16 @@ object NeoIcons {
     const val Trash = "M6.5 5.5h11l-1 14h-9zM9.5 5.5V3.6h5v1.9M10.5 9.5v6M13.5 9.5v6"
     const val Lock = "M4 12.6a2.6 2.6 0 0 1 2.6-2.6h10.8a2.6 2.6 0 0 1 2.6 2.6v5.3a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.9zM8 10V7.2a4 4 0 0 1 8 0V10"
     const val Search = "M11 4.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13M15.8 15.8 20 20"
+
+    /**
+     * A tray: a box with a slot cut out of the top edge, which is the shape
+     * that reads as "things are waiting in here" at 24 pixels without needing
+     * an envelope's diagonals to survive the same stroke width as everything
+     * else on the bar.
+     */
+    const val Requests = "M3.5 13.5h5l1.2 2.2h4.6l1.2-2.2h5" +
+        "M3.5 13.5 6.2 5.2a1.6 1.6 0 0 1 1.5-1.1h8.6a1.6 1.6 0 0 1 1.5 1.1l2.7 8.3" +
+        "v4.7a1.8 1.8 0 0 1-1.8 1.8H5.3a1.8 1.8 0 0 1-1.8-1.8Z"
     const val Heart = "M12 20.4C12 20.4 3.2 14.1 3.2 8.9C3.2 6.1 5.4 4 8.1 4" +
         "C9.9 4 11.4 5 12 6.5C12.6 5 14.1 4 15.9 4C18.6 4 20.8 6.1 20.8 8.9" +
         "C20.8 14.1 12 20.4 12 20.4Z"
