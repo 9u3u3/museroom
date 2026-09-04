@@ -235,10 +235,20 @@
       }
     },
 
+    /*
+     * Move to a moment, and mean it.
+     *
+     * The second argument is not optional in practice. Without it the player
+     * will not fetch anything it does not already hold, so a seek past the end
+     * of the buffer quietly lands short or does not happen at all. Every
+     * correction then measures the same gap it just tried to close and tries
+     * again, which is heard as a listener scrubbing back and forth and never
+     * arriving.
+     */
     seek: function (seconds) {
       var p = player();
       if (!p) return false;
-      try { p.seekTo(seconds); return true; } catch (e) { return false; }
+      try { p.seekTo(seconds, true); return true; } catch (e) { return false; }
     },
 
     /*

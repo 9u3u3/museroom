@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.SystemClock
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.media.NowPlayingRepository
+import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.ServerClock
 import kotlinx.coroutines.delay
 
@@ -46,14 +48,44 @@ object RoomStart {
     /** Above this, waiting is worse than being slightly out of step. */
     private const val CEILING_MS = 6_000L
 
-    /** Long enough for a paused player to have actually stopped and said so. */
-    private const val SETTLE_MS = 180L
+    /** How long a player is given to act on being asked to stop. */
+    private const val OBEY_WITHIN_MS = 1_200L
+
+    /** How often to look while waiting for that. */
+    private const val LOOK_EVERY_MS = 100L
+
+    /**
+     * How far a player may drift and still count as stopped.
+     *
+     * Position is the honest test. A player reports every state under the sun
+     * across a track change — stopped, buffering, none at all — and it reports
+     * them whether or not anybody asked it to pause, so the flag says nothing
+     * about whether the pause took. Whether the music is still moving does.
+     */
+    private const val STOPPED_WITHIN_MS = 250L
 
     /** How fast a room that keeps arriving early is allowed to tighten up. */
     private const val EASE_DOWN_MS = 150L
 
     /** Slack over the worst listener, so the estimate is not a coin toss. */
     private const val HEADROOM_MS = 250L
+
+    /** How often to ask the room whether it is ready yet. */
+    private const val ASK_EVERY_MS = 600L
+
+    /** Time for a moved moment to reach everybody before it arrives. */
+    private const val PUSH_ALLOWANCE_MS = 700L
+
+    /** How much further out the moment is pushed when somebody is not ready. */
+    private const val EXTENSION_MS = 1_200L
+
+    /**
+     * How long a room will be held for one phone that is not answering.
+     *
+     * Somebody who has walked away must not be able to keep everybody else in
+     * silence, so patience ends and the rest of the room begins.
+     */
+    private const val PATIENCE_MS = 9_000L
 
     /**
      * Whether the host's own music is stopped by us right now.
@@ -115,14 +147,11 @@ object RoomStart {
         holding = true
         try {
             if (!NowPlayingRepository.hold(app)) {
-                giveUpOn(app)
+                giveUpOn(app, "would not take the command")
                 return false
             }
-            delay(SETTLE_MS)
-            // Accepting the command and acting on it are different things, and
-            // only the second one can be checked.
-            if (NowPlayingRepository.isPlaying(app)) {
-                giveUpOn(app)
+            if (!stopped(app)) {
+                giveUpOn(app, "kept playing anyway")
                 NowPlayingRepository.release(app)
                 return false
             }
@@ -137,23 +166,43 @@ object RoomStart {
                 .firstOrNull { it.packageName == app } ?: track
             val from = stopped.positionAt(SystemClock.elapsedRealtime())
 
-            val begin = ServerClock.now().plusMillis(latencyMs)
-            startsAtMs = begin.toEpochMilli()
             val sync = SyncEngine.get(context)
-            sync.publishNowPlaying(
-                track = stopped,
-                positionMs = from,
-                startsAt = begin,
-                startPositionMs = from,
-                // Stopped, but not stopped in the sense a room cares about.
-                // The start time sitting beside this is what tells them apart.
-                playingOverride = false,
-            )
+            var target = ServerClock.nowMs() + latencyMs
+
+            suspend fun announce() {
+                startsAtMs = target
+                sync.publishNowPlaying(
+                    track = stopped,
+                    positionMs = from,
+                    startsAt = java.time.Instant.ofEpochMilli(target),
+                    startPositionMs = from,
+                    // Stopped, but not stopped in the sense a room cares
+                    // about. The start time beside it tells them apart.
+                    playingOverride = false,
+                )
+            }
+            announce()
+
+            // Held open until everybody actually has the track, rather than
+            // let go on a timer and hoped for. A guess that comes up short
+            // costs somebody the opening of the song, and that is the one
+            // price this is not allowed to pay. The moment moves instead.
+            val patienceEnds = ServerClock.nowMs() + PATIENCE_MS
+            while (true) {
+                if (everybodyHas(context, stopped.fingerprint)) break
+                val nowMs = ServerClock.nowMs()
+                if (nowMs >= patienceEnds) break
+                if (nowMs >= target - PUSH_ALLOWANCE_MS) {
+                    target = nowMs + EXTENSION_MS
+                    announce()
+                }
+                delay(ASK_EVERY_MS)
+            }
 
             // Waited out against the shared clock rather than by counting down
             // from here, so that the publish taking a moment comes out of the
             // wait instead of being added to it.
-            val remaining = startsAtMs - ServerClock.nowMs()
+            val remaining = target - ServerClock.nowMs()
             if (remaining > 0) delay(remaining)
 
             // They pressed next while everybody was getting ready. Nothing has
@@ -175,7 +224,7 @@ object RoomStart {
             sync.publishNowPlaying(
                 track = stopped,
                 positionMs = from,
-                startsAt = begin,
+                startsAt = java.time.Instant.ofEpochMilli(target),
                 startPositionMs = from,
                 playingOverride = true,
             )
@@ -186,8 +235,54 @@ object RoomStart {
         }
     }
 
-    private fun giveUpOn(packageName: String) {
+    /**
+     * Whether the music has actually stopped moving.
+     *
+     * Watched rather than asked once. A track change already makes a player
+     * announce several states in quick succession, so a single reading taken
+     * a moment after the request tells you nothing: it will often say stopped
+     * because the song was changing, not because we asked. Two positions a
+     * short time apart cannot lie about it.
+     */
+    private suspend fun stopped(packageName: String): Boolean {
+        val deadline = SystemClock.elapsedRealtime() + OBEY_WITHIN_MS
+        while (SystemClock.elapsedRealtime() < deadline) {
+            val first = reading(packageName) ?: return false
+            delay(LOOK_EVERY_MS * 2)
+            val second = reading(packageName) ?: return false
+            if (second - first < STOPPED_WITHIN_MS) return true
+        }
+        return false
+    }
+
+    private fun reading(packageName: String): Long? =
+        NowPlayingRepository.sessions.value
+            .firstOrNull { it.packageName == packageName }
+            ?.positionAt(SystemClock.elapsedRealtime())
+
+    /** Why a host is not being held, in the words the self-check will show. */
+    @Volatile
+    var lastRefusal: String = ""
+        private set
+
+    /**
+     * Whether everybody in the room has this track loaded and waiting.
+     *
+     * An empty room is ready by definition. Somebody who has not said anything
+     * is not ready, which is the safe way round: the cost of being wrong here
+     * is a second of silence for the host, and the cost of the other mistake
+     * is a listener losing the start of a song.
+     */
+    private suspend fun everybodyHas(context: Context, fingerprint: String): Boolean {
+        val me = AuthRepository.get(context).session.value?.userId ?: return true
+        val roster = FriendsRepository.get(context).roomMembersOf(me).getOrNull() ?: return false
+        if (roster.isEmpty()) return true
+        return roster.all { it.readyFor == fingerprint }
+    }
+
+    private fun giveUpOn(packageName: String, why: String) {
         synchronized(refuses) { refuses += packageName }
+        lastRefusal = "$packageName $why"
     }
 
     /**
@@ -213,6 +308,7 @@ object RoomStart {
     /** For tests, and for a room starting fresh. */
     internal fun reset() {
         latencyMs = OPENING_BID_MS
+        lastRefusal = ""
         holding = false
         startsAtMs = 0L
         synchronized(refuses) { refuses.clear() }

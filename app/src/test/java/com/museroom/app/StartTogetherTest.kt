@@ -69,6 +69,80 @@ class StartTogetherTest {
         assertEquals(0L, FollowSession.startsAtMs(row("not a time")))
     }
 
+    // ------------------------------------------------- turning up or not --
+
+    /**
+     * The bug that looked like magic: a room joined mid-song came right the
+     * instant the host passed thirty seconds, because that was when the stale
+     * schedule was finally forgotten. Until then the joiner was handed the top
+     * of a track everybody else was well into.
+     */
+    @Test
+    fun `a moment that has already gone is not turned up for`() {
+        assertTrue(!FollowSession.worthMeeting(-15_000, committed = false))
+        assertTrue(!FollowSession.worthMeeting(-29_000, committed = false))
+    }
+
+    @Test
+    fun `a moment still to come is`() {
+        assertTrue(FollowSession.worthMeeting(2_000, committed = false))
+        assertTrue(FollowSession.worthMeeting(50, committed = false))
+    }
+
+    /** Being a touch late to a moment is not a reason to abandon it. */
+    @Test
+    fun `being slightly late still counts`() {
+        assertTrue(FollowSession.worthMeeting(-200, committed = false))
+    }
+
+    /**
+     * Once the track is fetched and waiting, lateness stops mattering: the
+     * thing in hand is the right thing, and starting it beats loading it again.
+     */
+    @Test
+    fun `a track already fetched is started however late we are`() {
+        assertTrue(FollowSession.worthMeeting(-20_000, committed = true))
+    }
+
+    // ---------------------------------------------------------- projecting --
+
+    /**
+     * A phone that stopped saying anything is not evidence of a position. Run
+     * the arithmetic over a minute of silence and the track is put down
+     * somewhere nobody is, which is a song starting from the middle and then
+     * jumping back.
+     */
+    @Test
+    fun `a reading is not carried forward forever`() {
+        val ancient = RemoteNowPlaying(
+            title = "Passionfruit",
+            artist = "Drake",
+            durationMs = 298_000,
+            positionMs = 10_000,
+            isPlaying = true,
+            updatedAt = Instant.now().minusSeconds(120).toString(),
+        )
+        val where = FollowSession.hostPosition(ancient)
+        assertTrue(
+            "projected to ${where}ms from a two-minute-old reading",
+            where <= 10_000 + 20_000,
+        )
+    }
+
+    @Test
+    fun `a fresh reading is carried forward normally`() {
+        val recent = RemoteNowPlaying(
+            title = "Passionfruit",
+            artist = "Drake",
+            durationMs = 298_000,
+            positionMs = 10_000,
+            isPlaying = true,
+            updatedAt = Instant.now().minusSeconds(5).toString(),
+        )
+        val where = FollowSession.hostPosition(recent)
+        assertTrue("expected about 15s, got ${where}ms", where in 14_000..16_500)
+    }
+
     // ------------------------------------------------------------ the wait --
 
     @Test

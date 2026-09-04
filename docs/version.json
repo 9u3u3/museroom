@@ -1,6 +1,6 @@
 {
-  "version_code": 25,
-  "version_name": "5.3",
+  "version_code": 26,
+  "version_name": "5.4",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "A room now starts every song together. The host waits with everybody else, so nobody loses the opening of a track. Requests moved to their own page, Nearby finds people far faster, and screens update while you are looking at them."
+  "notes": "Joining a room mid-song no longer starts the track from the wrong place. The host now waits until everybody has the song loaded, so nobody misses the opening, and a listener is never jumped forward over music they have not heard."
 }

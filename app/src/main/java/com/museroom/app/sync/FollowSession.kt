@@ -165,6 +165,60 @@ object FollowSession {
     private const val SCHEDULE_FORGOTTEN_MS = 30_000L
 
     /**
+     * How late is still worth turning up for.
+     *
+     * Past this the moment has gone and the song is running without us. The
+     * important part is what must NOT happen then: a schedule says where the
+     * track begins, so acting on a stale one starts a song from the top while
+     * everybody else is a minute into it. Somebody joining a room mid-track
+     * would be dragged back to the beginning and then hauled forward again.
+     */
+    private const val MISSED_START_MS = 1_500L
+
+    /**
+     * The longest a track may be left settling before it is corrected anyway.
+     *
+     * The settling window used to end either when its clock ran out or when
+     * the page stopped saying it was buffering, and a page that says it is
+     * buffering forever meant a listener stuck on "catching up" for as long as
+     * they cared to watch. A window that can be held open by the thing it is
+     * waiting for is not a window.
+     */
+    private const val LONGEST_ACQUIRE_MS = 12_000L
+
+    /**
+     * How long after a jump its result is worth measuring.
+     *
+     * A seek is not instant, and a reading taken while one is in flight
+     * describes where the player was, not where it was sent. Acting on that
+     * produces a second correction for a gap that has already been closed.
+     */
+    private const val SEEK_SETTLE_MS = 1_200L
+
+    /** How many times a track is re-handed to a page that keeps refusing it. */
+    private const val RELOAD_ATTEMPTS = 3
+
+    /**
+     * How far a single reading is allowed to be carried forward.
+     *
+     * The host writes their position on every change and again every fifteen
+     * seconds, so a row a few seconds old is ordinary and worth projecting. A
+     * row a minute old is a phone that stopped saying anything, and running
+     * the arithmetic over that gap invents a position nobody is at. Starting a
+     * track there is a song beginning from the middle, and the correction that
+     * follows is it jumping back — which is exactly what it looked like.
+     */
+    private const val LONGEST_PROJECTION_MS = 20_000L
+
+    /**
+     * Past this, a row is too old to start a track from at all.
+     *
+     * Being a moment behind is worth fixing later; beginning in the wrong
+     * place is worth waiting a couple of seconds to avoid.
+     */
+    private const val TOO_OLD_TO_START_MS = 25_000L
+
+    /**
      * How long the host is allowed to still look stopped after the room began.
      *
      * We stopped them, so their row says stopped, and it keeps saying so until
@@ -420,6 +474,9 @@ object FollowSession {
             // stops seeing somebody who has left.
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 SyncEngine.get(context).publishRoomPresence(null)
+                // Or a host would go on holding songs open for somebody who
+                // has left the room.
+                SyncEngine.get(context).publishRoomReady(null)
             }
         }
     }
@@ -457,6 +514,25 @@ object FollowSession {
         /** When we were ready, in the shared clock, for reporting afterwards. */
         var readyAtMs = 0L
 
+        /** When the current settling window opened, so it cannot be endless. */
+        var acquireSince = 0L
+
+        /** Until when a reading would describe a jump still in flight. */
+        var settleUntil = 0L
+
+        /** How many times this track has been handed back to the page. */
+        var reloads = 0
+        var lastReloadAt = 0L
+
+        /**
+         * A track we started from its beginning and have therefore heard all
+         * of. While this is the track in hand, the gap to the host is closed
+         * by speed alone: a jump forward here would be skipping music the
+         * listener has not heard yet, which is the one thing worse than being
+         * a second or two behind.
+         */
+        var heardFrom = ""
+
         while (true) {
             val host = hostNow(friends, hostId)
 
@@ -476,9 +552,11 @@ object FollowSession {
             // to come before anything that reads a stopped host as a host who
             // gave up.
             val startAt = host?.let { startsAtMs(it) } ?: 0L
+            val untilStart = if (startAt > 0L) startAt - ServerClock.nowMs() else Long.MIN_VALUE
             if (host != null && startAt > 0L && host.title.isNotBlank()) {
                 val fingerprint = Fingerprint.of(host.title, host.artist, host.durationMs)
-                if (startedFor != fingerprint) {
+                val worthMeeting = worthMeeting(untilStart, scheduledFor == fingerprint)
+                if (startedFor != fingerprint && worthMeeting) {
                     if (scheduledFor != fingerprint) {
                         publish(hostId, handle, FollowState.Finding, host)
                         val id = resolve(context, host)
@@ -494,6 +572,11 @@ object FollowSession {
                             // are spent before it begins instead.
                             RoomPlayer.preload(id, host.startPositionMs)
                             readyAtMs = ServerClock.nowMs()
+                            // Said out loud, because the host is holding the
+                            // moment open until everybody has the track. A
+                            // listener who never says so is a listener the
+                            // room waits for and then starts without.
+                            announceReady(context, fingerprint)
                             cover = Artwork.cached(host.title, host.artist)
                                 ?: Artwork.fetch(host.title, host.artist)
                         }
@@ -510,18 +593,29 @@ object FollowSession {
                     // never managed to find falls through to the ordinary path
                     // and is loaded late, which is worse but is not nothing.
                     if (scheduledFor == fingerprint && loadedId.isNotBlank()) {
+                        // Where the track begins, always, even when we are
+                        // late to the moment. Beginning where the host is
+                        // would buy sync by throwing away however many seconds
+                        // we were late by, and losing music is the one thing
+                        // this is not allowed to do. Being behind is fixed
+                        // afterwards, by speed, and nobody hears that happen.
                         RoomPlayer.begin(host.startPositionMs)
+                        heardFrom = fingerprint
                         startedFor = fingerprint
                         startedAt = SystemClock.elapsedRealtime()
                         // Being early is as much worth saying as being late:
                         // it is what lets a quick room stop waiting so long.
                         val late = ((if (readyAtMs > 0) readyAtMs else ServerClock.nowMs()) - startAt)
                         report(context, late)
+                        announceReady(context, null)
                         // Started exactly where we were told, at the moment we
                         // were told. There is nothing to catch up to.
                         pendingFirstSync = false
                         lastCorrection = SystemClock.elapsedRealtime()
                         acquireUntil = SystemClock.elapsedRealtime() + SETTLE_MS
+                        acquireSince = SystemClock.elapsedRealtime()
+                        settleUntil = 0L
+                        reloads = 0
                         publish(hostId, handle, FollowState.CatchingUp, host)
                         delay(SETTLING_TICK_MS)
                         continue
@@ -576,6 +670,14 @@ object FollowSession {
                     delay(TICK_MS)
                     continue
                 }
+                // Where to start matters more than starting quickly. A
+                // reading this old would put the track down somewhere nobody
+                // is, and the jump back afterwards is heard by everybody.
+                if (host.isPlaying && ageOf(host) > TOO_OLD_TO_START_MS) {
+                    publish(hostId, handle, FollowState.CatchingUp, host)
+                    delay(SETTLING_TICK_MS)
+                    continue
+                }
                 loadedFingerprint = fingerprint
                 loaded = fingerprint
                 loadedId = id
@@ -587,8 +689,11 @@ object FollowSession {
                 // than the picture, and this can take a moment.
                 if (cover == null) cover = Artwork.fetch(host.title, host.artist)
                 acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
+                acquireSince = SystemClock.elapsedRealtime()
                 silentSince = 0L
                 lastCorrection = 0L
+                settleUntil = 0L
+                reloads = 0
                 pendingFirstSync = true
                 delay(SETTLING_TICK_MS)
                 continue
@@ -618,6 +723,21 @@ object FollowSession {
                 snapshot.videoId.isNotBlank() &&
                 snapshot.videoId != loadedId
             if (wandered) {
+                val nowW = SystemClock.elapsedRealtime()
+                val mayReload = reloads < RELOAD_ATTEMPTS && nowW - lastReloadAt > ACQUIRE_MS
+                if (!mayReload && worthReloading(host.durationMs, hostPosition(host))) {
+                    // Handed back three times and still playing something
+                    // else. Reloading again only starts the same cycle over,
+                    // and each attempt reopens the settling window, which is
+                    // how a room could sit on "catching up" indefinitely.
+                    RoomPlayer.pause()
+                    publish(
+                        hostId, handle,
+                        FollowState.Stuck("The player will not keep \"${host.title}\"."), host,
+                    )
+                    delay(TICK_MS)
+                    continue
+                }
                 if (!worthReloading(host.durationMs, hostPosition(host))) {
                     // Their song is nearly over and ours has already ended.
                     // Reloading the last few seconds only ends again, and the
@@ -629,7 +749,10 @@ object FollowSession {
                 } else {
                     publish(hostId, handle, FollowState.Loading(host.title), host)
                     RoomPlayer.load(loadedId, hostPosition(host))
+                    reloads += 1
+                    lastReloadAt = nowW
                     acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
+                    acquireSince = SystemClock.elapsedRealtime()
                     silentSince = 0L
                 }
                 delay(TICK_MS)
@@ -637,7 +760,12 @@ object FollowSession {
             }
 
             val now = SystemClock.elapsedRealtime()
-            if (now < acquireUntil || snapshot.buffering) {
+            // Buffering is allowed to extend this, but not to own it. A page
+            // that says it is buffering and never stops saying so used to mean
+            // a listener watching "catching up" until they gave up.
+            val settling = (now < acquireUntil || snapshot.buffering) &&
+                (acquireSince == 0L || now - acquireSince < LONGEST_ACQUIRE_MS)
+            if (settling) {
                 // One correction that does not wait for the settle window.
                 // The moment a freshly loaded track is genuinely playing, it
                 // is put where the host is now rather than where the host was
@@ -652,6 +780,7 @@ object FollowSession {
                     pendingFirstSync = false
                     lastCorrection = now
                     acquireUntil = now + SETTLE_MS
+                    acquireSince = now
                 }
                 publish(hostId, handle, FollowState.CatchingUp, host)
                 // Looked at often while a track is still finding its feet, and
@@ -680,6 +809,7 @@ object FollowSession {
                     publish(hostId, handle, FollowState.Silent(snapshot.detail), host)
                     RoomPlayer.load(loadedId, hostPosition(host))
                     acquireUntil = now + ACQUIRE_MS
+                    acquireSince = now
                     silentSince = now
                 }
                 delay(TICK_MS)
@@ -687,13 +817,34 @@ object FollowSession {
             }
             silentSince = 0L
 
+            // A reading taken while a jump is still landing describes where
+            // the player was, not where it was sent, and correcting on it
+            // produces a second jump for a gap already closed. That is what a
+            // listener scrubbing back and forth actually is.
+            if (now < settleUntil) {
+                publish(hostId, handle, FollowState.CatchingUp, host)
+                delay(SETTLING_TICK_MS)
+                continue
+            }
+
             val off = hostPosition(host) - localPosition(snapshot)
-            if (abs(off) > TOLERANCE_MS && now - lastCorrection > MIN_CORRECTION_GAP_MS) {
+
+            // A jump forward on a track we began at its start would skip
+            // seconds nobody has heard. Behind is allowed; missing is not.
+            // Backwards is still fine, since hearing something twice loses
+            // nobody anything, and so is any jump on a track we joined
+            // midway, where there was never anything to miss.
+            val wouldSkip = heardFrom == Fingerprint.of(host.title, host.artist, host.durationMs) &&
+                off > 0
+            if (abs(off) <= IN_STEP_MS) heardFrom = ""
+
+            if (!wouldSkip && abs(off) > TOLERANCE_MS && now - lastCorrection > MIN_CORRECTION_GAP_MS) {
                 // Too far to walk back. A jump is heard, which is why it is
                 // rate limited and why everything else is walked instead.
                 RoomPlayer.setRate(1.0)
                 RoomPlayer.seekTo(hostPosition(host))
                 lastCorrection = now
+                settleUntil = now + SEEK_SETTLE_MS
             } else {
                 // Including a gap too wide to walk that has just been jumped:
                 // during the wait before another jump is allowed, leaning on
@@ -811,6 +962,13 @@ object FollowSession {
      * roster, because the host is the one who decides how long the next wait
      * is and this is the only evidence they have.
      */
+    /** Holding this track, silent, waiting. Or holding nothing. */
+    private fun announceReady(context: Context, fingerprint: String?) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            SyncEngine.get(context).publishRoomReady(fingerprint)
+        }
+    }
+
     private fun report(context: Context, lateMs: Long) {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             SyncEngine.get(context).publishRoomLateness(
@@ -825,6 +983,31 @@ object FollowSession {
         return if (ServerClock.nowMs() - at > SCHEDULE_FORGOTTEN_MS) 0L else at
     }
 
+    /**
+     * Whether a start we have been given is still worth turning up for.
+     *
+     * This is where a room joined mid-song used to go wrong, and it went wrong
+     * in a way that looked like magic: everything came right the moment the
+     * host passed thirty seconds. A schedule was remembered for thirty
+     * seconds, and a schedule says where a track *begins*, so anybody joining
+     * inside that window was handed the top of a song everybody else was well
+     * into. Past thirty seconds the schedule was forgotten, the ordinary path
+     * ran, and it worked.
+     *
+     * A moment already gone is not a moment. Once we have committed to one —
+     * fetched the track and are holding it — it stays worth meeting even if
+     * we are late, because the track in hand is the right one.
+     */
+    internal fun worthMeeting(untilStartMs: Long, committed: Boolean): Boolean =
+        untilStartMs > -MISSED_START_MS || committed
+
+    /** How old the host's reading is, in the shared clock. */
+    internal fun ageOf(host: RemoteNowPlaying): Long {
+        val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
+            ?: return Long.MAX_VALUE
+        return (ServerClock.nowMs() - takenAt).coerceAtLeast(0)
+    }
+
     internal fun hostPosition(host: RemoteNowPlaying): Long {
         if (!host.isPlaying) return host.positionMs
         val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
@@ -833,7 +1016,7 @@ object FollowSession {
         // phone's would fold whatever the two clocks disagree by straight into
         // the answer, and two Android phones are routinely most of a second
         // apart without either of them being wrong.
-        val elapsed = (ServerClock.nowMs() - takenAt).coerceIn(0, 60_000)
+        val elapsed = (ServerClock.nowMs() - takenAt).coerceIn(0, LONGEST_PROJECTION_MS)
         val projected = host.positionMs + elapsed
         // A row that went stale near the end would otherwise project past the
         // end of the track and sit there, still counting.

@@ -93,6 +93,11 @@ data class RoomMember(
      * not been given one yet.
      */
     val lateMs: Int? = null,
+    /**
+     * The track they have fetched and are holding, silent, waiting for the
+     * agreed moment. Null when they are not waiting for anything.
+     */
+    val readyFor: String? = null,
 )
 
 @Serializable
@@ -101,6 +106,7 @@ private data class RosterRow(
     val handle: String = "",
     @SerialName("avatar_url") val avatarUrl: String? = null,
     @SerialName("late_ms") val lateMs: Int? = null,
+    @SerialName("ready_for") val readyFor: String? = null,
 )
 
 /** A friend, and whatever they were last heard playing. */
@@ -251,7 +257,7 @@ class FriendsRepository private constructor(context: Context) {
     suspend fun roomMembersOf(hostId: String): Result<List<RoomMember>> = call { token, _ ->
         val body = Supabase.rpc("room_members", buildJsonObject { put("host", hostId) }, token)
         Supabase.json.decodeFromString(ListSerializer(RosterRow.serializer()), body)
-            .map { RoomMember(it.userId, it.handle, it.avatarUrl, it.lateMs) }
+            .map { RoomMember(it.userId, it.handle, it.avatarUrl, it.lateMs, it.readyFor) }
             .filter { it.handle.isNotBlank() }
     }
 

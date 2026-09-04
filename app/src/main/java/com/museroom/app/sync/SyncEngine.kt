@@ -143,6 +143,18 @@ class SyncEngine private constructor(context: Context) {
         put("room_late_ms", lateMs)
     }
 
+    /**
+     * The track this phone has fetched and is holding for the agreed moment.
+     *
+     * The host reads this before letting anybody go. It is the difference
+     * between a start time that is a guess and one that is a fact: without it
+     * the room begins on a timer and whoever was not ready loses the opening
+     * of the song, which is the one thing none of this may cost.
+     */
+    suspend fun publishRoomReady(fingerprint: String?) = patchNowPlaying {
+        put("room_ready_for", fingerprint)
+    }
+
     /** Nothing is playing here any more. Said so that a room stops with you. */
     suspend fun publishStopped() = patchNowPlaying {
         put("is_playing", false)

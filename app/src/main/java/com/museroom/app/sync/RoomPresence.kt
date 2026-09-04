@@ -26,7 +26,14 @@ import kotlinx.coroutines.launch
  */
 object RoomPresence {
 
-    private const val POLL_MS = 20_000L
+    /**
+     * How soon a host learns somebody has joined.
+     *
+     * It decides more than the roster now. A track change is only held open
+     * for people the host knows about, so anybody who arrived since the last
+     * look is somebody whose first song starts without them.
+     */
+    private const val POLL_MS = 8_000L
 
     private val _members = MutableStateFlow<List<RoomMember>>(emptyList())
     val members: StateFlow<List<RoomMember>> = _members.asStateFlow()
