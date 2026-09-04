@@ -70,6 +70,24 @@
   .tag{margin:0 0 0 auto; font-size:11px; font-weight:900; letter-spacing:.16em;
        text-transform:uppercase; border:3px solid var(--ink); border-radius:999px;
        padding:6px 14px; background:var(--lime); box-shadow:3px 3px 0 var(--ink)}
+  /* The source, where somebody would look for it. Ink-filled so it reads as
+     the one thing in the header you can press, next to a tag you cannot. */
+  .gh{display:inline-flex; align-items:center; gap:8px; flex:0 0 auto;
+      font-size:12px; font-weight:900; letter-spacing:.1em; text-transform:uppercase;
+      text-decoration:none; color:var(--paper); background:var(--ink);
+      border:3px solid var(--ink); border-radius:999px; padding:7px 15px;
+      box-shadow:3px 3px 0 var(--violet); transition:transform .12s ease, box-shadow .12s ease}
+  .gh:hover{color:var(--paper); transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--violet)}
+  .gh:active{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--violet)}
+  .gh svg{width:17px; height:17px; fill:var(--paper); flex:0 0 auto}
+  /* On a phone the tag is the thing that gives way: it is a label, and the
+     button is the only thing in the header anybody presses. */
+  @media (max-width:430px){
+    .word{font-size:32px}
+    .mark{width:48px; height:48px; border-radius:14px}
+    .tag{display:none}
+    .gh{margin-left:auto}
+  }
 
   /* Hero — two columns on desktop, so the window is actually filled by the
      pitch and a look at the app rather than by margin. ------------------- */
@@ -289,6 +307,11 @@
   </span>
   <span class="word">MUSEROOM</span>
   <span class="tag">Android &middot; free</span>
+  <a class="gh" href="https://github.com/9u3u3/museroom"
+     target="_blank" rel="noopener" aria-label="Museroom on GitHub">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+    GitHub
+  </a>
 </header>
 
 <div class="hero">
