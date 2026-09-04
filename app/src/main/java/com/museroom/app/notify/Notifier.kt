@@ -289,7 +289,7 @@ object Notifier {
      * version: a message repeating that the same build exists every day is how
      * people learn to swipe them away unread.
      */
-    fun update(context: Context, versionName: String, notes: String): Boolean {
+    fun update(context: Context, versionName: String, notes: String, url: String): Boolean {
         if (!canPost(context)) return false
         ensureChannel(context)
         val notification = NotificationCompat.Builder(context, CHANNEL_UPDATES)
@@ -300,11 +300,33 @@ object Notifier {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setAutoCancel(true)
-            .setContentIntent(openApp(context, 7))
+            // Straight to the page. Opening Museroom to be told again that
+            // Museroom is out of date helps nobody.
+            .setContentIntent(openPage(context, url) ?: openApp(context, 7))
             .build()
         return runCatching {
             NotificationManagerCompat.from(context).notify(ID_UPDATE, notification)
         }.isSuccess
+    }
+
+    /**
+     * A tap that lands on the download page.
+     *
+     * The address came over the network, so only https is ever turned into a
+     * pending intent; anything else falls back to opening the app, which is
+     * useless but cannot be somebody else's link.
+     */
+    private fun openPage(context: Context, url: String): PendingIntent? {
+        if (!url.startsWith("https://")) return null
+        return runCatching {
+            PendingIntent.getActivity(
+                context,
+                9,
+                Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }.getOrNull()
     }
 
     /**

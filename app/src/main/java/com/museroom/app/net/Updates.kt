@@ -1,6 +1,8 @@
 package com.museroom.app.net
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import com.museroom.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -145,6 +147,27 @@ object Updates {
             .edit()
             .putInt(KEY_TOLD, release.versionCode)
             .apply()
+    }
+
+    /**
+     * Take them to the page.
+     *
+     * One place, because the card, the settings button and the notification
+     * are all the same promise and there is no version of this where two of
+     * them should land somewhere different. Nothing is downloaded and nothing
+     * is installed here: the browser opens and the person decides, exactly as
+     * they did the first time.
+     */
+    fun open(context: Context, release: Release): Boolean {
+        // The address arrives over the network. Whatever the file says, this
+        // must not be able to send somebody somewhere else.
+        if (!release.url.startsWith("https://")) return false
+        return runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(release.url))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.isSuccess
     }
 
     /** Not this one. A later one will ask again. */

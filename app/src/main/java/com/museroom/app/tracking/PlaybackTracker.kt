@@ -199,7 +199,7 @@ object PlaybackTracker {
                     // Marked only once it is actually in the shade. Marking
                     // first would turn a failed post into a version nobody is
                     // ever told about.
-                    if (Notifier.update(app, release.versionName, release.notes)) {
+                    if (Notifier.update(app, release.versionName, release.notes, release.url)) {
                         Updates.markAnnounced(app, release)
                     }
                 }

@@ -377,14 +377,7 @@ private fun UpdateCard() {
         Spacer(Modifier.size(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             NeoButton("Get it", small = true, tone = NeoTone.Lime, onClick = {
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(
-                            android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse(update.url),
-                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
+                Updates.open(context, update)
             })
             NeoButton("Not now", small = true, tone = NeoTone.Paper, onClick = {
                 Updates.skip(context, update)

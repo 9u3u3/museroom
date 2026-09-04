@@ -464,19 +464,38 @@ fun YouScreen() {
             enabled = updateNote == null,
             modifier = Modifier.fillMaxWidth(),
             onClick = {
+                // When there is one, this is the way to it. Telling somebody a
+                // newer build exists and then leaving them to find it is the
+                // long way round, and it is the whole reason the button has a
+                // dot on it.
+                val waiting = newer
+                if (waiting != null) {
+                    if (!Updates.open(context, waiting)) {
+                        updateNote = "Could not open the page"
+                        scope.launch { delay(4_000); updateNote = null }
+                    }
+                    return@NeoButton
+                }
                 updateNote = "Looking"
                 scope.launch {
                     Updates.check(context, force = true)
                         .onSuccess { found ->
-                            updateNote = if (found == null) {
-                                "You are on the newest build"
+                            updateNote = null
+                            // Asked for, and the answer is yes: go, rather
+                            // than reporting it and waiting to be asked again.
+                            if (found == null) {
+                                updateNote = "You are on the newest build"
+                                delay(4_000)
+                                updateNote = null
                             } else {
-                                "Museroom ${found.versionName} is out — see the Now tab"
+                                Updates.open(context, found)
                             }
                         }
-                        .onFailure { updateNote = "Could not reach the site" }
-                    delay(4_000)
-                    updateNote = null
+                        .onFailure {
+                            updateNote = "Could not reach the site"
+                            delay(4_000)
+                            updateNote = null
+                        }
                 }
             },
         )

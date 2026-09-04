@@ -1,6 +1,6 @@
 {
-  "version_code": 19,
-  "version_name": "4.7",
+  "version_code": 20,
+  "version_name": "4.8",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Nearby no longer crashes when Bluetooth is off. A dot when there is an update. A quiet line saying what Museroom is counting."
+  "notes": "The update button and the update notification now take you straight to the download page."
 }
