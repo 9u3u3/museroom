@@ -83,6 +83,18 @@ object FollowSession {
     /** Past this, the drift is worth the stutter of a seek. */
     private const val TOLERANCE_MS = 2_500L
 
+    /** Close enough that chasing it would only mean never settling. */
+    private const val IN_STEP_MS = 120L
+
+    /** How long a nudge is aimed to take to close the gap it was given. */
+    private const val CLOSE_OVER_MS = 12_000.0
+
+    /** Four per cent. Past this it stops being something nobody notices. */
+    private const val MAX_NUDGE = 0.04
+
+    /** Not worth crossing to the page to change the speed by less than this. */
+    private const val RATE_STEP = 0.004
+
     /** A seek stutters playback, so corrections are rate limited. */
     private const val MIN_CORRECTION_GAP_MS = 8_000L
 
@@ -405,6 +417,7 @@ object FollowSession {
                 loadedId = id
                 cover = Artwork.cached(host.title, host.artist)
                 publish(hostId, handle, FollowState.Loading(host.title), host)
+                RoomPlayer.setRate(1.0)
                 RoomPlayer.load(id, hostPosition(host))
                 // After the load rather than before it: the music matters more
                 // than the picture, and this can take a moment.
@@ -512,8 +525,14 @@ object FollowSession {
 
             val off = hostPosition(host) - localPosition(snapshot)
             if (abs(off) > TOLERANCE_MS && now - lastCorrection > MIN_CORRECTION_GAP_MS) {
+                // Too far to walk back. A jump is heard, which is why it is
+                // rate limited and why everything smaller is handled below.
+                RoomPlayer.setRate(1.0)
                 RoomPlayer.seekTo(hostPosition(host))
                 lastCorrection = now
+            } else if (abs(off) <= TOLERANCE_MS) {
+                val rate = rateFor(off)
+                if (abs(rate - snapshot.rate) > RATE_STEP) RoomPlayer.setRate(rate)
             }
             publish(hostId, handle, FollowState.InStep(off), host)
             delay(TICK_MS)
@@ -568,6 +587,25 @@ object FollowSession {
                 rawMetadata = emptyMap(),
             ),
         )
+    }
+
+    /**
+     * How fast to play, to close a gap without anybody hearing it happen.
+     *
+     * Seeking is the obvious answer and the wrong one for small numbers: the
+     * music stops, skips and starts again, and doing that every time two
+     * phones drift half a second apart is worse than the drift. A few per cent
+     * of speed is inaudible with the pitch held, and it closes the gap and
+     * then holds it closed.
+     *
+     * Aimed to converge over a few seconds and clamped hard, because the point
+     * is to be unnoticed. Inside [IN_STEP_MS] there is nothing worth doing:
+     * chasing the last fraction of a second only means never settling.
+     */
+    internal fun rateFor(offMs: Long): Double {
+        if (abs(offMs) <= IN_STEP_MS) return 1.0
+        val nudge = offMs.toDouble() / CLOSE_OVER_MS
+        return 1.0 + nudge.coerceIn(-MAX_NUDGE, MAX_NUDGE)
     }
 
     /**

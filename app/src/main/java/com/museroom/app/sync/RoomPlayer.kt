@@ -62,6 +62,8 @@ object RoomPlayer {
         val durationMs: Long = 0,
         val state: Int = -1,
         val ad: Boolean = false,
+        /** How fast it is playing, so a correction can be seen to have landed. */
+        val rate: Double = 1.0,
         /**
          * The page started something of its own and was stopped for it. Said
          * out loud so the room can tell "nothing is playing yet" from "the
@@ -267,6 +269,15 @@ object RoomPlayer {
 
     fun play() = js("window.__museroom.play()")
 
+    /**
+     * Walk a small gap off rather than jumping it.
+     *
+     * A seek is heard; a few per cent of speed is not. Kept as a fire-and-
+     * forget call because the next snapshot says whether it worked, and
+     * nothing here should ever wait on the page.
+     */
+    fun setRate(rate: Double) = js("window.__museroom.rate($rate)")
+
     fun pause() = js("window.__museroom.pause()")
 
     /** Stop following: silence the player and forget what it was aiming at. */
@@ -369,6 +380,7 @@ object RoomPlayer {
                 durationMs = o.optLong("durationMs"),
                 state = o.optInt("state", -1),
                 ad = o.optBoolean("ad"),
+                rate = o.optDouble("rate", 1.0),
                 strayed = o.optBoolean("strayed"),
                 detail = o.optString("detail"),
                 takenAt = SystemClock.elapsedRealtime(),

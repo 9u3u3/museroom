@@ -1,6 +1,6 @@
 {
-  "version_code": 22,
-  "version_name": "5.0",
+  "version_code": 23,
+  "version_name": "5.1",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "A host pausing is heard at once, and a new song no longer costs the listener its opening."
+  "notes": "Rooms hold in step by speed rather than by skipping, so small drift is closed without anybody hearing it. Somebody in your room is shown as being in it."
 }

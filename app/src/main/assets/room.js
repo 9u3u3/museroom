@@ -12,18 +12,36 @@
 (function () {
   if (window.__museroom) return;
 
+  /** YouTube's own numbering, so the hot path can compare without a call. */
+  var PLAYING = 1;
+
   var bridge = window.MuseroomBridge;
   var wanted = '';
   var api = null;
+  var media = null;
+  var adStore = null;
   var lastError = '';
 
-  /** The player, or null while the page is still assembling itself. */
+  /*
+   * The player and the media element, held rather than looked up.
+   *
+   * This runs several times a second now, and a querySelector across a page
+   * the size of YouTube Music is not free. Both are re-resolved the moment the
+   * one we are holding stops answering, which is what a navigation looks like
+   * from in here.
+   */
   function player() {
     if (api && typeof api.getCurrentTime === 'function') return api;
     api = document.querySelector('#movie_player');
     if (api && typeof api.getCurrentTime === 'function') return api;
     api = null;
     return null;
+  }
+
+  function video() {
+    if (media && media.isConnected) return media;
+    media = document.querySelector('video');
+    return media;
   }
 
   /*
@@ -34,10 +52,14 @@
    */
   function adPlaying() {
     try {
-      var queue = document.querySelector('#queue');
-      var store = queue && queue.queue && queue.queue.store && queue.queue.store.store;
-      if (store) return !!store.getState().player.adPlaying;
-    } catch (e) {}
+      if (!adStore) {
+        var queue = document.querySelector('#queue');
+        adStore = (queue && queue.queue && queue.queue.store && queue.queue.store.store) || null;
+      }
+      if (adStore) return !!adStore.getState().player.adPlaying;
+    } catch (e) {
+      adStore = null;
+    }
     return false;
   }
 
@@ -49,24 +71,34 @@
     }
     var data = {};
     try { data = p.getVideoData() || {}; } catch (e) {}
-    var payload = { ready: true, wanted: wanted, ad: adPlaying() };
+    var state = -1;
+    try { state = p.getPlayerState(); } catch (e) {}
+    var v = video();
+
+    var payload = { ready: true, wanted: wanted, ad: adPlaying(), state: state };
+
     /*
-     * A one-line account of what the player is actually doing. The room is
-     * invisible, so when it does not play there is otherwise nothing to look
-     * at, and "behind by 68 seconds" is what a stopped player looks like from
-     * the outside.
+     * A one-line account of what the player is actually doing, built only when
+     * it is not doing it.
+     *
+     * Nobody reads this while the music plays; it exists because the room is
+     * invisible and "behind by 68 seconds" is what a stopped player looks like
+     * from outside. Six calls and a string every quarter of a second, for a
+     * line nobody will look at, is the kind of cost that turns a sync loop
+     * into the reason it cannot keep up.
      */
-    try {
-      var v = document.querySelector('video');
-      payload.detail =
-        'state=' + (function () { try { return p.getPlayerState(); } catch (e) { return '?'; } })() +
-        ' video=' + (v ? (v.paused ? 'paused' : 'running') : 'none') +
-        ' ready=' + (v ? v.readyState : '-') +
-        ' muted=' + (function () { try { return p.isMuted() ? 1 : 0; } catch (e) { return '?'; } })() +
-        ' vol=' + (function () { try { return p.getVolume(); } catch (e) { return '?'; } })() +
-        (lastError ? ' err=' + lastError : '');
-    } catch (e) {
-      payload.detail = 'unreadable';
+    if (state !== PLAYING) {
+      try {
+        payload.detail =
+          'state=' + state +
+          ' video=' + (v ? (v.paused ? 'paused' : 'running') : 'none') +
+          ' ready=' + (v ? v.readyState : '-') +
+          ' muted=' + (function () { try { return p.isMuted() ? 1 : 0; } catch (e) { return '?'; } })() +
+          ' vol=' + (function () { try { return p.getVolume(); } catch (e) { return '?'; } })() +
+          (lastError ? ' err=' + lastError : '');
+      } catch (e) {
+        payload.detail = 'unreadable';
+      }
     }
     try { payload.videoId = data.video_id || data.videoId || ''; } catch (e) { payload.videoId = ''; }
 
@@ -86,15 +118,27 @@
     try {
       if (wanted && payload.videoId && payload.videoId !== wanted) {
         payload.strayed = true;
-        var stray = document.querySelector('video');
+        var stray = video();
         if (stray && !stray.paused) { try { stray.pause(); } catch (e) {} }
       }
     } catch (e) {}
     try { payload.title = data.title || ''; } catch (e) { payload.title = ''; }
     try { payload.author = data.author || ''; } catch (e) { payload.author = ''; }
-    try { payload.positionMs = Math.round((p.getCurrentTime() || 0) * 1000); } catch (e) { payload.positionMs = 0; }
-    try { payload.durationMs = Math.round((p.getDuration() || 0) * 1000); } catch (e) { payload.durationMs = 0; }
-    try { payload.state = p.getPlayerState(); } catch (e) { payload.state = -1; }
+    /*
+     * The element's own clock, not the player's. It is the thing actually
+     * making the sound, it is a plain property read rather than a call across
+     * the player's API, and it is not rounded to whole seconds — which is the
+     * difference between telling half a second of drift from none.
+     */
+    payload.positionMs = 0;
+    payload.durationMs = 0;
+    try {
+      if (v && !isNaN(v.currentTime)) payload.positionMs = Math.round(v.currentTime * 1000);
+      else payload.positionMs = Math.round((p.getCurrentTime() || 0) * 1000);
+      if (v && isFinite(v.duration)) payload.durationMs = Math.round(v.duration * 1000);
+      else payload.durationMs = Math.round((p.getDuration() || 0) * 1000);
+      payload.rate = v ? v.playbackRate : 1;
+    } catch (e) {}
     try { bridge.state(JSON.stringify(payload)); } catch (e) {}
   }
 
@@ -113,6 +157,10 @@
         // the page is silence with no way for anybody to notice or fix it.
         try { p.unMute(); } catch (e) {}
         try { p.setVolume(100); } catch (e) {}
+        try {
+          var v = video();
+          if (v) v.playbackRate = 1;
+        } catch (e) {}
         p.loadVideoById(id, startSeconds || 0);
         return true;
       } catch (e) {
@@ -138,7 +186,7 @@
         try { p.unMute(); } catch (e) {}
         try { p.setVolume(100); } catch (e) {}
       }
-      var v = document.querySelector('video');
+      var v = video();
       if (v) {
         try {
           var started = v.play();
@@ -159,8 +207,13 @@
     },
 
     pause: function () {
-      var v = document.querySelector('video');
-      if (v) { try { v.pause(); return true; } catch (e) {} }
+      var v = video();
+      if (v) {
+        // A rate left over from a correction would still be there on the way
+        // back in, quietly running the next track fast.
+        try { v.playbackRate = 1; } catch (e) {}
+        try { v.pause(); return true; } catch (e) {}
+      }
       var p = player();
       if (!p) return false;
       try { p.pauseVideo(); return true; } catch (e) { return false; }
@@ -168,8 +221,33 @@
 
     leave: function () {
       wanted = '';
-      var v = document.querySelector('video');
-      if (v) { try { v.pause(); } catch (e) {} }
+      var v = video();
+      if (v) {
+        try { v.playbackRate = 1; } catch (e) {}
+        try { v.pause(); } catch (e) {}
+      }
+    },
+
+    /*
+     * Closing a small gap by speed rather than by jumping.
+     *
+     * A seek is audible: the music stops, skips and starts again, and doing
+     * that every time a joiner drifts half a second apart from the host would
+     * be worse than the drift. Playing a few per cent fast or slow is not
+     * audible at all — the pitch is held — and it closes the gap smoothly and
+     * then stays closed. Seeking is left for gaps too large to walk back.
+     */
+    rate: function (r) {
+      var v = video();
+      if (!v) return false;
+      try {
+        // Without this the browser is free to shift the pitch instead, which
+        // is exactly what nobody would tolerate in music.
+        v.preservesPitch = true;
+        v.mozPreservesPitch = true;
+        v.webkitPreservesPitch = true;
+      } catch (e) {}
+      try { v.playbackRate = r; return true; } catch (e) { return false; }
     },
 
     /*
@@ -253,12 +331,22 @@
   };
 
   /*
-   * A track can end on its own and the player will helpfully start the next
-   * thing it fancies. Reporting on every change means Kotlin notices that
-   * within a tick and pulls it back to whatever the host is playing.
+   * When to speak.
+   *
+   * Polling on a timer is the wrong shape for this. The moments that matter —
+   * a track ending and the page starting one of its own, the player finally
+   * making a sound — are events, and waiting up to a second to notice one is
+   * a second of the wrong music or of silence. So the events are listened for
+   * and the timer is only a net underneath them.
+   *
+   * The media element's own timeupdate fires several times a second while
+   * audio plays and not at all while it does not, which is exactly the shape
+   * of how often anybody needs to hear from this.
    */
   var attached = false;
-  setInterval(function () {
+  var listening = null;
+
+  function attach() {
     var p = player();
     if (p && !attached && typeof p.addEventListener === 'function') {
       try {
@@ -267,6 +355,22 @@
         attached = true;
       } catch (e) {}
     }
+    var v = video();
+    if (v && v !== listening) {
+      listening = v;
+      try {
+        v.addEventListener('timeupdate', report);
+        v.addEventListener('play', report);
+        v.addEventListener('pause', report);
+        v.addEventListener('seeked', report);
+        v.addEventListener('ended', report);
+        v.addEventListener('ratechange', report);
+      } catch (e) {}
+    }
+  }
+
+  setInterval(function () {
+    attach();
     report();
   }, 1000);
 

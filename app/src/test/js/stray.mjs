@@ -14,7 +14,13 @@ const src = fs.readFileSync('app/src/main/assets/room.js', 'utf8');
 
 let paused = false;
 let currentId = 'aaaaaaaaaaa';
-const fakeVideo = { paused: false, pause() { this.paused = true; paused = true; }, play() {}, readyState: 4 };
+const fakeVideo = {
+  paused: false, readyState: 4, currentTime: 12.345, duration: 220, playbackRate: 1,
+  isConnected: true, preservesPitch: false,
+  pause() { this.paused = true; paused = true; },
+  play() { this.paused = false; },
+  addEventListener() {},
+};
 const fakePlayer = {
   getCurrentTime: () => 10,
   getDuration: () => 200,
@@ -87,6 +93,43 @@ fakeVideo.paused = false;
 room.poll();
 check('with nothing wanted, nothing is stopped', !!last().strayed, false);
 check('and the page is left alone', fakeVideo.paused, false);
+
+// --- what it says, and how dearly ------------------------------------------
+
+room.load('aaaaaaaaaaa', 0);
+fakeVideo.currentTime = 12.345;
+room.poll();
+check('the position is the element clock, to the millisecond', last().positionMs, 12345);
+check('and the duration comes with it', last().durationMs, 220000);
+
+// The diagnostic line is six calls and a string. Nobody reads it while the
+// music plays, and building it on the hot path is what makes a sync loop too
+// slow to sync with.
+fakePlayer.getPlayerState = () => 1;
+room.poll();
+check('a playing player says nothing about itself', last().detail, undefined);
+fakePlayer.getPlayerState = () => 2;
+room.poll();
+check('a stopped one explains itself', typeof last().detail, 'string');
+fakePlayer.getPlayerState = () => 1;
+
+// --- closing a gap by speed ------------------------------------------------
+
+check('speed can be set', room.rate(1.03), true);
+check('and it lands on the element', fakeVideo.playbackRate, 1.03);
+check('with the pitch held, or it is not inaudible', fakeVideo.preservesPitch, true);
+room.poll();
+check('and it is reported back', last().rate, 1.03);
+
+// A correction must never outlive the track it was correcting.
+room.load('aaaaaaaaaaa', 0);
+check('a new track starts at ordinary speed', fakeVideo.playbackRate, 1);
+room.rate(0.96);
+room.pause();
+check('so does a pause', fakeVideo.playbackRate, 1);
+room.rate(1.04);
+room.leave();
+check('and so does leaving', fakeVideo.playbackRate, 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

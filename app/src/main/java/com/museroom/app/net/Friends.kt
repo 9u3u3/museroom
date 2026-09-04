@@ -87,14 +87,6 @@ private data class RosterRow(
     @SerialName("avatar_url") val avatarUrl: String? = null,
 )
 
-@Serializable
-private data class RoomMemberRow(
-    @SerialName("user_id") val userId: String = "",
-    val profiles: Listener? = null,
-) {
-    @Serializable data class Listener(val handle: String = "")
-}
-
 /** A friend, and whatever they were last heard playing. */
 data class Friend(
     val profile: Profile,
@@ -176,33 +168,14 @@ class FriendsRepository private constructor(context: Context) {
     }
 
     /**
-     * People listening along with you right now.
+     * Everybody in a room, including you, and including people whose own rows
+     * are not yours to read.
      *
-     * They say so themselves, on a stamp of their own, because a joiner has
-     * nothing playing locally for anyone to notice. Anything older than a
-     * couple of minutes is somebody who closed the app rather than left.
-     */
-    suspend fun roomMembers(): Result<List<RoomMember>> = call { token, me ->
-        val since = java.time.Instant.now().minusSeconds(120).toString()
-        val body = Supabase.select(
-            "now_playing",
-            "following_user=eq.$me&following_since=gte.${URLEncoder.encode(since, "UTF-8")}" +
-                "&select=user_id,following_since,profiles!now_playing_user_id_fkey(handle)",
-            token,
-        )
-        Supabase.json.decodeFromString(ListSerializer(RoomMemberRow.serializer()), body)
-            .map { RoomMember(it.userId, it.profiles?.handle.orEmpty()) }
-            .filter { it.handle.isNotBlank() }
-    }
-
-    /**
-     * Everybody in somebody else's room, including you.
-     *
-     * A joiner used to be told "Nobody is in your room", which is true and
-     * beside the point: they are in a room, with whoever else turned up, and
-     * the roster was something only the host could see. Read through a
-     * function so that being present is all that travels — not what anybody
-     * in the room is playing.
+     * Through a function rather than by selecting the rows. A stranger who
+     * walked in from Nearby shares nothing with you, so their row is closed to
+     * you — and they are still in the room, which is the one thing the roster
+     * has to be right about. Being present is all that comes back; not a note
+     * of what any of them is playing.
      */
     suspend fun roomMembersOf(hostId: String): Result<List<RoomMember>> = call { token, _ ->
         val body = Supabase.rpc("room_members", buildJsonObject { put("host", hostId) }, token)

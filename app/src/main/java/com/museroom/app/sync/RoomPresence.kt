@@ -53,8 +53,14 @@ object RoomPresence {
                 // there. Announcing them would mean a notification for
                 // everybody still in the room every time the app restarts.
                 var first = true
+                val me = session.userId
                 while (true) {
-                    friends.roomMembers().onSuccess { members ->
+                    // Through the function rather than by selecting the rows,
+                    // because a stranger who walked into your room from Nearby
+                    // shares nothing with you and their row is not yours to
+                    // read. They are still in your room, and the roster is the
+                    // one place that has to know it.
+                    friends.roomMembersOf(me).onSuccess { members ->
                         if (!first) announceArrivals(app, members)
                         seen = members.map { it.userId }.toSet()
                         _members.value = members
