@@ -1,6 +1,6 @@
 {
-  "version_code": 23,
-  "version_name": "5.1",
+  "version_code": 24,
+  "version_name": "5.2",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Rooms hold in step by speed rather than by skipping, so small drift is closed without anybody hearing it. Somebody in your room is shown as being in it."
+  "notes": "Both phones now work in one shared clock, so a room holds together far more closely. Resuming after a pause is immediate."
 }

@@ -7,6 +7,7 @@ import com.museroom.app.data.ListeningSessionEntity as SessionEntity
 import com.museroom.app.data.PlayEventEntity
 import com.museroom.app.media.NowPlaying
 import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.ServerClock
 import com.museroom.app.net.Supabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,7 +100,11 @@ class SyncEngine private constructor(context: Context) {
                             put("source_package", track.packageName)
                             put("source_track_id", track.sourceTrackId)
                             put("is_advert", false)
-                            put("updated_at", Instant.now().toString())
+                            // The shared clock, not this phone's. A listener
+                            // works out where the host is by subtracting this
+                            // from now, and two phones a second apart on the
+                            // time are two phones a second apart on the music.
+                            put("updated_at", ServerClock.now().toString())
                         },
                     )
                 }
@@ -137,7 +142,7 @@ class SyncEngine private constructor(context: Context) {
                     "user_id=eq.$userId",
                     buildJsonObject {
                         build()
-                        put("updated_at", Instant.now().toString())
+                        put("updated_at", ServerClock.now().toString())
                     },
                     token,
                 )
@@ -167,7 +172,11 @@ class SyncEngine private constructor(context: Context) {
                     "user_id=eq.$userId",
                     buildJsonObject {
                         put("following_user", hostId)
-                        put("following_since", hostId?.let { Instant.now().toString() })
+                        // Also the shared clock: the roster keeps anybody
+                        // whose stamp is under two minutes old, judged by the
+                        // database, so a phone running slow would quietly drop
+                        // out of the room it was sitting in.
+                        put("following_since", hostId?.let { ServerClock.now().toString() })
                     },
                     token,
                 )

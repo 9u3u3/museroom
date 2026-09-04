@@ -203,13 +203,18 @@ object Supabase {
         }
     }
 
-    /** Calls a database function. Returns the raw JSON body. */
-    fun rpc(name: String, body: JsonObject, accessToken: String): String {
+    /**
+     * Calls a database function. Returns the raw JSON body.
+     *
+     * The token is optional for the one function that asks the time, which
+     * nobody needs an account to be told.
+     */
+    fun rpc(name: String, body: JsonObject, accessToken: String?): String {
         val request = Request.Builder()
             .url("$url/rest/v1/rpc/$name")
             .post(json.encodeToString(JsonObject.serializer(), body).toRequestBody(jsonMedia))
             .header("apikey", anonKey)
-            .header("Authorization", "Bearer $accessToken")
+            .apply { if (accessToken != null) header("Authorization", "Bearer $accessToken") }
             .header("Content-Type", "application/json")
             .build()
 

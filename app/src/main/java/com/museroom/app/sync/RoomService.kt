@@ -51,6 +51,9 @@ class RoomService : Service() {
     private var scope: CoroutineScope? = null
     private var handle: String = ""
 
+    /** Whether the debt to the system has been paid for this instance. */
+    private var foreground = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -59,6 +62,21 @@ class RoomService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Before anything else, always.
+        //
+        // A service started as a foreground service owes the system a
+        // notification within seconds of every start, and the system kills the
+        // process for the debt rather than for the work. The two button
+        // actions used to return before paying it, which is fine right up
+        // until the one time this instance is not already in the foreground —
+        // the process having been killed while the notification stayed in the
+        // shade, and somebody then pressing Leave on it. That is a crash on
+        // the way out of a room, and it costs nothing to make impossible.
+        if (!foreground) {
+            handle = intent?.getStringExtra(EXTRA_HANDLE) ?: handle
+            startInForeground(build(NowPlayingRepository.room.value, FollowSession.following.value))
+        }
+
         when (intent?.action) {
             ACTION_LEAVE -> {
                 FollowSession.stop()
@@ -70,8 +88,7 @@ class RoomService : Service() {
                 return START_NOT_STICKY
             }
         }
-        handle = intent?.getStringExtra(EXTRA_HANDLE).orEmpty()
-        startInForeground(build(NowPlayingRepository.room.value, FollowSession.following.value))
+        intent?.getStringExtra(EXTRA_HANDLE)?.let { handle = it }
         watch()
         return START_NOT_STICKY
     }
@@ -121,10 +138,13 @@ class RoomService : Service() {
         getSystemService(NotificationManager::class.java)
 
     private fun startInForeground(notification: Notification) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(ID, notification)
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(ID, notification)
+            }
+            foreground = true
         }
     }
 
@@ -156,8 +176,11 @@ class RoomService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(open())
-            .addAction(Notification.Action.Builder(null, "Like", intentFor(ACTION_LIKE, 3)).build())
-            .addAction(Notification.Action.Builder(null, "Leave", intentFor(ACTION_LEAVE, 2)).build())
+            // With icons. A media-style action without one is a shape some
+            // system interfaces will not draw and others will not parcel, and
+            // the failure lands in whichever process was unlucky.
+            .addAction(action(R.drawable.ic_notification, "Like", ACTION_LIKE, 3))
+            .addAction(action(R.drawable.ic_notification, "Leave", ACTION_LEAVE, 2))
 
         if (art != null) builder.setLargeIcon(art)
 
@@ -206,6 +229,13 @@ class RoomService : Service() {
         }
     }
 
+    private fun action(icon: Int, title: String, intentAction: String, code: Int): Notification.Action =
+        Notification.Action.Builder(
+            android.graphics.drawable.Icon.createWithResource(this, icon),
+            title,
+            intentFor(intentAction, code),
+        ).build()
+
     private fun open(): PendingIntent = PendingIntent.getActivity(
         this,
         1,
@@ -214,17 +244,29 @@ class RoomService : Service() {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun intentFor(action: String, code: Int): PendingIntent = PendingIntent.getService(
-        this,
-        code,
-        Intent(this, RoomService::class.java).setAction(action),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
+    /**
+     * A button on the notification.
+     *
+     * Started as a foreground service rather than an ordinary one, because
+     * that is what it is. An ordinary start from a notification that outlived
+     * its process is a start the system refuses, and refusing it is not a
+     * quiet no.
+     */
+    private fun intentFor(action: String, code: Int): PendingIntent {
+        val intent = Intent(this, RoomService::class.java).setAction(action)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(this, code, intent, flags)
+        } else {
+            PendingIntent.getService(this, code, intent, flags)
+        }
+    }
 
     override fun onDestroy() {
-        scope?.cancel()
+        foreground = false
+        runCatching { scope?.cancel() }
         scope = null
-        session?.release()
+        runCatching { session?.release() }
         session = null
         super.onDestroy()
     }

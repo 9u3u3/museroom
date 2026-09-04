@@ -39,14 +39,27 @@ class DriftTest {
     @Test fun `the nudge is clamped both ways`() {
         for (off in listOf(-60_000L, -3_000L, 3_000L, 60_000L)) {
             val rate = FollowSession.rateFor(off)
-            assertTrue("rate $rate for ${off}ms is audible", abs(rate - 1.0) <= 0.0401)
+            assertTrue("rate $rate for ${off}ms is audible", abs(rate - 1.0) <= 0.0501)
         }
     }
 
-    /** A bigger gap should be closed harder, up to the clamp. */
+    /**
+     * Inside the band a bigger gap is chased harder. Above it everything
+     * leans on the clamp, which is the point of having one.
+     */
     @Test fun `a wider gap is chased harder`() {
-        assertTrue(FollowSession.rateFor(900) > FollowSession.rateFor(300))
-        assertTrue(FollowSession.rateFor(-900) < FollowSession.rateFor(-300))
+        assertTrue(FollowSession.rateFor(240) > FollowSession.rateFor(160))
+        assertTrue(FollowSession.rateFor(-240) < FollowSession.rateFor(-160))
+    }
+
+    /**
+     * Whatever the gap, the walk has to finish inside a song. This is the
+     * number that decides whether "in step" is a claim or a fact.
+     */
+    @Test fun `the widest gap worth walking closes in under ten seconds`() {
+        val rate = FollowSession.rateFor(400)
+        val seconds = 400 / ((rate - 1.0) * 1000)
+        assertTrue("takes ${seconds}s to close 400ms", seconds < 10.0)
     }
 
     /**
@@ -57,6 +70,6 @@ class DriftTest {
         val rate = FollowSession.rateFor(500)
         val gainPerSecond = (rate - 1.0) * 1000
         val seconds = 500 / gainPerSecond
-        assertTrue("takes ${seconds}s to close half a second", seconds in 1.0..20.0)
+        assertTrue("takes ${seconds}s to close half a second", seconds in 1.0..12.0)
     }
 }

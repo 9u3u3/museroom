@@ -14,6 +14,7 @@ import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.LikesRepository
 import com.museroom.app.net.ListenRepository
+import com.museroom.app.net.ServerClock
 import com.museroom.app.net.Updates
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.notify.FriendAlerts
@@ -64,6 +65,15 @@ object PlaybackTracker {
 
     /** Nothing about a hand-installed app changes fast enough to ask sooner. */
     private const val UPDATE_CHECK_MS = 6 * 60 * 60 * 1000L
+
+    /**
+     * How often to look for a better reading of the shared clock.
+     *
+     * Not because the clock moves — it does not — but because a reading taken
+     * through a quiet moment on the network is worth more than one taken
+     * through a busy one, and asking again is how a better one turns up.
+     */
+    private const val CLOCK_SYNC_MS = 5 * 60 * 1000L
 
     private val differ = PlaybackDiffer(heartbeatMs = HEARTBEAT_MS)
 
@@ -141,6 +151,14 @@ object PlaybackTracker {
         newScope.launch { watchLikes(app, prefs) }
         newScope.launch { watchForUpdates(app) }
         newScope.launch { showWhatIsBeingCounted(app) }
+        // A host stamps every row it publishes with the shared clock, so it
+        // needs the reading whether or not anybody is listening along yet.
+        newScope.launch {
+            while (true) {
+                ServerClock.sync()
+                delay(CLOCK_SYNC_MS)
+            }
+        }
     }
 
     /**

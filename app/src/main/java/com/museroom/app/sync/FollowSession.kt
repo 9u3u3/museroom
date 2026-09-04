@@ -12,6 +12,7 @@ import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.Realtime
 import com.museroom.app.net.RemoteNowPlaying
+import com.museroom.app.net.ServerClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -80,23 +81,40 @@ sealed interface FollowState {
  */
 object FollowSession {
 
-    /** Past this, the drift is worth the stutter of a seek. */
-    private const val TOLERANCE_MS = 2_500L
+    /**
+     * Past this, the drift is worth the stutter of a seek.
+     *
+     * It was two and a half seconds, which was not a judgement about what
+     * people can hear — it was the width of the disagreement between two
+     * phones' clocks, absorbed rather than fixed. Now that both ends work in
+     * the database's time, this can be what it was always meant to be: the
+     * point where walking a gap off would take longer than the jump is worth.
+     *
+     * Five per cent of speed buys fifty milliseconds a second, so anything
+     * approaching half a second would take ten seconds to walk off. Past here
+     * the jump is quicker and, being rare, quieter overall.
+     */
+    private const val TOLERANCE_MS = 400L
 
     /** Close enough that chasing it would only mean never settling. */
     private const val IN_STEP_MS = 120L
 
-    /** How long a nudge is aimed to take to close the gap it was given. */
-    private const val CLOSE_OVER_MS = 12_000.0
+    /**
+     * How long a nudge is aimed to take to close the gap it was given.
+     *
+     * Proportional, so a gap of a fifth of a second is chased more gently than
+     * one of a third, and everything larger than the band leans on the clamp.
+     */
+    private const val CLOSE_OVER_MS = 5_000.0
 
-    /** Four per cent. Past this it stops being something nobody notices. */
-    private const val MAX_NUDGE = 0.04
+    /** Five per cent. Past this it stops being something nobody notices. */
+    private const val MAX_NUDGE = 0.05
 
     /** Not worth crossing to the page to change the speed by less than this. */
     private const val RATE_STEP = 0.004
 
     /** A seek stutters playback, so corrections are rate limited. */
-    private const val MIN_CORRECTION_GAP_MS = 8_000L
+    private const val MIN_CORRECTION_GAP_MS = 6_000L
 
     /**
      * How long a freshly loaded track is left alone.
@@ -208,6 +226,10 @@ object FollowSession {
 
         val newScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         scope = newScope
+        // Before anything is compared against anything. A room is two phones
+        // agreeing about a moment, and they cannot until they agree about the
+        // time.
+        newScope.launch { ServerClock.sync() }
         newScope.launch { follow(app, hostId, handle) }
         newScope.launch { announcePresence(app, hostId) }
         newScope.launch { listenForChanges(app, hostId) }
@@ -260,8 +282,39 @@ object FollowSession {
      * which knows whether the right track is even loaded.
      */
     private fun obeyImmediately(row: RemoteNowPlaying) {
-        if (saysStop(row)) RoomPlayer.pause()
+        if (saysStop(row)) {
+            RoomPlayer.pause()
+            return
+        }
+        // Starting again, on the same track we already have loaded.
+        //
+        // Left to the loop this was up to two seconds late, and those two
+        // seconds do not go away afterwards — the joiner is simply that far
+        // behind for the rest of the song, and closing a gap that size by
+        // speed alone takes the best part of a minute.
+        //
+        // Seeking is free here, which is the whole reason this is worth doing
+        // at all: the music is already stopped, so there is no jump to hear.
+        // Only ever on the track we were told to play, so a host who skipped
+        // while paused is left to the loop, where the new song is resolved.
+        val snapshot = RoomPlayer.snapshot.value
+        val sameTrack = loaded.isNotBlank() &&
+            loaded == Fingerprint.of(row.title, row.artist, row.durationMs)
+        if (!sameTrack || snapshot.playing || snapshot.strayed || !snapshot.onWantedTrack) return
+        RoomPlayer.setRate(1.0)
+        RoomPlayer.seekTo(hostPosition(row))
+        RoomPlayer.play()
     }
+
+    /**
+     * The track the loop has handed to the player.
+     *
+     * Out here rather than inside the loop because the socket needs it too: it
+     * is the difference between resuming the song the host is playing and
+     * resuming whatever was loaded before they skipped.
+     */
+    @Volatile
+    private var loaded: String = ""
 
     /**
      * Whether a row, on its own, is reason enough to go quiet at once.
@@ -331,6 +384,7 @@ object FollowSession {
         _following.value = null
         pushed = null
         polled = null
+        loaded = ""
         cover = null
         NowPlayingRepository.setRoomPlayback(null)
         RoomPlayer.leave()
@@ -414,6 +468,7 @@ object FollowSession {
                     continue
                 }
                 loadedFingerprint = fingerprint
+                loaded = fingerprint
                 loadedId = id
                 cover = Artwork.cached(host.title, host.artist)
                 publish(hostId, handle, FollowState.Loading(host.title), host)
@@ -526,11 +581,14 @@ object FollowSession {
             val off = hostPosition(host) - localPosition(snapshot)
             if (abs(off) > TOLERANCE_MS && now - lastCorrection > MIN_CORRECTION_GAP_MS) {
                 // Too far to walk back. A jump is heard, which is why it is
-                // rate limited and why everything smaller is handled below.
+                // rate limited and why everything else is walked instead.
                 RoomPlayer.setRate(1.0)
                 RoomPlayer.seekTo(hostPosition(host))
                 lastCorrection = now
-            } else if (abs(off) <= TOLERANCE_MS) {
+            } else {
+                // Including a gap too wide to walk that has just been jumped:
+                // during the wait before another jump is allowed, leaning on
+                // the speed is better than doing nothing at all.
                 val rate = rateFor(off)
                 if (abs(rate - snapshot.rate) > RATE_STEP) RoomPlayer.setRate(rate)
             }
@@ -634,7 +692,11 @@ object FollowSession {
         if (!host.isPlaying) return host.positionMs
         val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
             ?: return host.positionMs
-        val elapsed = (System.currentTimeMillis() - takenAt).coerceIn(0, 60_000)
+        // Both ends of this subtraction are in the database's time. Using this
+        // phone's would fold whatever the two clocks disagree by straight into
+        // the answer, and two Android phones are routinely most of a second
+        // apart without either of them being wrong.
+        val elapsed = (ServerClock.nowMs() - takenAt).coerceIn(0, 60_000)
         val projected = host.positionMs + elapsed
         // A row that went stale near the end would otherwise project past the
         // end of the track and sit there, still counting.
