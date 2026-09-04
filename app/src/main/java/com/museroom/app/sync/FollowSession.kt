@@ -707,12 +707,26 @@ object FollowSession {
                     delay(wait.coerceAtMost(SETTLING_TICK_MS))
                     continue
                 }
+                // Late to the moment, which means behind everybody who made
+                // it. They have all started the same song at the same instant,
+                // so the only thing standing between this phone and the rest
+                // of the room is the seconds it was late by.
+                val lateBy = -wait
                 RoomPlayer.begin(0L)
                 beginAt = 0L
-                lastCorrection = SystemClock.elapsedRealtime()
-                acquireUntil = SystemClock.elapsedRealtime() + SETTLE_MS
-                acquireSince = SystemClock.elapsedRealtime()
                 pendingFirstSync = false
+                acquireSince = SystemClock.elapsedRealtime()
+                if (lateBy > IN_STEP_MS) {
+                    // Start closing it at the next look rather than sitting
+                    // out the settle and the cooling-off first. Nothing is
+                    // skipped to do it — the gap is walked off by speed — but
+                    // there is no reason to spend eight seconds not starting.
+                    acquireUntil = 0L
+                    lastCorrection = 0L
+                } else {
+                    lastCorrection = SystemClock.elapsedRealtime()
+                    acquireUntil = SystemClock.elapsedRealtime() + SETTLE_MS
+                }
                 delay(SETTLING_TICK_MS)
                 continue
             }

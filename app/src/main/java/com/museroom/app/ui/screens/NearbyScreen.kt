@@ -155,9 +155,16 @@ fun NearbyScreen() {
             return@Column
         }
 
+        // Never yourself, whatever the radio thinks it heard. Some Android
+        // radios report their own advertisement back as a sighting, and the
+        // server's guard cannot help when the token really does belong to the
+        // person asking.
+        val me = session?.userId
+        val others = nearby.filterNot { it.userId == me }
+
         Radar(
             active = status is ProximityStatus.Searching,
-            people = nearby,
+            people = others,
             selected = selected,
             onPick = { selected = if (selected == it) null else it },
         )
@@ -191,14 +198,14 @@ fun NearbyScreen() {
             is ProximityStatus.PausedForPrivacy -> "Paused while your session is private."
             is ProximityStatus.Failed -> s.reason
             is ProximityStatus.Searching ->
-                if (nearby.isEmpty()) "Nobody nearby yet. They need Museroom open too." else null
+                if (others.isEmpty()) "Nobody nearby yet. They need Museroom open too." else null
             is ProximityStatus.Off -> null
         }
         trouble?.let {
             NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) { Note(it) }
         }
 
-        val shown = nearby.filter { selected == null || it.userId == selected }
+        val shown = others.filter { selected == null || it.userId == selected }
         shown.forEach { person ->
             ListenerRow(
                 handle = person.handle,

@@ -233,6 +233,12 @@ Invariants that were each learned from a real bug. Do not undo them:
 
 ### 4. Nearby
 
+`resolve_nearby` excludes anybody whose `following_user` is set and fresh:
+somebody in a room is not a room to join, and their phone reports the host's
+track as its own playback so they otherwise look exactly like a host.
+`NearbyScreen` also filters out the signed-in user, because some Android radios
+report their own advertisement back as a sighting.
+
 `proximity/` advertises a short token that rotates every fifteen minutes and
 means nothing on its own; only `resolve_nearby()` can map it to a person, and
 only while both people have it on. `neverForLocation` on `BLUETOOTH_SCAN` is

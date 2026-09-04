@@ -53,7 +53,13 @@ class RoomDelayTest {
     fun `the distance does not change with the position`() {
         val early = 20_000 - FollowSession.targetPosition(host(positionMs = 20_000))
         val late = 200_000 - FollowSession.targetPosition(host(positionMs = 200_000))
-        assertEquals(early, late)
+        // Not exact equality: each call reads the clock afresh, so two of them
+        // differ by however long the first took. What matters is that the
+        // distance does not depend on where in the song the host is.
+        assertTrue(
+            "the distance moved from ${early}ms to ${late}ms across the song",
+            Math.abs(early - late) < 50,
+        )
     }
 
     /**
