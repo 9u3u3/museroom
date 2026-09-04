@@ -106,6 +106,21 @@ object FollowSession {
 
     private const val TICK_MS = 2_000L
 
+    /**
+     * How often to look while a track is still starting.
+     *
+     * A load takes seconds and the moment it starts playing is the moment
+     * worth catching, so the loop watches closely for it and goes back to
+     * strolling once the track is under way.
+     */
+    private const val SETTLING_TICK_MS = 350L
+
+    /** Below this, a seek would cost more in stutter than it buys in accuracy. */
+    private const val FIRST_SYNC_TOLERANCE_MS = 700L
+
+    /** Long enough for one seek to land before anything measures the result. */
+    private const val SETTLE_MS = 2_500L
+
     /** Comfortably inside the two minutes the host counts as still here. */
     private const val PRESENCE_MS = 30_000L
 
@@ -115,6 +130,16 @@ object FollowSession {
      * a socket which quietly stopped delivering is noticed within seconds.
      */
     private const val PUSH_TRUSTED_MS = 6_000L
+
+    /**
+     * How long a polled row stands in for asking again.
+     *
+     * A cap on requests rather than on staleness: the loop's rate changes with
+     * what it is doing, and this keeps the traffic it makes from changing with
+     * it. Comfortably under the ordinary tick, so the usual cadence is
+     * untouched.
+     */
+    private const val POLL_TRUSTED_MS = 1_500L
 
     /** Between attempts to get the socket back. */
     private const val RECONNECT_MS = 5_000L
@@ -196,6 +221,9 @@ object FollowSession {
             runCatching {
                 Realtime.nowPlayingOf(hostId, token).collect { row ->
                     pushed = row to SystemClock.elapsedRealtime()
+                    // Newer than anything the poll is holding, by definition.
+                    polled = null
+                    obeyImmediately(row)
                 }
             }
             // Either the socket closed or the token expired. Both are worth
@@ -204,6 +232,35 @@ object FollowSession {
             delay(RECONNECT_MS)
         }
     }
+
+    /**
+     * Stopping, without waiting to be asked twice.
+     *
+     * Everything else can wait for the loop's next look, and should, because
+     * one place deciding with one set of rules is what keeps this honest. A
+     * pause cannot. The push arrives under a second after the host presses
+     * it, and then the joiner used to play on until the loop next came round
+     * — so a host pausing was heard as the music carrying on for a couple of
+     * seconds and stopping for no visible reason.
+     *
+     * Only the two states that are unambiguous from the row alone: they
+     * stopped, or an advert started. Starting again is left to the loop,
+     * which knows whether the right track is even loaded.
+     */
+    private fun obeyImmediately(row: RemoteNowPlaying) {
+        if (saysStop(row)) RoomPlayer.pause()
+    }
+
+    /**
+     * Whether a row, on its own, is reason enough to go quiet at once.
+     *
+     * Deliberately narrow. Only what is unambiguous from the row without
+     * knowing anything about our own player: they stopped, an advert started,
+     * or there is no track in it at all. Anything needing both sides of the
+     * story stays with the loop.
+     */
+    internal fun saysStop(row: RemoteNowPlaying): Boolean =
+        !row.isPlaying || row.isAdvert || row.title.isBlank()
 
     /**
      * The last row the socket pushed, and when.
@@ -215,16 +272,29 @@ object FollowSession {
     @Volatile
     private var pushed: Pair<RemoteNowPlaying, Long>? = null
 
+    /**
+     * The last answer the poll gave, and when it gave it.
+     *
+     * The loop looks far more often while a track is starting than it used to,
+     * and without this every one of those looks would be a request. Caching is
+     * safe because a row carries the moment it was written: a reading two
+     * seconds old still projects to the right position now, so age costs
+     * nothing that matters here.
+     */
+    @Volatile
+    private var polled: Pair<RemoteNowPlaying?, Long>? = null
+
     /** Whichever account of the host is freshest: the pushed one, or the asked-for one. */
     private suspend fun hostNow(friends: FriendsRepository, hostId: String): RemoteNowPlaying? {
-        val recent = pushed?.takeIf {
-            SystemClock.elapsedRealtime() - it.second < PUSH_TRUSTED_MS
-        }?.first
+        val now = SystemClock.elapsedRealtime()
         // A push is only ever fresher than a poll, never staler: it arrives at
         // the moment of the write. So when there is a recent one, it wins, and
         // the poll is spared entirely.
-        if (recent != null) return recent
-        return friends.nowPlayingOf(hostId).getOrNull()
+        pushed?.takeIf { now - it.second < PUSH_TRUSTED_MS }?.let { return it.first }
+        polled?.takeIf { now - it.second < POLL_TRUSTED_MS }?.let { return it.first }
+        val fresh = friends.nowPlayingOf(hostId).getOrNull()
+        polled = fresh to SystemClock.elapsedRealtime()
+        return fresh
     }
 
     /**
@@ -248,6 +318,7 @@ object FollowSession {
         scope = null
         _following.value = null
         pushed = null
+        polled = null
         cover = null
         NowPlayingRepository.setRoomPlayback(null)
         RoomPlayer.leave()
@@ -268,6 +339,19 @@ object FollowSession {
         var silentSince = 0L
         var loadedFingerprint = ""
         var loadedId = ""
+
+        /**
+         * A track was just handed to the player and has not been checked
+         * against the host since it started making a sound.
+         *
+         * This is where the missing opening went. A load is given the host's
+         * position at the moment it is issued, but the page then spends
+         * seconds fetching and buffering, and by the time sound comes out the
+         * host has moved on. So the joiner starts life behind by however long
+         * the load took, and the ordinary tolerance turns that into a jump
+         * several seconds later — the opening either heard twice or skipped.
+         */
+        var pendingFirstSync = false
 
         while (true) {
             val host = hostNow(friends, hostId)
@@ -328,7 +412,8 @@ object FollowSession {
                 acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
                 silentSince = 0L
                 lastCorrection = 0L
-                delay(TICK_MS)
+                pendingFirstSync = true
+                delay(SETTLING_TICK_MS)
                 continue
             }
 
@@ -376,10 +461,29 @@ object FollowSession {
 
             val now = SystemClock.elapsedRealtime()
             if (now < acquireUntil || snapshot.buffering) {
+                // One correction that does not wait for the settle window.
+                // The moment a freshly loaded track is genuinely playing, it
+                // is put where the host is now rather than where the host was
+                // when the load was issued. Everything after this can afford
+                // to wait; this cannot, because waiting is what costs the
+                // opening of the song.
+                if (pendingFirstSync && snapshot.playing && !snapshot.buffering &&
+                    snapshot.onWantedTrack && !snapshot.strayed
+                ) {
+                    val out = hostPosition(host) - localPosition(snapshot)
+                    if (abs(out) > FIRST_SYNC_TOLERANCE_MS) RoomPlayer.seekTo(hostPosition(host))
+                    pendingFirstSync = false
+                    lastCorrection = now
+                    acquireUntil = now + SETTLE_MS
+                }
                 publish(hostId, handle, FollowState.CatchingUp, host)
-                delay(TICK_MS)
+                // Looked at often while a track is still finding its feet, and
+                // rarely once it has. The whole cost of the missing opening was
+                // spent waiting for the next ordinary tick.
+                delay(if (pendingFirstSync) SETTLING_TICK_MS else TICK_MS)
                 continue
             }
+            pendingFirstSync = false
 
             // A player that is not playing has no position worth comparing.
             // Reporting an offset here is how "behind by 68s" came to mean
