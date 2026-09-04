@@ -36,16 +36,6 @@ data class RemoteNowPlaying(
      * is coming back, so a room holds rather than letting go.
      */
     @SerialName("is_advert") val isAdvert: Boolean = false,
-    /**
-     * The moment, in the database's clock, that everybody starts this track.
-     *
-     * Blank in the ordinary case. Present only when the host held their own
-     * music so the room could begin together, which is worth doing solely
-     * when there is a room.
-     */
-    @SerialName("starts_at") val startsAt: String? = null,
-    /** Where that start begins, which is where the host's player was stopped. */
-    @SerialName("start_position_ms") val startPositionMs: Long = 0,
 ) {
     /**
      * Whether this is somebody listening now or the last thing they played.
@@ -87,17 +77,6 @@ data class RoomMember(
     val userId: String,
     val handle: String,
     val avatarUrl: String? = null,
-    /**
-     * How late they were for the last start they were given, in milliseconds.
-     * Negative means they were ready with time to spare. Null means they have
-     * not been given one yet.
-     */
-    val lateMs: Int? = null,
-    /**
-     * The track they have fetched and are holding, silent, waiting for the
-     * agreed moment. Null when they are not waiting for anything.
-     */
-    val readyFor: String? = null,
 )
 
 @Serializable
@@ -105,8 +84,6 @@ private data class RosterRow(
     @SerialName("user_id") val userId: String = "",
     val handle: String = "",
     @SerialName("avatar_url") val avatarUrl: String? = null,
-    @SerialName("late_ms") val lateMs: Int? = null,
-    @SerialName("ready_for") val readyFor: String? = null,
 )
 
 /** A friend, and whatever they were last heard playing. */
@@ -236,7 +213,7 @@ class FriendsRepository private constructor(context: Context) {
         val body = Supabase.select(
             "now_playing",
             "user_id=eq.$userId&select=title,artist,duration_ms,position_ms,is_playing,updated_at," +
-                "source_track_id,source_package,is_advert,starts_at,start_position_ms",
+                "source_track_id,source_package,is_advert",
             token,
         )
         Supabase.json
@@ -257,7 +234,7 @@ class FriendsRepository private constructor(context: Context) {
     suspend fun roomMembersOf(hostId: String): Result<List<RoomMember>> = call { token, _ ->
         val body = Supabase.rpc("room_members", buildJsonObject { put("host", hostId) }, token)
         Supabase.json.decodeFromString(ListSerializer(RosterRow.serializer()), body)
-            .map { RoomMember(it.userId, it.handle, it.avatarUrl, it.lateMs, it.readyFor) }
+            .map { RoomMember(it.userId, it.handle, it.avatarUrl) }
             .filter { it.handle.isNotBlank() }
     }
 

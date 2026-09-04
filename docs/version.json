@@ -1,6 +1,6 @@
 {
-  "version_code": 26,
-  "version_name": "5.4",
+  "version_code": 27,
+  "version_name": "5.5",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Joining a room mid-song no longer starts the track from the wrong place. The host now waits until everybody has the song loaded, so nobody misses the opening, and a listener is never jumped forward over music they have not heard."
+  "notes": "Rooms now run a few seconds behind whoever is hosting, on purpose. Nothing is skipped and nothing is cut off: a song that starts while you are listening along starts from its first second, and your music is never jumped forward to catch up. The host is no longer paused between tracks."
 }

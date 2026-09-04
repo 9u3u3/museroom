@@ -79,23 +79,7 @@ class SyncEngine private constructor(context: Context) {
      * Publishes what is playing right now. Overwrites one row rather than
      * appending, because a friend list only ever wants the latest.
      */
-    suspend fun publishNowPlaying(
-        track: NowPlaying?,
-        positionMs: Long,
-        /**
-         * When everybody starts, in the shared clock, or null for the ordinary
-         * case where nobody is waiting on anybody.
-         */
-        startsAt: java.time.Instant? = null,
-        startPositionMs: Long = 0,
-        /**
-         * What to say about playing. While the host is held this is false even
-         * though their player is only stopped because we stopped it, and the
-         * room reads that as "not yet" rather than as "they gave up", because
-         * a start time is sitting beside it.
-         */
-        playingOverride: Boolean? = null,
-    ) {
+    suspend fun publishNowPlaying(track: NowPlaying?, positionMs: Long) {
         val userId = auth.session.value?.userId ?: return
         val token = auth.validAccessToken() ?: return
         if (track == null) return
@@ -112,7 +96,7 @@ class SyncEngine private constructor(context: Context) {
                             put("album", track.album)
                             put("duration_ms", track.durationMs)
                             put("position_ms", positionMs)
-                            put("is_playing", playingOverride ?: track.isPlaying)
+                            put("is_playing", track.isPlaying)
                             put("source_package", track.packageName)
                             put("source_track_id", track.sourceTrackId)
                             put("is_advert", false)
@@ -121,38 +105,12 @@ class SyncEngine private constructor(context: Context) {
                             // from now, and two phones a second apart on the
                             // time are two phones a second apart on the music.
                             put("updated_at", ServerClock.now().toString())
-                            put("starts_at", startsAt?.toString())
-                            put("start_position_ms", startPositionMs)
                         },
                     )
                 }
                 Supabase.insert("now_playing", row, token, upsertOnConflict = "user_id")
             }
         }
-    }
-
-    /**
-     * How late this phone was for the start it was given.
-     *
-     * Negative when it was ready early, which is the number that lets a room
-     * tighten up rather than only ever slacken. Written on the listener's own
-     * row, and read back by the host through the roster, because the host is
-     * the one who has to decide how long everybody waits next time.
-     */
-    suspend fun publishRoomLateness(lateMs: Int?) = patchNowPlaying {
-        put("room_late_ms", lateMs)
-    }
-
-    /**
-     * The track this phone has fetched and is holding for the agreed moment.
-     *
-     * The host reads this before letting anybody go. It is the difference
-     * between a start time that is a guess and one that is a fact: without it
-     * the room begins on a timer and whoever was not ready loses the opening
-     * of the song, which is the one thing none of this may cost.
-     */
-    suspend fun publishRoomReady(fingerprint: String?) = patchNowPlaying {
-        put("room_ready_for", fingerprint)
     }
 
     /** Nothing is playing here any more. Said so that a room stops with you. */

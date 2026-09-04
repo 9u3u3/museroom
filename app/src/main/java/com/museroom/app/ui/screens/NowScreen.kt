@@ -499,12 +499,6 @@ private fun FollowBar() {
                 is FollowState.Finding -> "Finding the track"
                 is FollowState.Loading -> "Loading ${s.title}"
                 is FollowState.CatchingUp -> "Catching up"
-                // Worth saying out loud. The music is stopped and nothing is
-                // wrong, which is a combination people otherwise read as a
-                // fault, and it lasts a couple of seconds every song.
-                is FollowState.Ready ->
-                    if (s.inMs > 300) "Starting together in ${(s.inMs + 499) / 1000}s"
-                    else "Starting together"
                 is FollowState.InStep ->
                     if (kotlin.math.abs(s.offMs) < 1000) "In step"
                     else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"

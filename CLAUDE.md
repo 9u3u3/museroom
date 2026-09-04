@@ -152,25 +152,30 @@ Pieces:
 
 Invariants that were each learned from a real bug. Do not undo them:
 
-- **A room starts every track together, on a moment rather than on a message.**
-  `sync/RoomStart.kt` holds the *host's own* player at a track change, publishes
-  `starts_at` and `start_position_ms`, waits, then releases; listeners preload
-  silently and begin at that instant. This is the standard multi-room audio
-  answer (agree a latency, put the whole room behind it, hand everyone the same
-  moment), and it is the only way the host can be in sync rather than ahead,
-  because a listener cannot hear a song before being told it exists. It happens
-  only at a track change, only when the room has somebody in it, and never again
-  for a player that has shown it will not be stopped. The wait starts at two
-  seconds and adapts from listeners' reported lateness (`room_late_ms`, returned
-  by `room_members`). Do not "simplify" this into a plain publish.
-- **`RoomStart.holding` suppresses ordinary publishing.** While the host is held,
-  their player reports stopped, and a room told "they stopped" lets the track go
-  moments before it is told to start it. Both publishers in `PlaybackTracker`
-  check the flag.
-- **`starts_at` is nullable and must stay nullable in Kotlin.** It is null on
-  almost every row. A non-nullable field throws on decode, and the Realtime path
-  swallows that as "no news", which looks exactly like following silently
-  breaking.
+- **A room runs a deliberate three seconds behind the host** (`ROOM_LAG_MS` in
+  `sync/FollowSession.kt`). Every comparison in the follow loop is against
+  `targetPosition`, not `hostPosition`. This is not a compromise, it is the
+  design: a listener is told a track exists at the instant it begins and cannot
+  have fetched it yet, so aiming to be level means either starting late and
+  skipping the difference or being hauled forward later. The delay turns that
+  gap into a budget spent before the song starts.
+- **Nobody ever loses a second of music. This is the top priority, stated by
+  the user.** Two rules enforce it. A track that began while we were in the
+  room starts at position 0, however far ahead the host is by then; only a
+  track already playing when we walked in is joined partway. And a track begun
+  at its start is never seeked forward, even to get in step, because that skips
+  seconds nobody has heard. Falling further behind is free; the gap is closed by
+  playback speed, which is inaudible.
+- **The previous track's tail is protected.** When the host changes song, the
+  listener still has the delay's worth of the old one to play. Loading the new
+  one immediately would cut it off, so the switch waits until the old track
+  finishes or the host passes the lag.
+- **An earlier design held the host's own player at a track change** so every
+  device could start on an agreed moment. It was built, shipped as 5.3/5.4, and
+  removed: the transport control was unreliable and the gap it cost the host was
+  not worth it. `now_playing.starts_at`, `start_position_ms`, `room_ready_for`
+  and `room_late_ms` are the leftover columns, still present and now unused, and
+  `room_members` still returns two of them. Do not build on them without asking.
 - **One shared clock.** `net/ServerClock.kt` asks the database
   (`server_now()`), halves the round trip, and keeps the *tightest* sample
   rather than the newest. Both ends stamp and project in that time. Two

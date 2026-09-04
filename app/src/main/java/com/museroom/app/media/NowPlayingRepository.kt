@@ -107,40 +107,6 @@ object NowPlayingRepository {
     /** Re-reads every bound controller without rebuilding the bindings. Cheap. */
     fun resync() = publish()
 
-    /**
-     * Stops the app that is playing, and starts it again.
-     *
-     * The only place Museroom touches somebody else's player rather than
-     * reading it, and it exists for one reason: a room cannot begin together
-     * unless the host waits with everybody else. Held at a track boundary,
-     * where a short gap reads as the gap between two songs, and only ever when
-     * there is somebody in the room to wait for.
-     *
-     * The same enabled notification listener that lets us read these sessions
-     * is what lets us send to them, so no further permission is involved. An
-     * app is still free to ignore it, which is why this reports whether the
-     * command was accepted and the caller checks afterwards whether anything
-     * actually happened. A player that will not be stopped is not an error; it
-     * is a host who stays slightly ahead of their room.
-     */
-    fun hold(packageName: String): Boolean = send(packageName) { it.pause() }
-
-    fun release(packageName: String): Boolean = send(packageName) { it.play() }
-
-    private fun send(
-        packageName: String,
-        command: (MediaController.TransportControls) -> Unit,
-    ): Boolean {
-        val controller = synchronized(this) {
-            bound.firstOrNull { (c, _) -> c.packageName == packageName }?.first
-        } ?: return false
-        return runCatching { command(controller.transportControls) }.isSuccess
-    }
-
-    /** Whether that app says it is playing, for checking a hold actually took. */
-    fun isPlaying(packageName: String): Boolean =
-        _sessions.value.any { it.packageName == packageName && it.isPlaying }
-
     /** Rebuilds the controller list from scratch. Use when sessions come and go. */
     fun refresh() {
         val msm = manager ?: return
