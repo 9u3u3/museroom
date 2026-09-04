@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -354,6 +355,32 @@ fun MonoText(
     modifier = modifier,
     style = TextStyle(fontFamily = Mono, fontSize = size.sp, color = color, letterSpacing = 0.4.sp),
 )
+
+/**
+ * The dot that says there is something here.
+ *
+ * Carries no number and no label on purpose: it marks a place worth looking,
+ * and everything about what and why lives at that place rather than on a
+ * seven-pixel circle. The ring is what keeps it visible on a lime sticker and
+ * on cream alike.
+ */
+@Composable
+fun NeoDot(
+    modifier: Modifier = Modifier,
+    size: Dp = 9.dp,
+    fill: Color = Neo.colors.pink,
+    ring: Color = Neo.colors.onAccent,
+) {
+    Box(
+        modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(ring)
+            .padding(1.5.dp)
+            .clip(CircleShape)
+            .background(fill),
+    )
+}
 
 @Composable
 fun Label(text: String, modifier: Modifier = Modifier, color: Color = Neo.colors.ink) = Text(

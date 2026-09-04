@@ -109,6 +109,14 @@ only grows when a music app is added to it deliberately.</p>
 whatever the web plays, so counting one would mean recording anything you happen to
 open.</p>
 
+<h2>Knowing when it is on</h2>
+<div class="rule" style="background:var(--sky)"></div>
+<p>While a track is being counted, Museroom posts a quiet notification saying so, with
+the name of the track. An app that reads what you are listening to should be visible
+while it does it, in the same place as everything else on your phone, rather than only
+from inside itself. It is silent, it can be swiped away, and it is not there when
+nothing is being counted &mdash; including during a private session.</p>
+
 <h2>What is stored on your phone</h2>
 <div class="rule" style="background:var(--pink)"></div>
 <ul>
@@ -188,6 +196,10 @@ immediately, and a private session pauses it.</p>
 <p>No location is used, requested or stored. Museroom declares to Android that scan
 results are never used to work out where you are, which is why it does not ask for
 location on Android 12 and later.</p>
+<p>The "Nearby devices" prompt covers three permissions: broadcasting, scanning, and
+connecting. The third is asked for only so Museroom can raise Android's own "turn
+Bluetooth on" dialog, which from Android 12 refuses without it. Museroom never
+connects to, pairs with, or reads anything from a Bluetooth device.</p>
 
 <h2>Who can see your listening</h2>
 <div class="rule" style="background:var(--violet)"></div>

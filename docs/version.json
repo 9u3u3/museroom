@@ -1,6 +1,6 @@
 {
-  "version_code": 18,
-  "version_name": "4.6",
+  "version_code": 19,
+  "version_name": "4.7",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "One card in a room, with its cover. A clock that stops when the host does. Add a friend from their page."
+  "notes": "Nearby no longer crashes when Bluetooth is off. A dot when there is an update. A quiet line saying what Museroom is counting."
 }

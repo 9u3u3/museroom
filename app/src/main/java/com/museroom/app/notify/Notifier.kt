@@ -45,12 +45,16 @@ object Notifier {
     private const val CHANNEL_ROOM = "room_activity_v2"
     private const val CHANNEL_ROOM_OLD = "room_activity"
     private const val CHANNEL_FRIENDS = "friend_activity"
+    private const val CHANNEL_UPDATES = "app_updates"
+    private const val CHANNEL_TRACKING = "tracking"
 
     private const val ID_LET_IN = 4203
     private const val ID_JOINED = 4204
     private const val ID_FRIEND_BASE = 4400
     private const val ID_REQUEST_BASE = 4600
     private const val ID_LIKE_BASE = 4800
+    private const val ID_UPDATE = 4900
+    private const val ID_TRACKING = 4901
 
     /** The notification for one particular request, so answering clears it. */
     fun requestNotificationId(requestId: Long): Int =
@@ -99,6 +103,30 @@ object Notifier {
                             .build(),
                     )
                     enableVibration(true)
+                },
+            )
+        }
+        if (manager.getNotificationChannel(CHANNEL_TRACKING) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_TRACKING,
+                    "What Museroom is hearing",
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply {
+                    description = "Shown while a track is being counted"
+                    setSound(null, null)
+                    setShowBadge(false)
+                },
+            )
+        }
+        if (manager.getNotificationChannel(CHANNEL_UPDATES) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_UPDATES,
+                    "New versions",
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply {
+                    description = "When a newer build of Museroom is on the site"
                 },
             )
         }
@@ -251,6 +279,76 @@ object Notifier {
             .build()
         val id = ID_LIKE_BASE + (handle.hashCode().mod(60))
         runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
+    }
+
+    /**
+     * A newer build is on the site.
+     *
+     * Without a store nothing updates itself and nobody is told, so somebody
+     * who installed once would sit on that build for ever. Said once per
+     * version: a message repeating that the same build exists every day is how
+     * people learn to swipe them away unread.
+     */
+    fun update(context: Context, versionName: String, notes: String): Boolean {
+        if (!canPost(context)) return false
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("Museroom $versionName is out")
+            .setContentText(notes.ifBlank { "Open Museroom to get it." })
+            .setStyle(NotificationCompat.BigTextStyle().bigText(notes))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context, 7))
+            .build()
+        return runCatching {
+            NotificationManagerCompat.from(context).notify(ID_UPDATE, notification)
+        }.isSuccess
+    }
+
+    /**
+     * What Museroom is counting, while it is counting it.
+     *
+     * Not a player and not an alert. An app that reads what you are listening
+     * to should be visible while it does, in the same place everything else on
+     * the phone is visible, rather than only inside itself — somebody should
+     * never have to open Museroom to find out whether Museroom is running.
+     *
+     * Silent, low, and swipeable. It is a statement of fact, not a request for
+     * attention, and it comes back on the next track.
+     */
+    fun tracking(
+        context: Context,
+        title: String,
+        artist: String,
+        source: String,
+        art: android.graphics.Bitmap? = null,
+    ) {
+        if (!canPost(context)) return
+        ensureChannel(context)
+        val notification = NotificationCompat.Builder(context, CHANNEL_TRACKING)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(art)
+            .setContentTitle(title.ifBlank { "Something is playing" })
+            .setContentText(
+                listOf(artist, source).filter { it.isNotBlank() }.joinToString(" · ")
+                    .ifBlank { "Museroom is counting this." },
+            )
+            .setSubText("Museroom is listening")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(openApp(context, 8))
+            .build()
+        runCatching { NotificationManagerCompat.from(context).notify(ID_TRACKING, notification) }
+    }
+
+    /** Nothing is playing, or nothing is being counted. Either way, say nothing. */
+    fun clearTracking(context: Context) {
+        runCatching { NotificationManagerCompat.from(context).cancel(ID_TRACKING) }
     }
 
     private fun answer(context: Context, requestId: Long, accept: Boolean): PendingIntent {

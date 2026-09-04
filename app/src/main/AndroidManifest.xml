@@ -15,6 +15,14 @@
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <!--
+        Only ever to raise the system's own "turn Bluetooth on" dialog, which
+        from Android 12 refuses without it and takes the app down with a
+        SecurityException. Museroom never connects to, pairs with, or reads
+        anything from a Bluetooth device. It sits in the same Nearby devices
+        prompt as the two above, so it costs nobody an extra tap.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission
         android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />

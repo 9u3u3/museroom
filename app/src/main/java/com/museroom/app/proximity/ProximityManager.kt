@@ -102,10 +102,22 @@ class ProximityManager private constructor(private val context: Context) {
 
     fun bluetoothReady(): Boolean = adapter?.isEnabled == true
 
-    /** Everything this needs, which differs sharply across Android versions. */
+    /**
+     * Everything this needs, which differs sharply across Android versions.
+     *
+     * BLUETOOTH_CONNECT is in the list for one reason: raising the system's
+     * own "turn Bluetooth on" dialog needs it from Android 12, and launching
+     * that dialog without it does not fail quietly — it throws, and takes the
+     * app down. Nothing here ever connects to a device. All three sit in the
+     * same Nearby devices prompt, so asking for it costs nobody a second tap.
+     */
     fun requiredPermissions(): Array<String> =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_SCAN)
+            arrayOf(
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+            )
         } else {
             // Before Android 12 a BLE scan counted as a location capability, so
             // there is no way to scan without asking for location.

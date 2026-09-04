@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -51,6 +52,7 @@ import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.BoardPeriod
 import com.museroom.app.net.BoardRepository
 import com.museroom.app.net.LikesRepository
+import com.museroom.app.net.Updates
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.RoomPresence
@@ -58,6 +60,7 @@ import com.museroom.app.tracking.PlaybackTracker
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MuseroomMark
 import com.museroom.app.ui.kit.NeoIcon
+import com.museroom.app.ui.kit.NeoDot
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.halftone
 import com.museroom.app.ui.screens.BoardScreen
@@ -275,6 +278,10 @@ private fun HeaderStats(signedIn: Boolean) {
 @Composable
 private fun BottomNav(current: Tab, onPick: (Tab) -> Unit) {
     val c = Neo.colors
+    // The only thing in here worth a mark. A newer build is a standing fact
+    // rather than a message, so it wants a dot on the way in rather than
+    // something that has to be read and dismissed.
+    val newer by Updates.newer.collectAsStateWithLifecycle()
     Row(
         Modifier
             .fillMaxWidth()
@@ -323,11 +330,21 @@ private fun BottomNav(current: Tab, onPick: (Tab) -> Unit) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        NeoIcon(
-                            entry.icon,
-                            size = 21.dp,
-                            color = if (on) c.onAccent else c.ink.copy(alpha = 0.72f),
-                        )
+                        Box {
+                            NeoIcon(
+                                entry.icon,
+                                size = 21.dp,
+                                color = if (on) c.onAccent else c.ink.copy(alpha = 0.72f),
+                            )
+                            if (entry == Tab.You && newer != null) {
+                                NeoDot(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 4.dp, y = (-3).dp),
+                                    ring = if (on) c.lime else c.card,
+                                )
+                            }
+                        }
                         Text(
                             text = entry.label.uppercase(),
                             style = androidx.compose.ui.text.TextStyle(

@@ -63,6 +63,7 @@ import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
+import com.museroom.app.ui.kit.NeoDot
 import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.ui.kit.NeoSwitch
 import com.museroom.app.ui.kit.NeoTone
@@ -106,6 +107,7 @@ fun YouScreen() {
     var confirmDeleteAccount by remember { mutableStateOf(false) }
     var photoNote by remember { mutableStateOf<String?>(null) }
     var updateNote by remember { mutableStateOf<String?>(null) }
+    val newer by Updates.newer.collectAsStateWithLifecycle()
 
     // The system picker, so Museroom never asks for access to the gallery: it
     // is handed one picture and sees nothing else.
@@ -451,8 +453,13 @@ fun YouScreen() {
         )
 
         // Nothing here updates itself, so there has to be somewhere to ask.
+        // The dot is the same one on the tab, so following it lands on the
+        // button it was about rather than on a screen with no answer.
+        Box(Modifier.fillMaxWidth()) {
         NeoButton(
-            updateNote ?: "Check for an update",
+            updateNote ?: if (newer != null) "Museroom ${newer?.versionName} is out" else "Check for an update",
+            // Paper rather than pink, so the dot is the loud thing on it. A
+            // pink dot on a pink button is a dot nobody sees.
             tone = NeoTone.Paper,
             enabled = updateNote == null,
             modifier = Modifier.fillMaxWidth(),
@@ -473,6 +480,16 @@ fun YouScreen() {
                 }
             },
         )
+            if (newer != null) {
+                NeoDot(
+                    size = 11.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-16).dp, y = 13.dp),
+                    ring = Neo.colors.card,
+                )
+            }
+        }
 
         Label("Counted", color = c.ink)
 

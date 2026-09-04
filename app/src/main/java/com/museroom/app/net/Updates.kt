@@ -39,6 +39,7 @@ object Updates {
     private const val MANIFEST = "https://9u3u3.github.io/museroom/version.json"
     private const val PREFS = "museroom.updates"
     private const val KEY_SKIPPED = "skipped_version_code"
+    private const val KEY_TOLD = "announced_version_code"
 
     /** Once a day is often enough for something people install by hand. */
     private const val EVERY_MS = 24 * 60 * 60 * 1000L
@@ -52,6 +53,19 @@ object Updates {
 
     /** Null unless there is a newer build this phone has not turned down. */
     val available: StateFlow<Release?> = _available.asStateFlow()
+
+    private val _newer = MutableStateFlow<Release?>(null)
+
+    /**
+     * A newer build exists, whether or not it has been turned down.
+     *
+     * Separate from [available] because the card and the dot are answering
+     * different questions. The card is the interruption, and "not now" should
+     * put it away. The dot is the standing fact, and putting a card away does
+     * not make the fact untrue — only installing the build does, at which
+     * point the next check finds nothing newer and it goes out by itself.
+     */
+    val newer: StateFlow<Release?> = _newer.asStateFlow()
 
     private var lastChecked = 0L
 
@@ -77,6 +91,9 @@ object Updates {
                     .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 val skipped = prefs.getInt(KEY_SKIPPED, 0)
 
+                _newer.value = release.takeIf {
+                    shouldOffer(it, BuildConfig.VERSION_CODE, skipped = 0, force = true)
+                }
                 _available.value =
                     if (shouldOffer(release, BuildConfig.VERSION_CODE, skipped, force)) {
                         release
@@ -108,6 +125,26 @@ object Updates {
         if (!release.url.startsWith("https://")) return false
         if (release.versionCode <= installed) return false
         return force || release.versionCode > skipped
+    }
+
+    /**
+     * Whether this build has already been announced once.
+     *
+     * A notification per version, not per check. Being reminded daily that the
+     * same build exists is how people learn to swipe the messages away without
+     * reading them.
+     */
+    fun alreadyAnnounced(context: Context, release: Release): Boolean =
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt(KEY_TOLD, 0) >= release.versionCode
+
+    fun markAnnounced(context: Context, release: Release) {
+        context.applicationContext
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_TOLD, release.versionCode)
+            .apply()
     }
 
     /** Not this one. A later one will ask again. */

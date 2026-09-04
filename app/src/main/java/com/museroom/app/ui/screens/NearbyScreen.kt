@@ -89,21 +89,46 @@ fun NearbyScreen() {
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) manager.start() else wanted = false
     }
+    var radioNote by remember { mutableStateOf<String?>(null) }
+
+    /**
+     * Ask for the radio, and survive being refused.
+     *
+     * From Android 12 this dialog needs the connect permission, and without it
+     * the platform does not decline — it throws, which took the whole app down
+     * the moment somebody with Bluetooth off tapped the switch. The permission
+     * is asked for now, and this can no longer be the thing that crashes:
+     * anything unexpected falls back to the Bluetooth settings screen.
+     */
+    fun askForBluetooth() {
+        runCatching { turnOnBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) }
+            .onFailure {
+                wanted = false
+                radioNote = "Museroom could not open the Bluetooth switch. Turn Bluetooth " +
+                    "on and try again."
+                runCatching {
+                    context.startActivity(
+                        Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }
+    }
 
     fun goOnAir() {
+        radioNote = null
         when {
-            !manager.hasPermissions() -> ask.launch(manager.requiredPermissions())
-            !manager.bluetoothReady() ->
-                turnOnBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            !manager.hasPermissions() ->
+                runCatching { ask.launch(manager.requiredPermissions()) }
+                    .onFailure { wanted = false }
+            !manager.bluetoothReady() -> askForBluetooth()
             else -> manager.start()
         }
     }
 
     // A permission granted is only half of it: the radio may still be off.
     LaunchedEffect(status) {
-        if (wanted && status is ProximityStatus.BluetoothOff) {
-            turnOnBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-        }
+        if (wanted && status is ProximityStatus.BluetoothOff) askForBluetooth()
     }
 
     Column(
@@ -151,7 +176,7 @@ fun NearbyScreen() {
         // One line, and only when there is something to do about it. A person
         // does not need to know whether the radio is advertising; they need to
         // know why nobody is showing up.
-        val trouble = when (val s = status) {
+        val trouble = radioNote ?: when (val s = status) {
             is ProximityStatus.NeedsPermission -> "Bluetooth permission is needed."
             is ProximityStatus.BluetoothOff -> "Bluetooth is off."
             is ProximityStatus.PausedForPrivacy -> "Paused while your session is private."

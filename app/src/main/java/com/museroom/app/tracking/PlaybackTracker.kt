@@ -14,6 +14,7 @@ import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.net.FriendsRepository
 import com.museroom.app.net.LikesRepository
 import com.museroom.app.net.ListenRepository
+import com.museroom.app.net.Updates
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.notify.Notifier
@@ -60,6 +61,9 @@ object PlaybackTracker {
 
     /** A friend putting a record on can wait a minute to be mentioned. */
     private const val FRIENDS_MS = 60_000L
+
+    /** Nothing about a hand-installed app changes fast enough to ask sooner. */
+    private const val UPDATE_CHECK_MS = 6 * 60 * 60 * 1000L
 
     private val differ = PlaybackDiffer(heartbeatMs = HEARTBEAT_MS)
 
@@ -135,6 +139,73 @@ object PlaybackTracker {
         RoomPresence.start(app)
         newScope.launch { watchFriendsListening(app) }
         newScope.launch { watchLikes(app, prefs) }
+        newScope.launch { watchForUpdates(app) }
+        newScope.launch { showWhatIsBeingCounted(app) }
+    }
+
+    /**
+     * Saying, out loud, that this is being recorded.
+     *
+     * An app that reads what you are listening to should be visible while it
+     * does it, in the shade with everything else, rather than only from inside
+     * itself. Nobody should have to open Museroom to find out whether Museroom
+     * is running — and the honest version of that is a line that appears
+     * exactly when something is being counted and goes when it is not.
+     *
+     * A private session shows nothing, because nothing is being counted. Nor
+     * does a room: a joiner already has the room's own notification, and two
+     * notifications for one piece of music is one too many.
+     */
+    private suspend fun showWhatIsBeingCounted(app: Context) {
+        var shown = ""
+        NowPlayingRepository.sessions.collect { sessions ->
+            val hidden = privacy?.privateSession?.value == true
+            val active = sessions.pickActive()
+                ?.takeIf { it.isTracked && it.isPlaying && !hidden }
+                // The room posts its own, with the same cover and more to say.
+                ?.takeIf { FollowSession.following.value == null }
+
+            val state = "${active?.fingerprint.orEmpty()}|${active?.artwork != null}"
+            if (state == shown) return@collect
+            shown = state
+
+            if (active == null) {
+                Notifier.clearTracking(app)
+            } else {
+                Notifier.tracking(
+                    app, active.title, active.artist, active.sourceLabel, active.artwork,
+                )
+            }
+        }
+    }
+
+    /**
+     * Whether a newer build is on the site.
+     *
+     * Here rather than on a screen because the point is to reach somebody who
+     * is not looking. Museroom is not on a store, so nothing updates itself
+     * and nobody would otherwise be told; the alternative is people running an
+     * old build for ever, which for an app where two phones have to agree
+     * about a protocol goes wrong quietly.
+     *
+     * Announced once per version, never downloaded, never installed. It opens
+     * the page and the person decides.
+     */
+    private suspend fun watchForUpdates(app: Context) {
+        while (true) {
+            Updates.check(app).onSuccess { offered ->
+                val release = offered ?: Updates.newer.value
+                if (release != null && !Updates.alreadyAnnounced(app, release)) {
+                    // Marked only once it is actually in the shade. Marking
+                    // first would turn a failed post into a version nobody is
+                    // ever told about.
+                    if (Notifier.update(app, release.versionName, release.notes)) {
+                        Updates.markAnnounced(app, release)
+                    }
+                }
+            }
+            delay(UPDATE_CHECK_MS)
+        }
     }
 
     /**
@@ -326,6 +397,7 @@ object PlaybackTracker {
         scope?.cancel()
         scope = null
         differ.reset()
+        runCatching { appContext.let { Notifier.clearTracking(it) } }
     }
 
     private var privacy: PrivacyState? = null
