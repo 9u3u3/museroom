@@ -52,6 +52,7 @@ import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.LikesRepository
 import com.museroom.app.net.ListenRepository
 import com.museroom.app.sync.FollowSession
+import com.museroom.app.sync.RoomPresence
 import com.museroom.app.sync.SyncEngine
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
@@ -301,6 +302,13 @@ fun ListenerRow(
     val following by FollowSession.following.collectAsStateWithLifecycle()
     val inTheirRoom = hostId != null && following?.hostId == hostId
 
+    // Somebody listening along with you is playing your music, through your
+    // room. Offering to join them would be joining your own music back to
+    // front, and the heart would be liking your own taste. Neither is a thing
+    // to offer, so the row says where they are instead.
+    val inMyRoom by RoomPresence.members.collectAsStateWithLifecycle()
+    val isMyGuest = hostId != null && inMyRoom.any { it.userId == hostId }
+
     var art by remember(title, artist) { mutableStateOf<Bitmap?>(Artwork.cached(title, artist)) }
     var outcome by remember { mutableStateOf<String?>(null) }
     var asked by remember(title) { mutableStateOf(false) }
@@ -399,7 +407,14 @@ fun ListenerRow(
                                     .padding(horizontal = 7.dp, vertical = 3.dp),
                             )
                         }
-                        Label(if (isPlaying) "listening" else "quiet", color = c.ink)
+                        Label(
+                            when {
+                                isMyGuest -> "in your room"
+                                isPlaying -> "listening"
+                                else -> "quiet"
+                            },
+                            color = c.ink,
+                        )
                     }
                 }
                 Text(
@@ -427,8 +442,9 @@ fun ListenerRow(
                 MonoText("${formatClock(position)} / ${formatClock(durationMs)}", size = 11, color = c.ink)
                 Spacer(Modifier.weight(1f))
                 // Only where there is something to like: a track somebody is
-                // actually playing, right now, that you can see.
-                if (hostId != null && isPlaying) {
+                // actually playing, right now, that you can see, and that is
+                // theirs rather than yours coming back through your own room.
+                if (hostId != null && isPlaying && !isMyGuest) {
                     LikeHeart(hostId, title, artist, durationMs)
                     Spacer(Modifier.size(8.dp))
                 }
@@ -437,13 +453,14 @@ fun ListenerRow(
                 // the music starts by itself when they say yes.
                 NeoButton(
                     text = when {
+                        isMyGuest -> "With you"
                         inTheirRoom -> "Listening"
                         asked -> "Waiting"
                         openToAll -> "Join"
                         else -> "Ask to join"
                     },
                     small = true,
-                    enabled = !asked && !inTheirRoom && hostId != null,
+                    enabled = !asked && !inTheirRoom && !isMyGuest && hostId != null,
                     onClick = {
                         val host = hostId ?: return@NeoButton
                         if (openToAll) {

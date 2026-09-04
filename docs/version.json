@@ -1,6 +1,6 @@
 {
-  "version_code": 20,
-  "version_name": "4.8",
+  "version_code": 21,
+  "version_name": "4.9",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "The update button and the update notification now take you straight to the download page."
+  "notes": "A room no longer wanders onto a song nobody chose when a track ends. Somebody listening along with you is shown as being in your room."
 }

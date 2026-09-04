@@ -69,6 +69,27 @@
       payload.detail = 'unreadable';
     }
     try { payload.videoId = data.video_id || data.videoId || ''; } catch (e) { payload.videoId = ''; }
+
+    /*
+     * Never play something nobody asked for.
+     *
+     * A track ending hands the page back its own queue, and it starts the
+     * next thing it fancies — which, after a Drake song, is another Drake
+     * song. Kotlin notices and corrects, but not for a second or two, and in
+     * those seconds the listener is hearing music the host is not playing and
+     * has no way to know it. Silence is the honest answer for that gap, so
+     * the page stops itself here rather than waiting to be told.
+     *
+     * Identity, not timing: whatever the reason the id changed, if it is not
+     * the one we asked for then it is not the room's music.
+     */
+    try {
+      if (wanted && payload.videoId && payload.videoId !== wanted) {
+        payload.strayed = true;
+        var stray = document.querySelector('video');
+        if (stray && !stray.paused) { try { stray.pause(); } catch (e) {} }
+      }
+    } catch (e) {}
     try { payload.title = data.title || ''; } catch (e) { payload.title = ''; }
     try { payload.author = data.author || ''; } catch (e) { payload.author = ''; }
     try { payload.positionMs = Math.round((p.getCurrentTime() || 0) * 1000); } catch (e) { payload.positionMs = 0; }
@@ -149,6 +170,19 @@
       wanted = '';
       var v = document.querySelector('video');
       if (v) { try { v.pause(); } catch (e) {} }
+    },
+
+    /*
+     * What this page is meant to be playing, said again after a navigation.
+     *
+     * The first track of a room arrives as a page load rather than as a call
+     * to the player, and a page load starts this script over with nothing
+     * wanted — which would leave the guard above switched off for exactly the
+     * song most likely to end and hand the queue back. So Kotlin says it once
+     * more when the page comes up.
+     */
+    expect: function (id) {
+      wanted = id || '';
     },
 
     poll: report,

@@ -62,6 +62,12 @@ object RoomPlayer {
         val durationMs: Long = 0,
         val state: Int = -1,
         val ad: Boolean = false,
+        /**
+         * The page started something of its own and was stopped for it. Said
+         * out loud so the room can tell "nothing is playing yet" from "the
+         * page tried to play the wrong song".
+         */
+        val strayed: Boolean = false,
         /** What the player is doing, in one line, for when it is doing nothing. */
         val detail: String = "",
         /** When this was taken, so a stale reading is recognisable as one. */
@@ -78,6 +84,9 @@ object RoomPlayer {
     private val main = Handler(Looper.getMainLooper())
     private var web: WebView? = null
     private var booted = false
+
+    /** The id the room asked for, which survives a page navigation. */
+    @Volatile private var wantedId: String = ""
     private var appContext: Context? = null
 
     private val pending = ConcurrentHashMap<String, CompletableDeferred<String?>>()
@@ -174,6 +183,15 @@ object RoomPlayer {
             override fun onPageFinished(v: WebView, url: String) {
                 booted = true
                 asset(v, "room.js")
+                // A navigation starts the page's script over with nothing
+                // wanted, which would leave it unable to tell its own queue
+                // from the room's music for the whole of the first track.
+                wantedId.takeIf { it.isNotBlank() }?.let {
+                    v.evaluateJavascript(
+                        "window.__museroom && window.__museroom.expect(${it.quoted()})",
+                        null,
+                    )
+                }
             }
         }
         web = view
@@ -225,6 +243,9 @@ object RoomPlayer {
      */
     fun load(videoId: String, startMs: Long) = onMain {
         val view = web ?: return@onMain
+        // Held here as well as in the page, because a navigation wipes the
+        // page's copy and the guard against a strayed player depends on it.
+        wantedId = videoId
         val startSeconds = (startMs.coerceAtLeast(0L) / 1000.0)
         if (!booted) {
             view.loadUrl(watchUrl(videoId, startSeconds))
@@ -250,6 +271,7 @@ object RoomPlayer {
 
     /** Stop following: silence the player and forget what it was aiming at. */
     fun leave() {
+        wantedId = ""
         js("window.__museroom.leave()")
         _snapshot.value = Snapshot(ready = _snapshot.value.ready)
     }
@@ -347,6 +369,7 @@ object RoomPlayer {
                 durationMs = o.optLong("durationMs"),
                 state = o.optInt("state", -1),
                 ad = o.optBoolean("ad"),
+                strayed = o.optBoolean("strayed"),
                 detail = o.optString("detail"),
                 takenAt = SystemClock.elapsedRealtime(),
             )

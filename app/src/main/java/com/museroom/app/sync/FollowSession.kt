@@ -120,6 +120,15 @@ object FollowSession {
     private const val RECONNECT_MS = 5_000L
 
     /**
+     * How close to the end of a track counts as over.
+     *
+     * Inside this, reloading is pointless: the copy would end again before
+     * anything could be done with it, and every ending hands the page back its
+     * own queue.
+     */
+    private const val END_OF_TRACK_MS = 6_000L
+
+    /**
      * The package a room reports itself under. Deliberately not in the
      * allowlist: this is the one session Museroom constructs rather than
      * reads, so it should never be picked up as though somebody's own copy of
@@ -297,6 +306,10 @@ object FollowSession {
                     // Not remembered as loaded. The page may simply not have
                     // been up yet, and a track given up on once would never be
                     // tried again for as long as the host played it.
+                    // Quiet while we look. Whatever the page was playing is
+                    // not what the host is playing, and letting it run is how
+                    // somebody ends up hearing a song nobody chose.
+                    RoomPlayer.pause()
                     publish(
                         hostId, handle,
                         FollowState.Stuck("Still looking for \"${host.title}\"."), host,
@@ -336,15 +349,27 @@ object FollowSession {
 
             // The player finished the track and started something of its own
             // choosing. Identity is the reliable test for that, which is why
-            // the id we asked for is kept rather than trusted to stick.
+            // the id we asked for is kept rather than trusted to stick. The
+            // page silences itself the moment this happens; this decides what
+            // to do about it.
             val wandered = loadedId.isNotBlank() &&
                 snapshot.videoId.isNotBlank() &&
                 snapshot.videoId != loadedId
             if (wandered) {
-                publish(hostId, handle, FollowState.Loading(host.title), host)
-                RoomPlayer.load(loadedId, hostPosition(host))
-                acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
-                silentSince = 0L
+                if (!worthReloading(host.durationMs, hostPosition(host))) {
+                    // Their song is nearly over and ours has already ended.
+                    // Reloading the last few seconds only ends again, and the
+                    // page starts something of its own each time round — which
+                    // is how a listener ended up on a different Drake song from
+                    // the host. Wait for whatever they play next instead.
+                    RoomPlayer.pause()
+                    publish(hostId, handle, FollowState.CatchingUp, host)
+                } else {
+                    publish(hostId, handle, FollowState.Loading(host.title), host)
+                    RoomPlayer.load(loadedId, hostPosition(host))
+                    acquireUntil = SystemClock.elapsedRealtime() + ACQUIRE_MS
+                    silentSince = 0L
+                }
                 delay(TICK_MS)
                 continue
             }
@@ -360,7 +385,10 @@ object FollowSession {
             // Reporting an offset here is how "behind by 68s" came to mean
             // "silent", which is the least useful thing it could have meant.
             if (!snapshot.playing) {
-                RoomPlayer.play()
+                // Never resume a player that has strayed. It was stopped
+                // because it had started somebody else's song, and pressing
+                // play on it plays that song.
+                if (!snapshot.strayed) RoomPlayer.play()
                 if (silentSince == 0L) silentSince = now
                 if (now - silentSince < SILENT_MS) {
                     publish(hostId, handle, FollowState.CatchingUp, host)
@@ -437,6 +465,19 @@ object FollowSession {
             ),
         )
     }
+
+    /**
+     * Whether a strayed player is worth pulling back to the track it left.
+     *
+     * Near the end it is not: the copy would end again within seconds, and
+     * every ending hands the page back its own queue to start something of
+     * its own. Waiting for the host's next track is quieter and quicker.
+     *
+     * A track of unknown length is always worth reloading, because there is
+     * no end for it to be near.
+     */
+    internal fun worthReloading(hostDurationMs: Long, hostPositionMs: Long): Boolean =
+        hostDurationMs <= 0 || hostDurationMs - hostPositionMs >= END_OF_TRACK_MS
 
     /**
      * Their position now, projected from the snapshot and when it was taken.
