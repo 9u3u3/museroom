@@ -104,6 +104,22 @@
             android:foregroundServiceType="mediaPlayback" />
 
         <!--
+            Museroom's own playback. Exported with the Media3 action because
+            that is how the system, a car head unit and the button on a pair of
+            headphones find the session; without the filter the notification has
+            no controls and a media button reaches nothing.
+        -->
+        <service
+            android:name=".player.PlayerService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <!--
             Enabling this component in Settings is what grants access to
             MediaSessionManager.getActiveSessions(). The service itself does very
             little; it exists to hold the permission and to nudge a resync.

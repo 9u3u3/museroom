@@ -113,7 +113,32 @@ object InnerTube {
     class Unplayable(val status: String, val reason: String?) :
         RuntimeException("YouTube will not play this ($status)${reason?.let { ": $it" } ?: ""}")
 
+    /**
+     * The web client, which is no good for playback and is exactly right for
+     * everything else. Search, browse and lyrics are not gated behind the bot
+     * check; only streaming data is. So we ask as a headset for audio and as a
+     * browser for words, which is the honest description of what each one is
+     * for.
+     */
+    private val WEB_REMIX = Client(
+        name = "WEB_REMIX",
+        version = "1.20250310.01.00",
+        userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    )
+
     private const val ENDPOINT = "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
+    private const val SEARCH = "https://music.youtube.com/youtubei/v1/search?prettyPrint=false"
+
+    /**
+     * YouTube Music's "songs" filter, as the site itself sends it.
+     *
+     * Without it a search returns music videos, which are a different recording
+     * of the same song with a different length. In a room that difference is
+     * everybody hearing a slightly different track and the follow loop trying to
+     * correct for something that is not drift.
+     */
+    private const val SONGS_ONLY = "EgWKAQIIAWoKEAkQBRAKEAMQBA=="
 
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonMedia = "application/json".toMediaType()
@@ -144,6 +169,139 @@ object InnerTube {
             }
         }
         throw last ?: Unplayable("NO_CLIENT", "every client was excluded")
+    }
+
+    /** A song somebody could choose. */
+    data class Found(
+        val id: String,
+        val title: String,
+        val artist: String,
+        val album: String,
+        val durationMs: Long,
+    )
+
+    /** Songs matching a query, best first, or empty if the search found none. */
+    fun search(query: String, limit: Int = 20): List<Found> {
+        if (query.isBlank()) return emptyList()
+        val body = buildJsonObject {
+            putJsonObject("context") {
+                putJsonObject("client") {
+                    put("clientName", WEB_REMIX.name)
+                    put("clientVersion", WEB_REMIX.version)
+                    put("hl", "en")
+                    put("gl", "US")
+                }
+            }
+            put("query", query)
+            put("params", SONGS_ONLY)
+        }
+        val request = Request.Builder()
+            .url(SEARCH)
+            .header("User-Agent", WEB_REMIX.userAgent)
+            .header("Origin", "https://music.youtube.com")
+            .post(body.toString().toRequestBody(jsonMedia))
+            .build()
+        val text = http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return emptyList()
+            response.body?.string().orEmpty()
+        }
+        return results(text, limit)
+    }
+
+    /**
+     * Reads the search response by hunting for the one renderer that matters
+     * rather than by describing the whole tree.
+     *
+     * The tree is deep, it is versioned by nobody, and the shelves around a
+     * result move about between releases. What has not moved is that a song is a
+     * `musicResponsiveListItemRenderer` with a video id somewhere inside it and
+     * its text in flex columns. Walking for that survives a redesign of
+     * everything around it; a full description of the layout does not.
+     */
+    fun results(payload: String, limit: Int = 20): List<Found> {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull()
+            ?: return emptyList()
+        val found = mutableListOf<Found>()
+        walk(root) { item ->
+            if (found.size >= limit) return@walk
+            val id = firstString(item, "videoId") ?: return@walk
+            val columns = item["flexColumns"]?.jsonArray ?: return@walk
+            val lines = columns.map { runsIn(it) }.filter { it.isNotBlank() }
+            if (lines.isEmpty()) return@walk
+            val title = lines.first()
+            val parts = lines.getOrNull(1)?.split("•")?.map { it.trim() }?.filter { it.isNotEmpty() }
+                ?: emptyList()
+            val duration = parts.lastOrNull()?.let { clock(it) } ?: 0
+            found += Found(
+                id = id,
+                title = title,
+                artist = parts.firstOrNull().orEmpty(),
+                album = if (parts.size > 2) parts[parts.size - 2] else "",
+                durationMs = duration,
+            )
+        }
+        return found
+    }
+
+    /** Every musicResponsiveListItemRenderer in the tree, in the order it appears. */
+    private fun walk(element: kotlinx.serialization.json.JsonElement, onItem: (JsonObject) -> Unit) {
+        when (element) {
+            is JsonObject -> for ((key, value) in element) {
+                if (key == "musicResponsiveListItemRenderer" && value is JsonObject) onItem(value)
+                else walk(value, onItem)
+            }
+            is kotlinx.serialization.json.JsonArray -> element.forEach { walk(it, onItem) }
+            else -> Unit
+        }
+    }
+
+    private fun firstString(element: kotlinx.serialization.json.JsonElement, key: String): String? {
+        when (element) {
+            is JsonObject -> {
+                for ((k, v) in element) {
+                    if (k == key) {
+                        val text = runCatching { v.jsonPrimitive.content }.getOrNull()
+                        if (!text.isNullOrBlank()) return text
+                    }
+                    firstString(v, key)?.let { return it }
+                }
+            }
+            is kotlinx.serialization.json.JsonArray -> element.forEach { child ->
+                firstString(child, key)?.let { return it }
+            }
+            else -> Unit
+        }
+        return null
+    }
+
+    /** Everything a renderer's runs say, joined, wherever they are nested. */
+    private fun runsIn(element: kotlinx.serialization.json.JsonElement): String {
+        val out = StringBuilder()
+        fun visit(e: kotlinx.serialization.json.JsonElement) {
+            when (e) {
+                is JsonObject -> for ((k, v) in e) {
+                    if (k == "runs" && v is kotlinx.serialization.json.JsonArray) {
+                        v.forEach { run ->
+                            runCatching { run.jsonObject["text"]!!.jsonPrimitive.content }
+                                .getOrNull()?.let { out.append(it) }
+                        }
+                    } else visit(v)
+                }
+                is kotlinx.serialization.json.JsonArray -> e.forEach { visit(it) }
+                else -> Unit
+            }
+        }
+        visit(element)
+        return out.toString().trim()
+    }
+
+    /** "4:09" or "1:02:11" as milliseconds, or zero when it is not a time at all. */
+    fun clock(text: String): Long {
+        val parts = text.split(":")
+        if (parts.size !in 2..3) return 0
+        val numbers = parts.map { it.trim().toIntOrNull() ?: return 0 }
+        val seconds = numbers.fold(0) { total, n -> total * 60 + n }
+        return seconds * 1000L
     }
 
     /** One request, one client, parsed into what the player actually needs. */

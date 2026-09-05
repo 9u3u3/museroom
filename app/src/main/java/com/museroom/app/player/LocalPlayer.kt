@@ -74,6 +74,27 @@ object LocalPlayer {
         val onWantedTrack: Boolean get() = wanted.isNotBlank() && videoId == wanted
     }
 
+    /**
+     * What the shade, the lock screen and the car need to draw a track.
+     *
+     * Carried with the media item rather than looked up when the notification
+     * is built, because by then the only thing we would still have is an id.
+     */
+    data class Track(
+        val id: String,
+        val title: String = "",
+        val artist: String = "",
+        val durationMs: Long = 0,
+    ) {
+        /** YouTube's own still. Always present, unlike the maxres variant. */
+        val artworkUrl: String get() = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
+    }
+
+    private val _current = MutableStateFlow<Track?>(null)
+
+    /** The track we last cued, for anything drawing it while it loads. */
+    val current: StateFlow<Track?> = _current.asStateFlow()
+
     private val _snapshot = MutableStateFlow(Snapshot())
     val snapshot: StateFlow<Snapshot> = _snapshot.asStateFlow()
 
@@ -187,17 +208,29 @@ object LocalPlayer {
      * This is the half of a scheduled start that can be done early. Everything
      * expensive happens here so that [begin] is only a decision to make sound.
      */
-    fun cue(videoId: String, positionMs: Long = 0) = onMain {
-        wanted = videoId
+    fun cue(videoId: String, positionMs: Long = 0) = cue(Track(videoId), positionMs)
+
+    fun cue(track: Track, positionMs: Long = 0) = onMain {
+        wanted = track.id
+        _current.value = track
         val p = require()
         p.setPlaybackParameters(PlaybackParameters(1f))
         p.setMediaItem(
             MediaItem.Builder()
-                .setMediaId(videoId)
-                .setUri("museroom://$videoId")
+                .setMediaId(track.id)
+                .setUri("museroom://${track.id}")
                 // The cache and the resolver both key on this, so a track is one
                 // thing to them however many times it is queued.
-                .setCustomCacheKey(videoId)
+                .setCustomCacheKey(track.id)
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(track.title.ifBlank { "Museroom" })
+                        .setArtist(track.artist)
+                        .setArtworkUri(Uri.parse(track.artworkUrl))
+                        .setIsBrowsable(false)
+                        .setIsPlayable(true)
+                        .build(),
+                )
                 .build(),
             positionMs.coerceAtLeast(0),
         )
@@ -240,6 +273,7 @@ object LocalPlayer {
 
     fun stop() = onMain {
         wanted = ""
+        _current.value = null
         player?.stop()
         player?.clearMediaItems()
         tick()
@@ -248,6 +282,7 @@ object LocalPlayer {
     /** Gives the player and its cache back. Called when a room ends, not on pause. */
     fun release() = onMain {
         wanted = ""
+        _current.value = null
         player?.removeListener(watcher)
         player?.release()
         player = null
@@ -255,6 +290,13 @@ object LocalPlayer {
         cache = null
         _snapshot.value = Snapshot()
     }
+
+    /**
+     * The player itself, for the one caller that needs the object rather than
+     * the surface: the media session, which is what puts Museroom on the lock
+     * screen, in the car and under a Bluetooth button.
+     */
+    internal fun exo(): ExoPlayer = require()
 
     private inline fun onMain(crossinline body: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) body() else main.post { body() }

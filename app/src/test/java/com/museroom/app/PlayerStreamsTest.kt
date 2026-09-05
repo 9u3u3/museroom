@@ -78,6 +78,38 @@ class PlayerStreamsTest {
         assertNull(Streams.pick(emptyList(), Streams.Quality.High))
     }
 
+    // ------------------------------------------------------------- searching --
+
+    private val songs: String =
+        javaClass.classLoader!!.getResourceAsStream("search-songs.json")!!
+            .bufferedReader().use { it.readText() }
+
+    @Test
+    fun `a search result carries enough to play and to name it`() {
+        val results = InnerTube.results(songs)
+        assertEquals(3, results.size)
+        val first = results.first()
+        assertEquals("LUjGtyYEi90", first.id)
+        assertEquals("Weird Fishes / Arpeggi", first.title)
+        assertEquals("Radiohead", first.artist)
+        assertEquals("In Rainbows", first.album)
+        assertEquals(319_000L, first.durationMs)
+    }
+
+    @Test
+    fun `a search that matched nothing is empty rather than a failure`() {
+        assertTrue(InnerTube.results("""{"contents":{}}""").isEmpty())
+        assertTrue(InnerTube.results("not json at all").isEmpty())
+    }
+
+    @Test
+    fun `durations are read in both shapes and refused otherwise`() {
+        assertEquals(249_000L, InnerTube.clock("4:09"))
+        assertEquals(3_731_000L, InnerTube.clock("1:02:11"))
+        assertEquals(0L, InnerTube.clock("In Rainbows"))
+        assertEquals(0L, InnerTube.clock(""))
+    }
+
     // ------------------------------------------------------------- the cache --
 
     private fun stream(id: String, expiresAtMs: Long) = Streams.Stream(
