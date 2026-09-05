@@ -92,7 +92,6 @@ fun PlayerScreen(onClose: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(c.paper)
             .padding(horizontal = 22.dp),
     ) {
         Spacer(Modifier.height(8.dp))

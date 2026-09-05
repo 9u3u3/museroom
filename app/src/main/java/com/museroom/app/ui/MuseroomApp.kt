@@ -183,8 +183,18 @@ fun MuseroomApp() {
         // Over everything, including the person card, because while it is up it
         // is the only thing being looked at.
         if (playerOpen) {
-            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                PlayerScreen(onClose = { playerOpen = false })
+            // The fill goes to the edges and the padding goes inside it. Insetting
+            // the whole sheet leaves a strip of whatever was underneath showing
+            // along the top, which reads as the screen not having opened.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(c.paper)
+                    .halftone(c.ink, alpha = if (c.dark) 0.10f else 0.07f),
+            ) {
+                Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                    PlayerScreen(onClose = { playerOpen = false })
+                }
             }
         }
     }

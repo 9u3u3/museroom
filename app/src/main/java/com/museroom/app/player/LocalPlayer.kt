@@ -3,6 +3,7 @@ package com.museroom.app.player
 import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
@@ -85,9 +86,11 @@ object LocalPlayer {
         val title: String = "",
         val artist: String = "",
         val durationMs: Long = 0,
+        /** Empty when we only know the id, which is when the still has to do. */
+        val cover: String = "",
     ) {
-        /** YouTube's own still. Always present, unlike the maxres variant. */
-        val artworkUrl: String get() = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
+        val artworkUrl: String
+            get() = cover.ifBlank { "https://i.ytimg.com/vi/$id/hqdefault.jpg" }
     }
 
     private val _current = MutableStateFlow<Track?>(null)
@@ -178,7 +181,9 @@ object LocalPlayer {
 
         val network = DefaultDataSource.Factory(
             context,
-            OkHttpDataSource.Factory(OkHttpClient.Builder().build()),
+            OkHttpDataSource.Factory(
+                OkHttpClient.Builder().build(),
+            ),
         )
 
         val cached = CacheDataSource.Factory()
@@ -192,13 +197,33 @@ object LocalPlayer {
             if (store.isCached(id, spec.position, 1)) return@Factory spec
 
             val stream = Streams.resolve(id, quality, burned[id].orEmpty())
-            spec.withUri(Uri.parse(stream.url))
+            val located = spec.withUri(Uri.parse(stream.url))
                 .withRequestHeaders(spec.httpRequestHeaders + stream.headers)
+
+            // Every read is a bounded range, and never a large one.
+            //
+            // Two refusals were measured against the real server, both answered
+            // 403 with no explanation. A GET with no Range header at all is
+            // refused, which is the shape ExoPlayer uses by default when it
+            // wants a file from the start. So is a Range that covers most of
+            // the track: a four megabyte file serves 0-1048575 and refuses
+            // 0-2097151. Whatever the rule is, asking a megabyte at a time is
+            // inside it, and a megabyte is about a minute of audio.
+            val remaining = stream.contentLength - located.position
+            val asked = when {
+                located.length != C.LENGTH_UNSET.toLong() -> minOf(located.length, CHUNK_BYTES)
+                remaining > 0 -> minOf(remaining, CHUNK_BYTES)
+                else -> CHUNK_BYTES
+            }
+            located.subrange(0, asked)
         }
     }
 
     /** A session's worth of listening, not a library. Downloads come later. */
     private const val CACHE_BYTES = 512L * 1024 * 1024
+
+    /** The largest range the server was willing to serve, measured not guessed. */
+    private const val CHUNK_BYTES = 1L * 1024 * 1024
 
     // ----------------------------------------------------------------- driving --
 
@@ -211,6 +236,7 @@ object LocalPlayer {
     fun cue(videoId: String, positionMs: Long = 0) = cue(Track(videoId), positionMs)
 
     fun cue(track: Track, positionMs: Long = 0) = onMain {
+        retries = 0
         wanted = track.id
         _current.value = track
         val p = require()
@@ -304,9 +330,24 @@ object LocalPlayer {
 
     // ---------------------------------------------------------------- watching --
 
+    /**
+     * How many times running we have re-asked for the current track's address.
+     *
+     * Reset the moment anything actually plays, so a track that recovers gets
+     * its full allowance back rather than carrying a grudge into the next stall.
+     */
+    private var retries = 0
+
+    private const val RETRIES = 4
+    private const val TAG = "MuseroomPlayer"
+
     private val watcher = object : Player.Listener {
         override fun onPlaybackStateChanged(state: Int) = tick()
-        override fun onIsPlayingChanged(isPlaying: Boolean) = tick()
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            if (isPlaying) retries = 0
+            tick()
+        }
         override fun onPlaybackParametersChanged(parameters: PlaybackParameters) = tick()
         override fun onPositionDiscontinuity(
             old: Player.PositionInfo,
@@ -315,18 +356,33 @@ object LocalPlayer {
         ) = tick()
 
         override fun onPlayerError(error: PlaybackException) {
-            // Blame the client that produced this URL, drop the stream, and let
-            // the next attempt ask somebody else. A source error on a URL that
-            // resolved cleanly is what a wrong client looks like from here.
             val id = wanted
-            if (id.isNotBlank()) {
-                Streams.cached(id)?.client?.let { client ->
-                    burned.getOrPut(id) { mutableSetOf() }.add(client)
-                }
-                Streams.forget(id)
+            val player = player
+            if (id.isBlank() || player == null) return
+
+            // A URL that resolved cleanly and then stopped serving is the
+            // ordinary weather here, not a broken track. These links are signed,
+            // they expire, the edge that issued one stops answering for it, and
+            // a long track outlives its own address. So the answer is thrown
+            // away and asked for again, from where we had got to.
+            val resumeAt = player.currentPosition.coerceAtLeast(0)
+            Streams.forget(id)
+
+            if (retries < RETRIES) {
+                retries++
+                Log.w(TAG, "$id stalled at ${resumeAt}ms (${error.errorCodeName}), asking again")
+                player.seekTo(resumeAt)
+                player.prepare()
+                return
             }
+
+            // Out of patience. Blame the client that kept producing bad URLs so
+            // the next track is asked of somebody else, and say what happened
+            // rather than falling silent.
+            Streams.cached(id)?.client?.let { burned.getOrPut(id) { mutableSetOf() }.add(it) }
+            Log.w(TAG, "$id gave up after $RETRIES tries: ${error.errorCodeName}")
             _snapshot.value = _snapshot.value.copy(
-                detail = error.errorCodeName,
+                detail = "Could not keep this playing",
                 takenAt = System.currentTimeMillis(),
             )
         }

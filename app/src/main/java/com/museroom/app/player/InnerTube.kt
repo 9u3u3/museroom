@@ -165,6 +165,7 @@ object InnerTube {
                 if (answer.formats.isNotEmpty()) return answer
                 last = Unplayable("NO_AUDIO", "no audio formats from ${client.name}")
             } catch (e: Exception) {
+                android.util.Log.w("MuseroomStream", "${client.name} refused $videoId: ${e.message}")
                 last = e
             }
         }
@@ -178,6 +179,13 @@ object InnerTube {
         val artist: String,
         val album: String,
         val durationMs: Long,
+        /**
+         * The square cover, which the search response carries and the video
+         * still does not. YouTube's own thumbnail for a song is a 4:3 frame
+         * with the sleeve boxed inside it, so using it means either black bars
+         * or cropping the art.
+         */
+        val artworkUrl: String = "",
     )
 
     /** Songs matching a query, best first, or empty if the search found none. */
@@ -238,10 +246,52 @@ object InnerTube {
                 artist = parts.firstOrNull().orEmpty(),
                 album = if (parts.size > 2) parts[parts.size - 2] else "",
                 durationMs = duration,
+                artworkUrl = biggestThumbnail(item),
             )
         }
         return found
     }
+
+    /**
+     * The largest thumbnail anywhere inside one result.
+     *
+     * Largest rather than first: the same renderer offers the sleeve at several
+     * sizes, and the small one is visibly soft behind a full-width player.
+     */
+    private fun biggestThumbnail(item: JsonObject): String {
+        var best = ""
+        var area = 0
+        fun visit(e: kotlinx.serialization.json.JsonElement) {
+            when (e) {
+                is JsonObject -> {
+                    val url = runCatching { e["url"]!!.jsonPrimitive.content }.getOrNull()
+                    val width = runCatching { e["width"]!!.jsonPrimitive.content.toInt() }.getOrNull()
+                    val height = runCatching { e["height"]!!.jsonPrimitive.content.toInt() }.getOrNull()
+                    if (url != null && width != null && height != null && width * height > area) {
+                        area = width * height
+                        best = url
+                    }
+                    e.values.forEach { visit(it) }
+                }
+                is kotlinx.serialization.json.JsonArray -> e.forEach { visit(it) }
+                else -> Unit
+            }
+        }
+        visit(item)
+        return enlarge(best)
+    }
+
+    /**
+     * Asks Google's image host for the sleeve at a useful size.
+     *
+     * These URLs end in the dimensions they were rendered for, and a list ships
+     * the sixty-pixel one. Blown up to the width of a phone that is visibly
+     * soft, and the fix is a different number rather than a different request:
+     * the host resizes on demand.
+     */
+    private fun enlarge(url: String): String =
+        if (url.isBlank()) url
+        else Regex("=w\\d+-h\\d+").replace(url, "=w544-h544")
 
     /** Every musicResponsiveListItemRenderer in the tree, in the order it appears. */
     private fun walk(element: kotlinx.serialization.json.JsonElement, onItem: (JsonObject) -> Unit) {

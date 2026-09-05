@@ -159,6 +159,7 @@ object Playback {
                     title = it.title,
                     artist = listOf(it.artist, it.album).filter(String::isNotBlank).joinToString(" · "),
                     durationMs = it.durationMs,
+                    cover = it.artworkUrl,
                 )
             }
         }.getOrDefault(emptyList())

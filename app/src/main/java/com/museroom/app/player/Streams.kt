@@ -1,5 +1,7 @@
 package com.museroom.app.player
 
+import android.util.Log
+
 /**
  * Turning a video id into something ExoPlayer can read, and remembering it.
  *
@@ -156,6 +158,10 @@ object Streams {
             // track is halfway through it stops mid-song, and thirty seconds of
             // unused shelf life is cheaper than that.
             expiresAtMs = nowMs + (answer.expiresInSeconds - 30).coerceAtLeast(30) * 1000L,
+        )
+        Log.i(
+            "MuseroomPlayer",
+            "resolved $videoId via ${answer.client}, itag ${format.itag} at ${format.bitrate}bps",
         )
         remember(stream, generation)
         return stream
