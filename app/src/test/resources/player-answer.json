@@ -1,0 +1,74 @@
+{
+ "playabilityStatus": {
+  "status": "OK"
+ },
+ "streamingData": {
+  "expiresInSeconds": "21540",
+  "adaptiveFormats": [
+   {
+    "itag": 139,
+    "mimeType": "audio/mp4; codecs=\"mp4a.40.5\"",
+    "bitrate": 50152,
+    "contentLength": "1300631",
+    "approxDurationMs": "213159",
+    "audioSampleRate": "22050",
+    "audioQuality": "AUDIO_QUALITY_LOW",
+    "loudnessDb": 0.9899998,
+    "url": "https://rr5---sn-gwpa-cvhek.googlevideo.com/videoplayback?itag=139&trimmed-for-fixture"
+   },
+   {
+    "itag": 140,
+    "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+    "bitrate": 130677,
+    "contentLength": "3449447",
+    "approxDurationMs": "213089",
+    "audioSampleRate": "44100",
+    "audioQuality": "AUDIO_QUALITY_MEDIUM",
+    "loudnessDb": 0.9899998,
+    "url": "https://rr5---sn-gwpa-cvhek.googlevideo.com/videoplayback?itag=140&trimmed-for-fixture"
+   },
+   {
+    "itag": 249,
+    "mimeType": "audio/webm; codecs=\"opus\"",
+    "bitrate": 49496,
+    "contentLength": "1231355",
+    "approxDurationMs": "213061",
+    "audioSampleRate": "48000",
+    "audioQuality": "AUDIO_QUALITY_LOW",
+    "loudnessDb": 0.97999954,
+    "url": "https://rr5---sn-gwpa-cvhek.googlevideo.com/videoplayback?itag=249&trimmed-for-fixture"
+   },
+   {
+    "itag": 251,
+    "mimeType": "audio/webm; codecs=\"opus\"",
+    "bitrate": 136544,
+    "contentLength": "3433755",
+    "approxDurationMs": "213061",
+    "audioSampleRate": "48000",
+    "audioQuality": "AUDIO_QUALITY_MEDIUM",
+    "loudnessDb": 0.97999954,
+    "url": "https://rr5---sn-gwpa-cvhek.googlevideo.com/videoplayback?itag=251&trimmed-for-fixture"
+   },
+   {
+    "itag": 313,
+    "mimeType": "video/webm; codecs=\"vp9\"",
+    "bitrate": 18076636,
+    "width": 3840,
+    "height": 2160,
+    "url": "https://example/video"
+   },
+   {
+    "itag": 141,
+    "mimeType": "audio/mp4; codecs=\"mp4a.40.2\"",
+    "bitrate": 256000,
+    "signatureCipher": "s=SCRAMBLED&sp=sig&url=https://example/ciphered"
+   }
+  ]
+ },
+ "videoDetails": {
+  "videoId": "dQw4w9WgXcQ",
+  "title": "Rick Astley - Never Gonna Give You Up (Official Video) (4K Remaster)",
+  "author": "Rick Astley",
+  "lengthSeconds": "213"
+ }
+}
