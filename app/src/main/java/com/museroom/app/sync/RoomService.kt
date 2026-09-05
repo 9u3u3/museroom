@@ -40,10 +40,15 @@ import kotlinx.coroutines.launch
  * without opening the app. It is a media notification with a real session
  * behind it, so the system draws the cover and the seek bar itself.
  *
- * There is nothing to press. Pause, skip and scrub all belong to the host, and
- * offering a joiner a button that would silently do nothing is worse than not
- * offering it. What is left is the one thing a joiner does decide: whether
- * they liked it.
+ * There is nothing for a joiner to press. Pause, skip and scrub all belong to
+ * the host, and offering a joiner a button that would silently do nothing is
+ * worse than not offering it. What is left is the one thing a joiner does
+ * decide: whether they liked it.
+ *
+ * A together-mode host is the other case this serves, and there the buttons are
+ * real. Their music is coming out of Museroom rather than out of Spotify, so
+ * Museroom is the only thing that can pause it — and a player in the shade with
+ * no way to stop it is not a player, it is a hostage.
  */
 class RoomService : Service() {
 
@@ -79,8 +84,23 @@ class RoomService : Service() {
 
         when (intent?.action) {
             ACTION_LEAVE -> {
-                FollowSession.stop()
+                // Whichever room this notification belongs to. A host leaving
+                // is giving the room back to their own music app; a listener
+                // leaving is walking out of somebody else's.
+                if (FollowSession.following.value != null) {
+                    FollowSession.stop()
+                } else {
+                    TogetherHost.stop()
+                }
                 stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_PLAY_PAUSE -> {
+                TogetherHost.toggle()
+                return START_NOT_STICKY
+            }
+            ACTION_SKIP -> {
+                TogetherHost.skip()
                 return START_NOT_STICKY
             }
             ACTION_LIKE -> {
@@ -105,11 +125,13 @@ class RoomService : Service() {
         val newScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         scope = newScope
         newScope.launch {
-            combine(NowPlayingRepository.room, FollowSession.following) { track, room ->
-                track to room
-            }.collect { (track, room) ->
-                if (room == null) return@collect
-                handle = room.handle
+            combine(
+                NowPlayingRepository.room,
+                FollowSession.following,
+                TogetherHost.state,
+            ) { track, room, _ -> track to room }.collect { (track, room) ->
+                if (room == null && !TogetherHost.on.value) return@collect
+                room?.let { handle = it.handle }
                 runCatching { notifier().notify(ID, build(track, room)) }
             }
         }
@@ -119,7 +141,8 @@ class RoomService : Service() {
         newScope.launch {
             while (true) {
                 delay(5_000)
-                val room = FollowSession.following.value ?: continue
+                val room = FollowSession.following.value
+                if (room == null && !TogetherHost.on.value) continue
                 runCatching { notifier().notify(ID, build(NowPlayingRepository.room.value, room)) }
             }
         }
@@ -161,26 +184,65 @@ class RoomService : Service() {
         val title = track?.title?.ifBlank { null } ?: room?.title.orEmpty()
         val artist = track?.artist?.ifBlank { null } ?: room?.artist.orEmpty()
         val duration = track?.durationMs?.takeIf { it > 0 } ?: room?.durationMs ?: 0L
-        val position = room?.positionMs ?: 0L
+        // A listener's clock comes from the follow loop, which is the thing
+        // holding them in step. A host has no follow loop: their own player is
+        // the clock, so the seek bar is read straight off it.
+        val position = room?.positionMs
+            ?: track?.positionAt(android.os.SystemClock.elapsedRealtime())
+            ?: 0L
         val playing = track != null && track.isPlaying
         val art = track?.artwork
 
         publishSession(title, artist, duration, position, playing, art)
 
+        // Whose room this is. A listener is in somebody else's and can only
+        // like it or leave it; a host is in their own, played by Museroom, and
+        // the buttons that would be a lie for a listener are the truth here.
+        val hosting = room == null && TogetherHost.on.value
         val who = handle.ifBlank { room?.handle.orEmpty() }
         val builder = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title.ifBlank { "Listening along" })
-            .setContentText(artist.ifBlank { if (who.isBlank()) "" else "with $who" })
-            .setSubText(if (who.isBlank()) "Museroom" else "Listening with $who")
+            .setContentTitle(title.ifBlank { if (hosting) "Your room" else "Listening along" })
+            .setContentText(
+                artist.ifBlank {
+                    when {
+                        hosting -> "Playing together"
+                        who.isBlank() -> ""
+                        else -> "with $who"
+                    }
+                },
+            )
+            .setSubText(
+                when {
+                    hosting -> "Your room"
+                    who.isBlank() -> "Museroom"
+                    else -> "Listening with $who"
+                },
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(open())
-            // With icons. A media-style action without one is a shape some
-            // system interfaces will not draw and others will not parcel, and
-            // the failure lands in whichever process was unlucky.
-            .addAction(action(R.drawable.ic_notification, "Like", ACTION_LIKE, 3))
-            .addAction(action(R.drawable.ic_notification, "Leave", ACTION_LEAVE, 2))
+
+        // With icons. A media-style action without one is a shape some system
+        // interfaces will not draw and others will not parcel, and the failure
+        // lands in whichever process was unlucky.
+        if (hosting) {
+            builder
+                .addAction(
+                    action(
+                        R.drawable.ic_notification,
+                        if (playing) "Pause" else "Play",
+                        ACTION_PLAY_PAUSE,
+                        4,
+                    ),
+                )
+                .addAction(action(R.drawable.ic_notification, "Skip", ACTION_SKIP, 5))
+                .addAction(action(R.drawable.ic_notification, "Stop", ACTION_LEAVE, 2))
+        } else {
+            builder
+                .addAction(action(R.drawable.ic_notification, "Like", ACTION_LIKE, 3))
+                .addAction(action(R.drawable.ic_notification, "Leave", ACTION_LEAVE, 2))
+        }
 
         if (art != null) builder.setLargeIcon(art)
 
@@ -195,8 +257,10 @@ class RoomService : Service() {
     /**
      * What the system draws the cover and the seek bar from.
      *
-     * No actions are declared, which is what stops Android offering play,
-     * pause and skip buttons over a player that would ignore all three.
+     * No actions are declared, even for a host who has real ones. The buttons
+     * on the notification are Museroom's own and go to this service, where
+     * they are answered; declaring them on the session as well would hand the
+     * system a second, parallel set of controls with nothing behind them.
      */
     private fun publishSession(
         title: String,
@@ -275,8 +339,10 @@ class RoomService : Service() {
         // Swiping Museroom out of recents destroys the window the player lives
         // in, and Chromium will not keep audio without one. Measured, not
         // assumed. So the room ends here rather than leaving a notification
-        // sitting over silence.
+        // sitting over silence. Together mode gets no exemption from this: the
+        // host's music comes out of the same window as everybody else's.
         FollowSession.stop()
+        TogetherHost.stop()
         stopSelf()
     }
 
@@ -286,6 +352,8 @@ class RoomService : Service() {
         private const val EXTRA_HANDLE = "handle"
         const val ACTION_LEAVE = "com.museroom.app.LEAVE_ROOM"
         const val ACTION_LIKE = "com.museroom.app.LIKE_ROOM_TRACK"
+        const val ACTION_PLAY_PAUSE = "com.museroom.app.ROOM_PLAY_PAUSE"
+        const val ACTION_SKIP = "com.museroom.app.ROOM_SKIP"
 
         fun ensureChannel(context: Context) {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return

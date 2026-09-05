@@ -21,15 +21,23 @@ const fakeVideo = {
   play() { this.paused = false; },
   addEventListener() {},
 };
+let volume = 100;
 const fakePlayer = {
   getCurrentTime: () => 10,
   getDuration: () => 200,
   getPlayerState: () => 1,
   getVideoData: () => ({ video_id: currentId, title: 't', author: 'a' }),
   isMuted: () => false,
-  getVolume: () => 100,
+  getVolume: () => volume,
   loadVideoById(id) { currentId = id; fakeVideo.paused = false; paused = false; },
-  seekTo() {}, playVideo() {}, pauseVideo() {}, unMute() {}, setVolume() {},
+  // The player's own word for fetching something without playing it, which is
+  // how every phone in a room holds the next song until the agreed moment.
+  cueVideoById(id) { currentId = id; fakeVideo.paused = true; },
+  seekTo() {},
+  playVideo() { fakeVideo.paused = false; },
+  pauseVideo() { fakeVideo.paused = true; },
+  unMute() {},
+  setVolume(v) { volume = v; },
   addEventListener() {},
 };
 
@@ -130,6 +138,36 @@ check('so does a pause', fakeVideo.playbackRate, 1);
 room.rate(1.04);
 room.leave();
 check('and so does leaving', fakeVideo.playbackRate, 1);
+
+// --- the host is a client of this too --------------------------------------
+//
+// In together mode nobody's music app is the speaker, the host's included:
+// their song comes out of this page exactly as a listener's does. So every
+// rule here applies to them, and the one that has to is the guard against
+// playing something nobody chose. A host who strays does not merely hear the
+// wrong song — the whole room is steered by what their player is doing, so
+// they take everybody with them.
+
+room.leave();
+volume = 100;
+room.cue('hhhhhhhhhhh', 0);
+check('cueing takes the sound down', volume, 0);
+room.poll();
+check('a cued track is what the page is meant to be playing', last().wanted, 'hhhhhhhhhhh');
+check('and it is not strayed', !!last().strayed, false);
+check('and it is silent until the moment', fakeVideo.paused, true);
+
+// The page reaches the end of a cued track and helps itself to another.
+currentId = 'kkkkkkkkkkk';
+fakeVideo.paused = false;
+room.poll();
+check('a host who strays is caught the same way', !!last().strayed, true);
+check('and stopped the same way', fakeVideo.paused, true);
+
+room.cue('hhhhhhhhhhh', 0);
+room.begin(0);
+check('beginning gives the sound back', volume, 100);
+check('and lets the track go', fakeVideo.paused, false);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

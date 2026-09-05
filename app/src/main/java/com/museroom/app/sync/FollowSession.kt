@@ -33,6 +33,12 @@ data class Following(
     val artist: String = "",
     val durationMs: Long = 0,
     val positionMs: Long = 0,
+    /**
+     * Whether the host is a client of their own room rather than a DJ ahead
+     * of it. Only the copy on screen cares: "in step" means something
+     * different when there is nobody three seconds in front of you.
+     */
+    val together: Boolean = false,
 )
 
 sealed interface FollowState {
@@ -46,6 +52,15 @@ sealed interface FollowState {
 
     /** Loaded, buffering, not yet worth correcting. */
     data object CatchingUp : FollowState
+
+    /**
+     * Fetched, silent, and waiting for the moment the room lets go.
+     *
+     * Told apart from catching up because it is the opposite of it. Catching
+     * up is being behind; this is being early on purpose, which is the whole
+     * mechanism by which nobody starts a song late.
+     */
+    data object Waiting : FollowState
 
     data class InStep(val offMs: Long) : FollowState
 
@@ -149,23 +164,6 @@ object FollowSession {
     private const val FIRST_SYNC_TOLERANCE_MS = 700L
 
     /**
-     * How long after the agreed moment a schedule is still worth acting on.
-     *
-     * Past this it belongs to a track that has been playing for a while, and
-     * acting on it would restart a song somebody is halfway through.
-     */
-    private const val SCHEDULE_FORGOTTEN_MS = 30_000L
-
-    /**
-     * How late is still worth turning up for.
-     *
-     * Past this the moment has gone and the song is running without us. The
-     * important part is what must NOT happen then: a schedule says where the
-     * track begins, so acting on a stale one starts a song from the top while
-     * everybody else is a minute into it. Somebody joining a room mid-track
-     * would be dragged back to the beginning and then hauled forward again.
-     */
-    /**
      * How far behind the host a room deliberately runs.
      *
      * Everything that ever went wrong at the start of a song came from the
@@ -250,18 +248,18 @@ object FollowSession {
      */
     private const val TOO_OLD_TO_START_MS = 25_000L
 
-    /**
-     * How long the host is allowed to still look stopped after the room began.
-     *
-     * We stopped them, so their row says stopped, and it keeps saying so until
-     * their phone notices being started again and writes it down. In that gap
-     * the truthful reading of the row is the wrong one, and acting on it would
-     * pause a room in the first second of a song.
-     */
-    private const val RESUME_GRACE_MS = 8_000L
-
     /** Long enough for one seek to land before anything measures the result. */
     private const val SETTLE_MS = 2_500L
+
+    /**
+     * How long a together host is allowed to still look stopped after the
+     * room has begun.
+     *
+     * Long enough for their own "playing" to be written and pushed, and short
+     * enough that a host who really did pause is obeyed while it still reads
+     * as pausing. See [starting], which is where it means something.
+     */
+    private const val START_GRACE_MS = 3_000L
 
     /** Comfortably inside the two minutes the host counts as still here. */
     private const val PRESENCE_MS = 30_000L
@@ -326,6 +324,10 @@ object FollowSession {
     @Synchronized
     fun start(context: Context, hostId: String, handle: String) {
         stop()
+        // One player, one room. Walking into somebody else's while hosting one
+        // of your own would leave two loops steering the same WebView at two
+        // different songs, and the WebView would play whichever spoke last.
+        TogetherHost.stop()
         val app = context.applicationContext
         _following.value = Following(hostId, handle)
 
@@ -437,7 +439,30 @@ object FollowSession {
      * story stays with the loop.
      */
     internal fun saysStop(row: RemoteNowPlaying): Boolean =
-        !row.isPlaying || row.isAdvert || row.title.isBlank()
+        (!row.isPlaying && !starting(row)) || row.isAdvert || row.title.isBlank()
+
+    /**
+     * A room in the act of starting a song, rather than a room that stopped.
+     *
+     * Only together mode produces one, and it spans both sides of the moment.
+     * Before it, the host has fetched the next track and is holding it silent
+     * with everybody else, so the row honestly says "not playing" for several
+     * seconds. After it, every phone has let go at once but the host's own
+     * "playing" still has to travel — their player says so, the row is
+     * written, the socket carries it — and until it arrives the row still says
+     * not playing, at position zero.
+     *
+     * Both halves of that are wrong to act on. One would send a listener away
+     * from a song that is about to start; the other would pause a room in the
+     * first second of one, or drag it back to a beginning it has already
+     * passed. So neither is treated as news until the row has had time to
+     * catch up with what everybody is already hearing.
+     */
+    internal fun starting(row: RemoteNowPlaying): Boolean {
+        if (!row.together || row.isPlaying || row.isAdvert || row.title.isBlank()) return false
+        val moment = roomStartMoment(row)
+        return moment > 0L && ServerClock.nowMs() < moment + START_GRACE_MS
+    }
 
     /**
      * The last row the socket pushed, and when.
@@ -560,6 +585,17 @@ object FollowSession {
          */
         var beginAt = 0L
 
+        /**
+         * Where the room begins it.
+         *
+         * Almost always the top of the song, which is the whole point of
+         * waiting for a moment rather than joining one. It is not zero for the
+         * one track a together host carries across when they turn the mode on
+         * mid-song: rewinding everybody to a beginning they heard a minute ago
+         * is not a handover, it is an interruption.
+         */
+        var beginFrom = 0L
+
         while (true) {
             val host = hostNow(friends, hostId)
 
@@ -574,7 +610,7 @@ object FollowSession {
                 continue
             }
 
-            if (host == null || !host.isPlaying || host.title.isBlank()) {
+            if (host == null || saysStop(host)) {
                 RoomPlayer.pause()
                 publish(hostId, handle, FollowState.HostQuiet, host)
                 delay(TICK_MS)
@@ -607,9 +643,14 @@ object FollowSession {
                 // done rather than until a number says it ought to be.
                 val nearlyOver = snapshotNow.durationMs > 0 &&
                     snapshotNow.positionMs >= snapshotNow.durationMs - END_OF_TRACK_MS / 4
+                // Only where the room is actually behind. In together mode
+                // it is level with the host, so when their song changes ours
+                // has changed too and there is no tail left to protect —
+                // holding one would simply be playing the wrong song.
                 val stillFinishing = beginAt == 0L &&
+                    lagFor(host) > 0L &&
                     loadedFingerprint.isNotBlank() &&
-                    hostPosition(host) < ROOM_LAG_MS + LONGEST_TAIL_MS &&
+                    hostPosition(host) < lagFor(host) + LONGEST_TAIL_MS &&
                     snapshotNow.playing &&
                     snapshotNow.onWantedTrack &&
                     !snapshotNow.strayed &&
@@ -667,17 +708,28 @@ object FollowSession {
                  * miss, so we join it where the room is.
                  */
                 val walkedIn = loadedFingerprint.isBlank()
-                val from = if (walkedIn) targetPosition(host) else 0L
+                /*
+                 * Somebody who walks in while the room is between songs is
+                 * not walking in on anything. In together mode the host
+                 * fetches the next track and holds it silent for a few
+                 * seconds, and arriving in that window means there is nothing
+                 * running to join — so they wait for the same moment as
+                 * everybody else and get the song whole, rather than being
+                 * dropped into its opening a moment before it starts.
+                 */
+                val fromTheTop = !walkedIn || starting(host)
+                val from = if (fromTheTop) startFrom(host) else targetPosition(host)
 
                 loadedFingerprint = fingerprint
                 loaded = fingerprint
                 loadedId = id
-                heardFrom = if (walkedIn) "" else fingerprint
+                heardFrom = if (fromTheTop) fingerprint else ""
                 // Somebody who walked in has nothing to wait for; the song is
                 // already running and they join it. A song that started while
                 // we were here is begun by the whole room at once, so it is
                 // fetched silently and held until that moment.
-                beginAt = if (walkedIn) 0L else roomStartMoment(host)
+                beginAt = if (fromTheTop) roomStartMoment(host) else 0L
+                beginFrom = if (fromTheTop) from else 0L
                 cover = Artwork.cached(host.title, host.artist)
                 publish(hostId, handle, FollowState.Loading(host.title), host)
                 RoomPlayer.setRate(1.0)
@@ -703,7 +755,7 @@ object FollowSession {
             if (beginAt > 0L) {
                 val wait = beginAt - ServerClock.nowMs()
                 if (wait > 0) {
-                    publish(hostId, handle, FollowState.CatchingUp, host)
+                    publish(hostId, handle, FollowState.Waiting, host)
                     delay(wait.coerceAtMost(SETTLING_TICK_MS))
                     continue
                 }
@@ -712,7 +764,7 @@ object FollowSession {
                 // so the only thing standing between this phone and the rest
                 // of the room is the seconds it was late by.
                 val lateBy = -wait
-                RoomPlayer.begin(0L)
+                RoomPlayer.begin(beginFrom)
                 beginAt = 0L
                 pendingFirstSync = false
                 acquireSince = SystemClock.elapsedRealtime()
@@ -727,6 +779,18 @@ object FollowSession {
                     lastCorrection = SystemClock.elapsedRealtime()
                     acquireUntil = SystemClock.elapsedRealtime() + SETTLE_MS
                 }
+                delay(SETTLING_TICK_MS)
+                continue
+            }
+
+            // Begun, and the host's row has not said so yet. There is nothing
+            // here worth measuring against: their position is frozen at the
+            // start of a song this phone is already a second into, and acting
+            // on it would seek backwards over music nobody asked to hear
+            // twice. Everybody let go on the same moment, so in step is
+            // exactly what this is.
+            if (starting(host)) {
+                publish(hostId, handle, FollowState.InStep(0), host)
                 delay(SETTLING_TICK_MS)
                 continue
             }
@@ -1000,11 +1064,48 @@ object FollowSession {
      * Zero when the row cannot be read, which means start when ready.
      */
     internal fun roomStartMoment(host: RemoteNowPlaying): Long {
+        // A together room does not deduce the moment, it is told it. The host
+        // is a client of the same clock rather than a player already running,
+        // so there is a decision to write down and no reason to reconstruct
+        // one from where somebody has got to.
+        if (host.together) {
+            host.startsAt
+                ?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
+                ?.let { return it }
+        }
         val takenAt = runCatching { Instant.parse(host.updatedAt).toEpochMilli() }.getOrNull()
             ?: return 0L
         val began = takenAt - host.positionMs
-        return began + ROOM_LAG_MS + FETCH_ALLOWANCE_MS
+        return began + lagFor(host) + FETCH_ALLOWANCE_MS
     }
+
+    /**
+     * How far behind this host a room has to sit.
+     *
+     * Three seconds behind a music app Museroom can only read, and nothing at
+     * all behind a host who is playing through Museroom like everybody else.
+     * The distance is not a tolerance or a safety margin — it is the budget
+     * for fetching a song that a listener is told about at the instant it
+     * begins. A together host has already spent that budget on their own
+     * behalf, waiting with the room, so there is nothing left to run behind.
+     */
+    internal fun lagFor(host: RemoteNowPlaying): Long = if (host.together) 0L else ROOM_LAG_MS
+
+    /**
+     * Where the room begins a track it is waiting to begin.
+     *
+     * Zero for every song anybody starts from its start, which is all of them
+     * but one: the track a together host is already playing when they turn the
+     * mode on. Rewinding a room to a beginning it heard a minute ago is not a
+     * handover, it is an interruption, so the host says where the song is and
+     * everybody joins it there.
+     *
+     * Only ever read from a together row. A broadcast room works out where to
+     * be from the position and the clock, and a number left on the column by
+     * some other mode is not an instruction to it.
+     */
+    internal fun startFrom(host: RemoteNowPlaying): Long =
+        if (host.together) host.startPositionMs.coerceAtLeast(0L) else 0L
 
     /**
      * Where this phone should be: a set distance behind the host.
@@ -1015,7 +1116,7 @@ object FollowSession {
      * and it sounds the same as being level because the distance never moves.
      */
     internal fun targetPosition(host: RemoteNowPlaying): Long =
-        (hostPosition(host) - ROOM_LAG_MS).coerceAtLeast(0L)
+        (hostPosition(host) - lagFor(host)).coerceAtLeast(0L)
 
     internal fun hostPosition(host: RemoteNowPlaying): Long {
         if (!host.isPlaying) return host.positionMs
@@ -1059,6 +1160,7 @@ object FollowSession {
             artist = known?.artist ?: previous.artist,
             durationMs = known?.durationMs ?: previous.durationMs,
             positionMs = shownPosition(state, known) ?: previous.positionMs,
+            together = host?.together ?: previous.together,
         )
     }
 

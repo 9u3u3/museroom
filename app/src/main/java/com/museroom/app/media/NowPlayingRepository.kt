@@ -33,7 +33,26 @@ object NowPlayingRepository {
     private var started = false
 
     private val _sessions = MutableStateFlow<List<NowPlaying>>(emptyList())
+
+    /**
+     * What this phone is playing, as far as the rest of Museroom is concerned.
+     *
+     * Not quite the same list as the one the system hands over. While Museroom
+     * is the room's own player, everything else on the phone is deliberately
+     * left out of it — see [setRoomOnly].
+     */
     val sessions: StateFlow<List<NowPlaying>> = _sessions.asStateFlow()
+
+    private val _heard = MutableStateFlow<List<NowPlaying>>(emptyList())
+
+    /**
+     * Every session on the phone, including any this is choosing to ignore.
+     *
+     * The honest list, for the two questions that need it: what was playing
+     * just before Museroom took the room over, and whether the app it asked to
+     * stop actually did.
+     */
+    val heard: StateFlow<List<NowPlaying>> = _heard.asStateFlow()
 
     /** Wall-clock time of the last update we received. Powers the self-check. */
     private val _lastEventAt = MutableStateFlow(0L)
@@ -62,6 +81,31 @@ object NowPlayingRepository {
         _room.value = track
         publish()
     }
+
+    /**
+     * Whether Museroom's own player is the only music on this phone that counts.
+     *
+     * Set while a together-mode room is running, and it is not a tidying-up.
+     * Museroom asks the music app it is taking over from to stop and cannot
+     * make it, so a phone hosting a together room may well still have Spotify
+     * running in the background. Everything downstream reads one session and
+     * calls it "what this phone is playing" — the minutes, the friends list,
+     * and above all the row every listener steers by. If Spotify can win that
+     * even for a moment, a room full of people is yanked onto a song their
+     * host is not choosing, three seconds ahead of where any of them can be.
+     *
+     * So while the room owns the speaker, the room is the only answer. What
+     * the other app is doing is still readable through [heard], which is how
+     * the person is told it never stopped.
+     */
+    fun setRoomOnly(only: Boolean) {
+        if (roomOnly == only) return
+        roomOnly = only
+        publish()
+    }
+
+    @Volatile
+    private var roomOnly = false
 
     private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
         rebind(controllers.orEmpty())
@@ -101,7 +145,31 @@ object NowPlayingRepository {
         component = null
         started = false
         _room.value = null
+        roomOnly = false
         _sessions.value = emptyList()
+        _heard.value = emptyList()
+    }
+
+    /**
+     * Asks whatever is playing here to stop. Once, and without insisting.
+     *
+     * A third-party transport control on Android is a request, not a command:
+     * Spotify usually honours it, YouTube Music often does not, and nothing
+     * about the API says which you are talking to. So this is offered once, on
+     * the way into a together-mode room where Museroom is about to become the
+     * speaker, and if it is ignored the person is told on screen that two apps
+     * will sound until they pause the other one themselves. Repeating it would
+     * be a loop fighting an app that has already declined.
+     */
+    @Synchronized
+    fun askToPause() {
+        bound.forEach { (controller, _) ->
+            runCatching {
+                if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                    controller.transportControls.pause()
+                }
+            }
+        }
     }
 
     /** Re-reads every bound controller without rebuilding the bindings. Cheap. */
@@ -142,7 +210,9 @@ object NowPlayingRepository {
 
     private fun publish() {
         val live = bound.mapNotNull { (controller, _) -> controller.toNowPlaying() }
-        _sessions.value = live + listOfNotNull(_room.value)
+        val room = _room.value
+        _heard.value = live + listOfNotNull(room)
+        _sessions.value = if (roomOnly) listOfNotNull(room) else _heard.value
         _lastEventAt.value = System.currentTimeMillis()
     }
 }
@@ -156,12 +226,21 @@ object NowPlayingRepository {
  * were recorded. The self-check still lists what was detected, by package name
  * alone, so nothing is hidden from the person who owns the phone.
  */
-fun List<NowPlaying>.pickActive(): NowPlaying? =
-    filter { it.isTracked && !it.isAdvert }
-        .let { supported ->
-            supported.filter { it.isPlaying }.maxByOrNull { it.reportedAtElapsed }
-                ?: supported.maxByOrNull { it.reportedAtElapsed }
-        }
+fun List<NowPlaying>.pickActive(): NowPlaying? {
+    val supported = filter { it.isTracked && !it.isAdvert }
+    // Museroom's own player wins outright whenever it is running, rather than
+    // by being the most recent reading. In a together-mode room the host is a
+    // client of their own room, and their music app may well still be playing
+    // in the background because the request to pause it was only ever a
+    // request. Deciding between the two on recency would mean whichever
+    // happened to report last, so the room would be published as the room for
+    // a few seconds and then as Spotify, and everybody following would be
+    // yanked between two different songs. There is nothing to weigh here: if
+    // Museroom is playing, that is what this phone is playing.
+    supported.firstOrNull { it.isRoom }?.let { return it }
+    return supported.filter { it.isPlaying }.maxByOrNull { it.reportedAtElapsed }
+        ?: supported.maxByOrNull { it.reportedAtElapsed }
+}
 
 /**
  * Whether the sound coming out of this phone right now is an advert.

@@ -58,6 +58,8 @@ import com.museroom.app.privacy.PrivacyState
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.FollowState
 import com.museroom.app.sync.RoomPresence
+import com.museroom.app.sync.RoomPlayer
+import com.museroom.app.sync.TogetherHost
 import com.museroom.app.ui.Refreshing
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
@@ -67,6 +69,7 @@ import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoProgress
+import com.museroom.app.ui.kit.NeoSwitch
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.formatClock
 import com.museroom.app.util.formatMinutes
@@ -138,6 +141,7 @@ fun NowScreen() {
 
             UpdateCard()
             FollowBar()
+            TogetherCard()
             RoomMembers()
 
             if (isPrivate) {
@@ -334,6 +338,182 @@ private fun NowPlayingHeader(track: NowPlaying, collapse: Float, modifier: Modif
 }
 
 /**
+ * The two kinds of room, and the switch between them.
+ *
+ * Broadcast is a room around whatever the host already had on: Museroom reads
+ * their Spotify and plays a copy for everybody else, three seconds behind,
+ * because a listener told about a song at the instant it starts cannot have
+ * fetched it yet. That distance is what stops anybody losing the opening, and
+ * it is the right default.
+ *
+ * It is also exactly wrong when two phones are on the same table. Then the
+ * host being three seconds early is the whole problem, and no amount of
+ * chasing on the listener's side fixes it, because the thing that is ahead is
+ * a player Museroom does not own. So together mode moves the host onto the
+ * same player as everybody else. Nobody's music app is the speaker, and being
+ * level stops being a trick.
+ *
+ * The cost is stated rather than discovered: the music comes out of Museroom
+ * now, so the other app has to be told to stop, and Museroom can only ask.
+ */
+@Composable
+private fun TogetherCard() {
+    val context = LocalContext.current
+    val c = Neo.colors
+    val auth = remember { AuthRepository.get(context) }
+    val session by auth.session.collectAsStateWithLifecycle()
+    val following by FollowSession.following.collectAsStateWithLifecycle()
+    val on by TogetherHost.on.collectAsStateWithLifecycle()
+    val state by TogetherHost.state.collectAsStateWithLifecycle()
+    val queue by TogetherHost.queue.collectAsStateWithLifecycle()
+    val elsewhere by TogetherHost.playingElsewhere.collectAsStateWithLifecycle()
+    val player by RoomPlayer.snapshot.collectAsStateWithLifecycle()
+    var query by remember { mutableStateOf("") }
+
+    // Somebody in a friend's room is not hosting one. The switch would be a
+    // second player fighting the first for the same page.
+    if (session == null || following != null) return
+
+    NeoCard(radius = 18.dp, shadow = 6.dp, padding = 16.dp) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Label("Your room")
+                Spacer(Modifier.size(3.dp))
+                Text(
+                    if (on) "Together" else "Broadcast",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = c.ink,
+                )
+            }
+            NeoSwitch(
+                checked = on,
+                onCheckedChange = { wanted ->
+                    if (wanted) TogetherHost.start(context) else TogetherHost.stop()
+                },
+            )
+        }
+
+        Spacer(Modifier.size(8.dp))
+        Note(
+            if (on) {
+                "Everyone, including you, plays in Museroom. Pause Spotify or both will sound."
+            } else {
+                "Your room plays a copy of whatever your music app is playing, a few seconds behind you."
+            },
+        )
+
+        if (!on) return@NeoCard
+
+        if (elsewhere) {
+            Spacer(Modifier.size(8.dp))
+            Text(
+                "Another app is still playing here. Pause it, or you will hear two songs.",
+                style = MaterialTheme.typography.bodySmall,
+                color = c.pink,
+            )
+        }
+
+        Spacer(Modifier.size(10.dp))
+        Text(
+            when (val s = state) {
+                is TogetherHost.TogetherState.Off -> ""
+                is TogetherHost.TogetherState.Empty -> "Nothing queued. Search for something to play."
+                is TogetherHost.TogetherState.Finding -> "Finding \"${s.query}\""
+                // Not a countdown against named people. Everybody is fetching
+                // the same song and the room lets go on one moment; who is
+                // ready is not something this promises to know.
+                is TogetherHost.TogetherState.Starting -> "Starting together — ${s.title}"
+                is TogetherHost.TogetherState.Playing ->
+                    listOf(s.title, s.artist).filter { it.isNotBlank() }.joinToString(" · ")
+                is TogetherHost.TogetherState.Stuck -> s.reason
+            },
+            style = MaterialTheme.typography.titleMedium,
+            color = c.ink,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        Spacer(Modifier.size(12.dp))
+        Field(value = query, onChange = { query = it }, label = "Search for a song")
+        Spacer(Modifier.size(9.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+            NeoButton(
+                "Play now",
+                small = true,
+                enabled = query.isNotBlank(),
+                onClick = {
+                    TogetherHost.playNow(query)
+                    query = ""
+                },
+            )
+            NeoButton(
+                "Add",
+                small = true,
+                tone = NeoTone.Paper,
+                enabled = query.isNotBlank(),
+                onClick = {
+                    TogetherHost.enqueue(query)
+                    query = ""
+                },
+            )
+        }
+
+        // Only once there is something to press these on. A pause button over
+        // an empty room is a button that does nothing.
+        val holding = state is TogetherHost.TogetherState.Playing ||
+            state is TogetherHost.TogetherState.Starting
+        if (holding) {
+            Spacer(Modifier.size(9.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                NeoButton(
+                    if (player.playing) "Pause" else "Play",
+                    small = true,
+                    tone = NeoTone.Lime,
+                    onClick = { TogetherHost.toggle() },
+                )
+                NeoButton(
+                    "Skip",
+                    small = true,
+                    tone = NeoTone.Paper,
+                    onClick = { TogetherHost.skip() },
+                )
+            }
+        }
+
+        if (queue.isNotEmpty()) {
+            Spacer(Modifier.size(12.dp))
+            Label("Up next")
+            queue.forEachIndexed { index, item ->
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    Text(
+                        item.label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = c.ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    NeoButton(
+                        "Remove",
+                        small = true,
+                        tone = NeoTone.Paper,
+                        onClick = { TogetherHost.remove(index) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * A newer build exists.
  *
  * Not being on the Play Store means nothing updates itself and nobody is told,
@@ -499,9 +679,17 @@ private fun FollowBar() {
                 is FollowState.Finding -> "Finding the track"
                 is FollowState.Loading -> "Loading ${s.title}"
                 is FollowState.CatchingUp -> "Catching up"
+                is FollowState.Waiting -> "Starting together"
                 is FollowState.InStep ->
-                    if (kotlin.math.abs(s.offMs) < 1000) "In step"
-                    else "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"
+                    if (kotlin.math.abs(s.offMs) < 1000) {
+                        // Worth saying which room this is. Three seconds behind
+                        // a friend's Spotify and level with a room that is all
+                        // on one clock are both "in step", and they do not
+                        // sound the same in a kitchen with two phones out.
+                        if (room.together) "In step — everyone together" else "In step"
+                    } else {
+                        "${if (s.offMs > 0) "behind" else "ahead"} by ${kotlin.math.abs(s.offMs) / 1000}s"
+                    }
                 is FollowState.Advert -> "Ad break — back in a moment"
                 is FollowState.HostAdvert -> "Ad on their end — holding the track"
                 is FollowState.Silent -> "The player will not start"

@@ -105,6 +105,7 @@ class SyncEngine private constructor(context: Context) {
                             // from now, and two phones a second apart on the
                             // time are two phones a second apart on the music.
                             put("updated_at", ServerClock.now().toString())
+                            roomAgreement()
                         },
                     )
                 }
@@ -143,11 +144,30 @@ class SyncEngine private constructor(context: Context) {
                     buildJsonObject {
                         build()
                         put("updated_at", ServerClock.now().toString())
+                        roomAgreement()
                     },
                     token,
                 )
             }
         }
+    }
+
+    /**
+     * Which bargain this room is running, and when it begins the track.
+     *
+     * Written on every row rather than only on the rows that need it, because
+     * a listener steers by the difference between the two modes and the one
+     * thing they must never do is read a row that has half changed. A
+     * broadcast room says so and carries no moment; the moment there is worked
+     * out from the position, which every phone can do for itself.
+     *
+     * In together mode Museroom owns the speaker at both ends, so the moment
+     * is a decision rather than a deduction and has to be written down.
+     */
+    private fun kotlinx.serialization.json.JsonObjectBuilder.roomAgreement() {
+        put("room_mode", TogetherHost.modeName)
+        put("starts_at", TogetherHost.startsAtIso)
+        put("start_position_ms", TogetherHost.startPositionMs)
     }
 
     /**

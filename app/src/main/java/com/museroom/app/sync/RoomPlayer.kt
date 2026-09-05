@@ -46,6 +46,7 @@ object RoomPlayer {
     /** Player states, as YouTube numbers them. */
     private const val PLAYING = 1
     private const val BUFFERING = 3
+    private const val ENDED = 0
 
     private const val HOME = "https://music.youtube.com/"
 
@@ -77,6 +78,15 @@ object RoomPlayer {
     ) {
         val playing: Boolean get() = state == PLAYING
         val buffering: Boolean get() = state == BUFFERING
+
+        /**
+         * The track ran out on its own.
+         *
+         * Only a host reads this. A listener never has to: their next track is
+         * whatever the host says it is. A host has nobody to be told by, so the
+         * end of a song is the moment they have to notice for themselves.
+         */
+        val ended: Boolean get() = state == ENDED
         val onWantedTrack: Boolean get() = wanted.isNotBlank() && videoId == wanted
     }
 

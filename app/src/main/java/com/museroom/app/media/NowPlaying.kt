@@ -3,6 +3,18 @@ package com.museroom.app.media
 import android.graphics.Bitmap
 
 /**
+ * The package a room reports itself under.
+ *
+ * Deliberately not in the allowlist. This is the one session Museroom builds
+ * rather than reads, so it must never be picked up as though somebody's own
+ * copy of Museroom were a music player somebody else could be recorded
+ * through. It is named here rather than inside a room because two different
+ * places now have to recognise it: the room that writes it, and the rule that
+ * decides which of several sessions the person actually means.
+ */
+const val ROOM_PACKAGE = "com.museroom.app"
+
+/**
  * One music app's playback, snapshotted. Positions are carried as the player
  * reported them plus the clock reading at that moment, never as "the position
  * right now", so a snapshot stays correct however long it sits in a queue.
@@ -47,6 +59,9 @@ data class NowPlaying(
 ) {
 
     val fingerprint: String get() = Fingerprint.of(title, artist, durationMs)
+
+    /** Museroom's own player, rather than an app it is reading. */
+    val isRoom: Boolean get() = packageName == ROOM_PACKAGE
 
     /** Plain-language form of [audioContentType], for the diagnostics panel. */
     val contentKind: String

@@ -21,6 +21,7 @@ import com.museroom.app.notify.FriendAlerts
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.RoomPresence
 import com.museroom.app.sync.SyncEngine
+import com.museroom.app.sync.TogetherHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -171,8 +172,9 @@ object PlaybackTracker {
      * exactly when something is being counted and goes when it is not.
      *
      * A private session shows nothing, because nothing is being counted. Nor
-     * does a room: a joiner already has the room's own notification, and two
-     * notifications for one piece of music is one too many.
+     * does a room, at either end of it: a joiner already has the room's own
+     * notification, a together-mode host has the same one with buttons on it,
+     * and two notifications for one piece of music is one too many.
      */
     private suspend fun showWhatIsBeingCounted(app: Context) {
         var shown = ""
@@ -182,6 +184,7 @@ object PlaybackTracker {
                 ?.takeIf { it.isTracked && it.isPlaying && !hidden }
                 // The room posts its own, with the same cover and more to say.
                 ?.takeIf { FollowSession.following.value == null }
+                ?.takeIf { !TogetherHost.on.value }
 
             val state = "${active?.fingerprint.orEmpty()}|${active?.artwork != null}"
             if (state == shown) return@collect

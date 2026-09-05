@@ -77,7 +77,7 @@ until it is granted again.
 | `media/` | Reading `MediaSession`s, fingerprints, artwork, track resolution |
 | `tracking/` | Playback into events (`PlaybackTracker`, `PlaybackDiffer`) |
 | `credit/` | The rules deciding how much of a play counts |
-| `sync/` | Rooms: `FollowSession`, `RoomPlayer`, `RoomService`, `RoomPresence`, `SyncEngine` |
+| `sync/` | Rooms: `FollowSession`, `TogetherHost`, `RoomPlayer`, `RoomService`, `RoomPresence`, `SyncEngine` |
 | `net/` | Supabase: auth, profiles, friends, board, likes, proximity, realtime, `ServerClock`, `Updates` |
 | `proximity/` | BLE advertising and scanning |
 | `notify/` | Notification channels and their actions |
@@ -129,6 +129,27 @@ No audio crosses between phones. The host writes their position into
 recording out of a hidden full-size `WebView` running `music.youtube.com`,
 driven by `evaluateJavascript` against `#movie_player`.
 
+There are **two kinds of room**, and the host chooses. A room is one or the
+other, never a mix, and `now_playing.room_mode` says which.
+
+**Broadcast** is the default and what a room has always been. The host plays
+Spotify or YouTube Music, Museroom only ever reads that session, and everybody
+else runs three seconds behind. That distance is the design, not a shortfall —
+see `ROOM_LAG_MS` below.
+
+**Together** is the opt-in for when people are in the same actual room with
+both phones out loud, where the host being three seconds early is the entire
+problem. Nobody's music app is the speaker, the host's included: every phone is
+a `RoomPlayer` cued to the same recording and released on one moment written in
+the shared clock. `sync/TogetherHost.kt` is the host's side of it — the queue,
+the search, the schedule, and the handover from whatever was playing natively.
+Being level then is not a trick; there is simply no player ahead of the clock.
+
+The plan behind it is `plans/together-mode.md`, including the things it
+deliberately does not do. Step 6 of that plan (using `room_ready_for` to shrink
+the buffer on a fast room) is **not built**, on purpose: a dead phone must not
+be able to hold a room silent.
+
 Pieces:
 
 - **`sync/RoomPlayer.kt`** — owns the WebView. `search`, `load`, `seekTo`,
@@ -173,9 +194,13 @@ Invariants that were each learned from a real bug. Do not undo them:
 - **An earlier design held the host's own player at a track change** so every
   device could start on an agreed moment. It was built, shipped as 5.3/5.4, and
   removed: the transport control was unreliable and the gap it cost the host was
-  not worth it. `now_playing.starts_at`, `start_position_ms`, `room_ready_for`
-  and `room_late_ms` are the leftover columns, still present and now unused, and
-  `room_members` still returns two of them. Do not build on them without asking.
+  not worth it. Nothing in Museroom reaches into another app's transport
+  controls to hold a start, and nothing should. `room_ready_for` and
+  `room_late_ms` are what is left of that attempt, still present and still
+  unused; `room_members` returns both. Do not build on those two without asking.
+  `starts_at` and `start_position_ms` are no longer leftovers — together mode
+  uses them for exactly what their comments always said, the difference being
+  that the host is now a client of the moment rather than being held at it.
 - **Every listener begins a new song on the same computed moment.**
   `roomStartMoment` derives it from the host's own row (position and when that
   was true give the instant the track began) plus the lag and a fetch
@@ -229,7 +254,38 @@ Invariants that were each learned from a real bug. Do not undo them:
   stops rather than leaving a notification over silence. This is a platform
   limit, not a bug to chase.
 - **The joiner's notification has no transport controls.** Pause, skip and
-  scrub belong to the host. Only Like and Leave.
+  scrub belong to the host. Only Like and Leave. A *together host's*
+  notification does get Pause, Skip and Stop, because there the buttons are
+  real: their music is coming out of Museroom, so Museroom is the only thing
+  that can stop it.
+
+Together mode adds its own, all learned the same way:
+
+- **The mode is read, never inferred.** `FollowSession.lagFor` is the only
+  place that decides how far behind to sit, and it decides from `room_mode`.
+- **Where there is no lag there is no tail to protect.** The rule that lets the
+  previous song finish exists because a listener is behind and still has
+  seconds of it left. A together listener is level, so `stillFinishing` is
+  gated on `lagFor(host) > 0`; holding a tail there would just be playing the
+  wrong song.
+- **A silent together row is not a stopped one.** `FollowSession.starting`
+  covers both sides of the moment: the seconds before it, where the host is
+  holding a cued track, and the seconds after it, where every phone has let go
+  but the host's own "playing" has not been written and pushed yet. Acting on
+  either would pause a room in the first second of a song, or drag it back to a
+  beginning it has already passed.
+- **The room owns what the phone reports.** `NowPlayingRepository.setRoomOnly`
+  drops every other session out of `sessions` while a together room runs, and
+  `pickActive` prefers the room outright rather than by recency. Museroom can
+  only *ask* Spotify to pause; if the two competed, the row every listener
+  steers by would flick between two different songs. What the other app is
+  doing is still readable through `NowPlayingRepository.heard`, which is how
+  the host is told it never stopped.
+- **The host is credited once.** Their play events come from the room session,
+  never from the music app it took over from — same rule, same mechanism.
+- **The host must be able to change song without leaving the mode.** Search,
+  play now, queue, skip and pause exist for this reason. Do not land changes
+  that take them away.
 
 ### 4. Nearby
 
@@ -250,6 +306,11 @@ permission, it throws, which took the whole app down. The launch is also
 wrapped with a Settings fallback.
 
 ## The database
+
+`now_playing.room_mode` is `'broadcast'` or `'together'`, checked in SQL and
+defaulted to broadcast. Read it; never infer the mode from whether `starts_at`
+happens to be set, because a listener reading a half-written row would pick the
+wrong distance to hold and the wrong distance is heard.
 
 Tables: `profiles`, `play_events`, `listening_sessions`, `daily_listening`,
 `tracks`, `track_aliases`, `leaderboard_entries`, `friendships`, `now_playing`,

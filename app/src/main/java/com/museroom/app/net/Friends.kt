@@ -36,7 +36,31 @@ data class RemoteNowPlaying(
      * is coming back, so a room holds rather than letting go.
      */
     @SerialName("is_advert") val isAdvert: Boolean = false,
+    /**
+     * Which bargain this room is running: "broadcast" or "together".
+     *
+     * Read rather than inferred. Both modes write a start moment, and a
+     * listener guessing the mode from whether one happens to be present would
+     * pick the wrong distance to hold behind the host — which is the one thing
+     * anybody can hear.
+     */
+    @SerialName("room_mode") val roomMode: String = "broadcast",
+    /**
+     * The moment, in the database's clock, that the whole room begins this
+     * track. Null on an ordinary broadcast row, where the moment is worked out
+     * from the position instead of being written down.
+     */
+    @SerialName("starts_at") val startsAt: String? = null,
+    @SerialName("start_position_ms") val startPositionMs: Long = 0,
 ) {
+
+    /**
+     * Whether the host is a client of their own room rather than a DJ ahead
+     * of it. In together mode there is no native player to run behind, so
+     * there is nothing to run behind.
+     */
+    val together: Boolean get() = roomMode == "together"
+
     /**
      * Whether this is somebody listening now or the last thing they played.
      *
@@ -191,7 +215,7 @@ class FriendsRepository private constructor(context: Context) {
         val list = ids.joinToString(",")
         val body = Supabase.select(
             "profiles",
-            "id=in.($list)&select=id,handle,display_name,avatar_url,join_mode,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at,source_track_id,source_package,is_advert)",
+            "id=in.($list)&select=id,handle,display_name,avatar_url,join_mode,now_playing(title,artist,duration_ms,position_ms,is_playing,updated_at,source_track_id,source_package,is_advert,room_mode,starts_at,start_position_ms)",
             token,
         )
         Supabase.json
@@ -213,7 +237,7 @@ class FriendsRepository private constructor(context: Context) {
         val body = Supabase.select(
             "now_playing",
             "user_id=eq.$userId&select=title,artist,duration_ms,position_ms,is_playing,updated_at," +
-                "source_track_id,source_package,is_advert",
+                "source_track_id,source_package,is_advert,room_mode,starts_at,start_position_ms",
             token,
         )
         Supabase.json
