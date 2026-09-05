@@ -1,6 +1,6 @@
 {
-  "version_code": 29,
-  "version_name": "5.7",
+  "version_code": 30,
+  "version_name": "5.8",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Nearby no longer lists people who are already listening along with somebody, including yourself. And anybody who is late to the start of a song now catches up with the rest of the room straight away instead of waiting first."
+  "notes": "A room can now put everyone on the same clock, you included. Turn on Together and your music plays through Museroom instead of Spotify, so nobody is a few seconds ahead of anybody. Search, queue, skip and pause are yours from inside the app."
 }
