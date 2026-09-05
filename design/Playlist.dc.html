@@ -221,97 +221,72 @@
     @media (prefers-reduced-motion: reduce){
       *,*::before,*::after{animation:none !important; transition:none !important}
     }
+    .pbar{display:flex; align-items:center; justify-content:space-between; gap:12px;
+          padding:48px 20px 6px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+        transition:transform .12s ease, box-shadow .12s ease}
+    .ib:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .ib.big{width:54px; height:54px}
     .body{flex:1; overflow:hidden; padding:0 20px}
-    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--pink)}
-    .radar{position:relative; margin:12px auto 0; width:190px; height:190px;
-           border-radius:999px; border:3px solid var(--ink); background:var(--card);
-           box-shadow:5px 5px 0 var(--ink); overflow:hidden}
-    .radar i{position:absolute; left:50%; top:50%; border:2.5px solid var(--ink);
-             border-radius:999px; transform:translate(-50%,-50%); opacity:.32}
-    .sweep{position:absolute; inset:0; border-radius:999px;
-      background:conic-gradient(from 0deg, rgba(123,75,255,.55), rgba(123,75,255,0) 78deg);
-      animation:spin 2.6s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .blip{position:absolute; width:15px; height:15px; border-radius:999px;
-          background:var(--pink); border:2.5px solid var(--on); animation:beat 1.7s ease-in-out infinite}
-    .toggle{margin-top:16px; padding:14px 16px; display:flex; align-items:center; gap:14px;
-            background:var(--violet); color:#fff; border:3px solid var(--ink);
-            border-radius:18px; box-shadow:5px 5px 0 var(--ink)}
-    .toggle .t{flex:1}
-    .toggle .t b{display:block; font-size:16px; font-weight:900}
-    .toggle .t span{display:block; font-size:11px; line-height:1.4; opacity:.85; margin-top:2px}
-    .sw{flex:none; width:62px; height:34px; border-radius:999px; border:3px solid var(--on);
-        background:var(--lime); position:relative; cursor:pointer;
-        box-shadow:3px 3px 0 var(--on)}
-    .sw::after{content:""; position:absolute; top:2px; left:30px; width:24px; height:24px;
-               border-radius:999px; background:#fff; border:2.5px solid var(--on);
-               transition:left .18s cubic-bezier(.2,.9,.3,1.4)}
-    .sw.off{background:var(--card)}
-    .sw.off::after{left:2px}
-    .near{margin-top:12px; padding:12px; display:flex; gap:11px; align-items:center;
-          background:var(--card); border:3px solid var(--ink); border-radius:16px;
-          box-shadow:4px 4px 0 var(--ink)}
-    .near .cv{flex:none; width:52px; height:52px; border-radius:11px; border:3px solid var(--ink)}
-    .near .m{flex:1; min-width:0}
-    .near .m b{display:block; font-size:14px; font-weight:900}
-    .near .m span{display:block; font-size:12px; font-weight:700; white-space:nowrap;
-                  overflow:hidden; text-overflow:ellipsis}
-    .near .m em{display:block; font-style:normal; font-size:11px; opacity:.6; font-weight:600}
-    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
-                 box-shadow:3px 3px 0 var(--on)}
+
+    /* A playlist is the user's own object, so its header is a card with a
+       shadow: something made, sitting on the page, rather than a masthead. */
+    .hero{margin-top:8px; padding:16px; background:var(--card); border:3px solid var(--ink);
+          border-radius:20px; box-shadow:6px 6px 0 var(--ink); text-align:center}
+    .hc{position:relative; width:150px; height:150px; margin:0 auto; border-radius:16px;
+        border:3px solid var(--ink); overflow:hidden; box-shadow:5px 5px 0 var(--ink)}
+    .hc span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.3px, transparent 2.4px);
+      background-size:12px 12px; opacity:.2}
+    .ht{margin:14px 0 0; font-size:26px; line-height:1.02; font-weight:900; letter-spacing:-.03em}
+    .hs{margin:5px 0 0; font-size:10px; font-weight:800; letter-spacing:.1em;
+        text-transform:uppercase; opacity:.55}
+    .hbtn{display:flex; align-items:center; gap:10px; margin-top:14px}
+
+    .tracks{margin-top:6px}
+    .grip{flex:none; width:14px; font-size:11px; line-height:1; letter-spacing:-3px;
+          opacity:.35; cursor:grab; writing-mode:vertical-rl}
+
+    /* A pushed surface keeps its parent tab lit; you did not leave it. */
+    .nav .LIBRARY{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+               box-shadow:3px 3px 0 var(--on)}
   </style>
 </helmet>
 <div class="screen {{theme}}">
-  <div class="bar">
-    <span class="crumb">Museroom</span>
-    <span class="pill acc" style="background:var(--lime)">2 in range</span>
+  <div class="pbar">
+    <button class="ib" aria-label="Back">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 7.5 12l7.5 7.5"/></svg>
+    </button>
+    <span class="crumb">Playlist</span>
+    <button class="ib" aria-label="More">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
+    </button>
   </div>
 
   <div class="body">
-    <h2 class="h2 bang p">NEARBY</h2>
-
-    <div class="chips" style="margin:12px 0 2px">
-      <button class="chip ">Friends</button>
-      <button class="chip sel">Nearby</button>
-      <button class="chip">Requests</button>
-    </div>
-
-
-    <div class="radar r d2">
-      <span class="sweep"></span>
-      <i style="width:60px;height:60px"></i>
-      <i style="width:118px;height:118px"></i>
-      <i style="width:176px;height:176px"></i>
-      <span class="blip" style="left:118px;top:56px"></span>
-      <span class="blip" style="left:52px;top:120px;animation-delay:.5s"></span>
-    </div>
-
-    <div class="toggle r d3">
-      <div class="t">
-        <b>Broadcasting</b>
-        <span>A code that changes every 15 minutes. Not your name.</span>
+    <div class="hero p d1">
+      <div class="hc" style="background:linear-gradient(150deg,#7B4BFF,#FF4D8D)"><span></span></div>
+      <h1 class="ht">Late drives</h1>
+      <p class="hs">Yours &middot; 41 tracks &middot; 2h 38m</p>
+      <div class="hbtn">
+        <button class="btn lime" style="flex:1">Play</button>
+        <button class="ib big" aria-label="Shuffle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h3.6c3.4 0 3.4 11 6.8 11h4.4M3.5 17.5h3.6c3.4 0 3.4-11 6.8-11h4.4"/><path d="m16.6 3.6 2.9 2.9-2.9 2.9M16.6 14.6l2.9 2.9-2.9 2.9"/></svg>
+        </button>
+        <button class="ib big" aria-label="Edit">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 19.5.6-3.9L15.6 5.2l3.2 3.2L8.4 18.9z"/><path d="m13.6 7.2 3.2 3.2"/></svg>
+        </button>
       </div>
-      <span class="sw" role="switch" aria-checked="true" aria-label="Proximity"></span>
     </div>
 
-    <div class="near r d4">
-      <span class="cv" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"></span>
-      <div class="m">
-        <b>@arun_v</b>
-        <span>Nights</span>
-        <em>Frank Ocean</em>
-      </div>
-      <button class="btn sm">Listen too</button>
-    </div>
-
-    <div class="near r d5">
-      <span class="cv" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"></span>
-      <div class="m">
-        <b>@thebasement</b>
-        <span>F o r C e r t a i n</span>
-        <em>PARTYNEXTDOOR</em>
-      </div>
-      <button class="btn sm">Listen too</button>
+    <div class="tracks">
+      <div class="row r d3"><span class="grip">&#8942;&#8942;</span><div class="th" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"><span></span></div><div class="rm"><div class="rt">Nights</div><div class="rs">Frank Ocean &middot; 5:07</div></div><div class="dots">&#8942;</div></div>
+      <div class="row r d4"><span class="grip">&#8942;&#8942;</span><div class="th" style="background:linear-gradient(150deg,#54D6F5,#7B4BFF)"><span></span></div><div class="rm"><div class="rt">Weird Fishes / Arpeggi</div><div class="rs">Radiohead &middot; 5:18</div></div><div class="dots">&#8942;</div></div>
+      <div class="row r d5"><span class="grip">&#8942;&#8942;</span><div class="th" style="background:linear-gradient(150deg,#CDFF3E,#54D6F5)"><span></span></div><div class="rm"><div class="rt">Motion Sickness</div><div class="rs">Phoebe Bridgers &middot; 4:00</div></div><div class="dots">&#8942;</div></div>
+      <div class="row r d6"><span class="grip">&#8942;&#8942;</span><div class="th" style="background:linear-gradient(150deg,#FF4D8D,#7B4BFF)"><span></span></div><div class="rm"><div class="rt">Kabhi Kabhie Aditi</div><div class="rs">Rashid Ali &middot; 3:39</div></div><div class="dots">&#8942;</div></div>
+      <div class="row r d7"><span class="grip">&#8942;&#8942;</span><div class="th" style="background:linear-gradient(150deg,#7B4BFF,#54D6F5)"><span></span></div><div class="rm"><div class="rt">EYE ON IT</div><div class="rs">PARTYNEXTDOOR &middot; 3:32</div></div><div class="dots">&#8942;</div></div>
     </div>
   </div>
 
@@ -355,7 +330,7 @@
   </nav>
 </div>
 </x-dc>
-<script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
 class Component extends DCLogic {
   renderVals() {
     return { theme: this.props.dark ? "dark" : "light" };

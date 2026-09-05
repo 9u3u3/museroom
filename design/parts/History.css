@@ -29,5 +29,5 @@
              overflow:hidden; text-overflow:ellipsis}
     .it .m span{display:block; font-size:11px; opacity:.62; font-weight:600}
     .it .t{font-family:"Space Mono",monospace; font-size:12px; font-weight:700}
-    .nav .NOW{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+    .nav .HOME{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
               box-shadow:3px 3px 0 var(--on)}

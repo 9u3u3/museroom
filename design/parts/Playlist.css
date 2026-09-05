@@ -1,0 +1,31 @@
+    .pbar{display:flex; align-items:center; justify-content:space-between; gap:12px;
+          padding:48px 20px 6px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+        transition:transform .12s ease, box-shadow .12s ease}
+    .ib:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .ib.big{width:54px; height:54px}
+    .body{flex:1; overflow:hidden; padding:0 20px}
+
+    /* A playlist is the user's own object, so its header is a card with a
+       shadow: something made, sitting on the page, rather than a masthead. */
+    .hero{margin-top:8px; padding:16px; background:var(--card); border:3px solid var(--ink);
+          border-radius:20px; box-shadow:6px 6px 0 var(--ink); text-align:center}
+    .hc{position:relative; width:150px; height:150px; margin:0 auto; border-radius:16px;
+        border:3px solid var(--ink); overflow:hidden; box-shadow:5px 5px 0 var(--ink)}
+    .hc span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.3px, transparent 2.4px);
+      background-size:12px 12px; opacity:.2}
+    .ht{margin:14px 0 0; font-size:26px; line-height:1.02; font-weight:900; letter-spacing:-.03em}
+    .hs{margin:5px 0 0; font-size:10px; font-weight:800; letter-spacing:.1em;
+        text-transform:uppercase; opacity:.55}
+    .hbtn{display:flex; align-items:center; gap:10px; margin-top:14px}
+
+    .tracks{margin-top:6px}
+    .grip{flex:none; width:14px; font-size:11px; line-height:1; letter-spacing:-3px;
+          opacity:.35; cursor:grab; writing-mode:vertical-rl}
+
+    /* A pushed surface keeps its parent tab lit; you did not leave it. */
+    .nav .LIBRARY{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+               box-shadow:3px 3px 0 var(--on)}

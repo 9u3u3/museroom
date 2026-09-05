@@ -1,0 +1,32 @@
+    .body{flex:1; overflow:hidden; padding:0 20px}
+    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--violet)}
+    .acts{display:flex; gap:9px}
+    .ib{width:42px; height:42px; display:grid; place-items:center; border:3px solid var(--ink);
+        border-radius:999px; background:var(--card); color:var(--ink); cursor:pointer;
+        box-shadow:3px 3px 0 var(--ink); transition:transform .12s ease, box-shadow .12s ease}
+    .ib:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+
+    .sortrow{display:flex; align-items:center; justify-content:space-between;
+             margin:14px 0 4px}
+    .sort{font-size:10px; font-weight:900; letter-spacing:.14em; text-transform:uppercase;
+          opacity:.55; cursor:pointer}
+
+    .grid{display:grid; grid-template-columns:1fr 1fr; gap:16px 14px; margin-top:10px}
+    .tile{min-width:0}
+    .tc{position:relative; aspect-ratio:1; border-radius:16px; border:3px solid var(--ink);
+        overflow:hidden; box-shadow:5px 5px 0 var(--ink); display:grid; place-items:center}
+    .tc span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.1px, transparent 2.2px);
+      background-size:11px 11px; opacity:.2}
+    /* The two built-in shelves are accent fills, not artwork, because they are
+       the app's own collections and never carry a cover of their own. */
+    .tc.liked{background:var(--pink); color:var(--on); border-color:var(--on);
+              box-shadow:5px 5px 0 var(--on)}
+    .tc.down{background:var(--sky); color:var(--on); border-color:var(--on);
+             box-shadow:5px 5px 0 var(--on)}
+    .tn{font-size:13px; font-weight:900; margin-top:9px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+    .ts{font-size:10px; font-weight:600; opacity:.6; margin-top:1px}
+
+    .nav .LIBRARY{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+                  box-shadow:3px 3px 0 var(--on)}

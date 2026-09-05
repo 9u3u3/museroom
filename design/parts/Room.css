@@ -1,0 +1,52 @@
+    .pbar{display:flex; align-items:center; gap:12px; padding:48px 20px 8px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink)}
+    .from{flex:1; min-width:0}
+    .fk{display:flex; align-items:center; gap:6px; font-size:9px; font-weight:900;
+        letter-spacing:.16em; text-transform:uppercase; opacity:.6}
+    .fv{font-size:15px; font-weight:900; margin-top:2px}
+    .body{flex:1; overflow:hidden; padding:0 20px}
+
+    .mode{margin-top:8px; padding:12px; background:var(--card); border:3px solid var(--ink);
+          border-radius:18px; box-shadow:5px 5px 0 var(--ink)}
+    .seg{display:flex; gap:0; border:3px solid var(--ink); border-radius:999px;
+         overflow:hidden; background:var(--card)}
+    .sg{flex:1; height:42px; border:0; background:transparent; color:var(--ink);
+        font-family:"Archivo",sans-serif; font-weight:900; font-size:12px;
+        letter-spacing:.1em; text-transform:uppercase; cursor:pointer}
+    .sg.sel{background:var(--lime); color:var(--on)}
+    .mnote{margin:10px 2px 0; font-size:11px; line-height:1.45; font-weight:700; opacity:.65}
+
+    .np{display:flex; gap:13px; margin-top:14px}
+    .nc{flex:none; position:relative; width:88px; height:88px; border-radius:14px;
+        border:3px solid var(--ink); overflow:hidden; box-shadow:4px 4px 0 var(--ink)}
+    .nc span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2px, transparent 2.1px);
+      background-size:10px 10px; opacity:.2}
+    .nm{flex:1; min-width:0}
+    .nt{font-size:17px; font-weight:900; line-height:1.12}
+    .na{font-size:12px; font-weight:700; opacity:.62; margin-top:3px}
+    .nbar{height:11px; margin-top:10px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); overflow:hidden}
+    .nbar i{display:block; height:100%; background:var(--violet)}
+    .nfoot{font-size:11px; font-weight:700; margin-top:7px; opacity:.7}
+
+    .tp{margin-top:16px}
+
+    .mem{display:flex; gap:10px}
+    .mm{flex:1; text-align:center; padding:10px 4px; background:var(--card);
+        border:2.5px solid var(--ink); border-radius:14px; box-shadow:3px 3px 0 var(--ink)}
+    .av{width:34px; height:34px; margin:0 auto; display:grid; place-items:center;
+        border:2.5px solid var(--on); border-radius:999px; color:var(--on);
+        font-family:"Bangers","Impact",sans-serif; font-size:17px}
+    .mn{font-size:10px; font-weight:900; margin-top:6px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+    /* Lateness is stated, never hidden. A number that is fine still gets shown,
+       so the one that is not fine does not arrive as a surprise. */
+    .ms{font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase;
+        margin-top:2px}
+    .ms.ok{opacity:.5}
+    .ms.late{color:var(--pink)}
+
+    .row.guest .rs{color:var(--pink); opacity:1; font-weight:800}

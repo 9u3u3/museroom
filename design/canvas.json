@@ -1,27 +1,44 @@
 {
   "pages": [
-    { "id": "page-1", "name": "Screens" },
-    { "id": "page-2", "name": "Brand" }
+    { "id": "page-1", "name": "The player" },
+    { "id": "page-2", "name": "Rooms & people" },
+    { "id": "page-3", "name": "Brand" }
   ],
   "artboards": [
-    { "file": "Onboarding.dc.html",  "title": "1 · Permission",  "page": "page-1", "x": 0,    "y": 0,    "w": 390, "h": 844 },
-    { "file": "SignIn.dc.html",      "title": "2 · Sign in",     "page": "page-1", "x": 470,  "y": 0,    "w": 390, "h": 844 },
-    { "file": "Main.dc.html",        "title": "3 · Now playing", "page": "page-1", "x": 940,  "y": 0,    "w": 390, "h": 844 },
-    { "file": "History.dc.html",     "title": "4 · The tally",   "page": "page-1", "x": 1410, "y": 0,    "w": 390, "h": 844 },
-    { "file": "Friends.dc.html",     "title": "5 · Friends",     "page": "page-1", "x": 1880, "y": 0,    "w": 390, "h": 844 },
-    { "file": "Nearby.dc.html",      "title": "6 · Nearby",      "page": "page-1", "x": 0,    "y": 1000, "w": 390, "h": 844 },
-    { "file": "Leaderboard.dc.html", "title": "7 · Top 100",     "page": "page-1", "x": 470,  "y": 1000, "w": 390, "h": 844 },
-    { "file": "Settings.dc.html",    "title": "8 · You",         "page": "page-1", "x": 940,  "y": 1000, "w": 390, "h": 844 },
-    { "file": "Modals.dc.html",      "title": "9 · Sheets",      "page": "page-1", "x": 1410, "y": 1000, "w": 390, "h": 844 },
-    { "file": "Logo.dc.html",        "title": "The mark",        "page": "page-2", "x": 0,    "y": 0,    "w": 900, "h": 844 },
-    { "file": "System.dc.html",      "title": "The kit",         "page": "page-2", "x": 980,  "y": 0,    "w": 900, "h": 844 }
+    { "file": "Main.dc.html",        "title": "1 · Home",        "page": "page-1", "x": 0,    "y": 0,    "w": 390, "h": 844 },
+    { "file": "Search.dc.html",      "title": "2 · Search",      "page": "page-1", "x": 470,  "y": 0,    "w": 390, "h": 844 },
+    { "file": "Library.dc.html",     "title": "3 · Library",     "page": "page-1", "x": 940,  "y": 0,    "w": 390, "h": 844 },
+    { "file": "Album.dc.html",       "title": "4 · Album",       "page": "page-1", "x": 1410, "y": 0,    "w": 390, "h": 844 },
+    { "file": "Artist.dc.html",      "title": "5 · Artist",      "page": "page-1", "x": 1880, "y": 0,    "w": 390, "h": 844 },
+    { "file": "Playlist.dc.html",    "title": "6 · Playlist",    "page": "page-1", "x": 0,    "y": 1000, "w": 390, "h": 844 },
+    { "file": "Player.dc.html",      "title": "7 · Player",      "page": "page-1", "x": 470,  "y": 1000, "w": 390, "h": 844 },
+    { "file": "Lyrics.dc.html",      "title": "8 · Lyrics",      "page": "page-1", "x": 940,  "y": 1000, "w": 390, "h": 844 },
+    { "file": "Queue.dc.html",       "title": "9 · Queue",       "page": "page-1", "x": 1410, "y": 1000, "w": 390, "h": 844 },
+    { "file": "Sound.dc.html",       "title": "10 · Sound",      "page": "page-1", "x": 1880, "y": 1000, "w": 390, "h": 844 },
+
+    { "file": "Room.dc.html",        "title": "1 · In a room",   "page": "page-2", "x": 0,    "y": 0,    "w": 390, "h": 844 },
+    { "file": "Friends.dc.html",     "title": "2 · Friends",     "page": "page-2", "x": 470,  "y": 0,    "w": 390, "h": 844 },
+    { "file": "Nearby.dc.html",      "title": "3 · Nearby",      "page": "page-2", "x": 940,  "y": 0,    "w": 390, "h": 844 },
+    { "file": "Leaderboard.dc.html", "title": "4 · Board",       "page": "page-2", "x": 1410, "y": 0,    "w": 390, "h": 844 },
+    { "file": "Settings.dc.html",    "title": "5 · You",         "page": "page-2", "x": 1880, "y": 0,    "w": 390, "h": 844 },
+    { "file": "History.dc.html",     "title": "6 · The tally",   "page": "page-2", "x": 0,    "y": 1000, "w": 390, "h": 844 },
+    { "file": "Modals.dc.html",      "title": "7 · Sheets",      "page": "page-2", "x": 470,  "y": 1000, "w": 390, "h": 844 },
+    { "file": "Onboarding.dc.html",  "title": "8 · Permission",  "page": "page-2", "x": 940,  "y": 1000, "w": 390, "h": 844 },
+    { "file": "SignIn.dc.html",      "title": "9 · Sign in",     "page": "page-2", "x": 1410, "y": 1000, "w": 390, "h": 844 },
+
+    { "file": "Logo.dc.html",        "title": "The mark",        "page": "page-3", "x": 0,    "y": 0,    "w": 900, "h": 844 },
+    { "file": "System.dc.html",      "title": "The kit",         "page": "page-3", "x": 980,  "y": 0,    "w": 900, "h": 844 }
   ],
   "annotations": [
-    { "id": "flow-note", "page": "page-1", "x": 0, "y": -170, "w": 720,
-      "text": "MUSEROOM — comic / neobrutalist UI\nTop row: first run and the daily loop. Bottom row: the social half.\nEvery screen carries a Dark switch in the chips above it. Three ship dark so both skins are on screen at once." },
-    { "id": "press-note", "page": "page-1", "x": 1880, "y": 1000, "w": 340,
+    { "id": "player-note", "page": "page-1", "x": 0, "y": -200, "w": 900,
+      "text": "MUSEROOM — the player half.\nThese screens exist because the music now comes from Museroom itself rather than a YouTube Music page hidden behind the app. Top row is browsing: home, search, library, and the three pages a result opens into. Bottom row is the thing playing: the player, its lyrics, its queue, and the settings that govern sound.\nEvery screen carries a Dark switch in the chips above it. The player surfaces ship dark, because artwork should be the only bright thing on them." },
+    { "id": "nav-note", "page": "page-1", "x": 1880, "y": -200, "w": 390,
+      "text": "The tabs are Home, Library, Rooms, Board, You. Search moved to the top bar, where a magnifier is expected. The mini player sits on the nav rather than floating over it, so it never hides the last row of a list." },
+    { "id": "rooms-note", "page": "page-2", "x": 0, "y": -200, "w": 900,
+      "text": "MUSEROOM — the social half.\nRooms is one tab with three chips: friends, nearby, and requests. Inside a room the mode is a switch, because there are exactly two modes and the difference between them is one sentence long.\nReading another app is drawn in sky and never in lime. Lime means Museroom is the one playing." },
+    { "id": "press-note", "page": "page-2", "x": 1880, "y": 1000, "w": 340,
       "text": "Press behaviour: buttons move onto their own shadow instead of dimming. Hover one to see it." },
-    { "id": "brand-note", "page": "page-2", "x": 0, "y": -140, "w": 720,
+    { "id": "brand-note", "page": "page-3", "x": 0, "y": -140, "w": 720,
       "text": "The mark and the kit.\nSurfaces invert between the two themes. Accents never do, which is what keeps dark reading as the same design rather than a photo negative." }
   ],
   "launch": { "view": "canvas", "page": "page-1" }

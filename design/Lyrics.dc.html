@@ -221,138 +221,66 @@
     @media (prefers-reduced-motion: reduce){
       *,*::before,*::after{animation:none !important; transition:none !important}
     }
-    .body{flex:1; overflow:hidden; padding:0 20px}
-    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--pink)}
-    .radar{position:relative; margin:12px auto 0; width:190px; height:190px;
-           border-radius:999px; border:3px solid var(--ink); background:var(--card);
-           box-shadow:5px 5px 0 var(--ink); overflow:hidden}
-    .radar i{position:absolute; left:50%; top:50%; border:2.5px solid var(--ink);
-             border-radius:999px; transform:translate(-50%,-50%); opacity:.32}
-    .sweep{position:absolute; inset:0; border-radius:999px;
-      background:conic-gradient(from 0deg, rgba(123,75,255,.55), rgba(123,75,255,0) 78deg);
-      animation:spin 2.6s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .blip{position:absolute; width:15px; height:15px; border-radius:999px;
-          background:var(--pink); border:2.5px solid var(--on); animation:beat 1.7s ease-in-out infinite}
-    .toggle{margin-top:16px; padding:14px 16px; display:flex; align-items:center; gap:14px;
-            background:var(--violet); color:#fff; border:3px solid var(--ink);
-            border-radius:18px; box-shadow:5px 5px 0 var(--ink)}
-    .toggle .t{flex:1}
-    .toggle .t b{display:block; font-size:16px; font-weight:900}
-    .toggle .t span{display:block; font-size:11px; line-height:1.4; opacity:.85; margin-top:2px}
-    .sw{flex:none; width:62px; height:34px; border-radius:999px; border:3px solid var(--on);
-        background:var(--lime); position:relative; cursor:pointer;
-        box-shadow:3px 3px 0 var(--on)}
-    .sw::after{content:""; position:absolute; top:2px; left:30px; width:24px; height:24px;
-               border-radius:999px; background:#fff; border:2.5px solid var(--on);
-               transition:left .18s cubic-bezier(.2,.9,.3,1.4)}
-    .sw.off{background:var(--card)}
-    .sw.off::after{left:2px}
-    .near{margin-top:12px; padding:12px; display:flex; gap:11px; align-items:center;
-          background:var(--card); border:3px solid var(--ink); border-radius:16px;
-          box-shadow:4px 4px 0 var(--ink)}
-    .near .cv{flex:none; width:52px; height:52px; border-radius:11px; border:3px solid var(--ink)}
-    .near .m{flex:1; min-width:0}
-    .near .m b{display:block; font-size:14px; font-weight:900}
-    .near .m span{display:block; font-size:12px; font-weight:700; white-space:nowrap;
-                  overflow:hidden; text-overflow:ellipsis}
-    .near .m em{display:block; font-style:normal; font-size:11px; opacity:.6; font-weight:600}
-    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
-                 box-shadow:3px 3px 0 var(--on)}
+    .pbar{display:flex; align-items:center; gap:12px; padding:48px 20px 6px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink)}
+    .from{flex:1; text-align:center; min-width:0}
+    .fk{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; opacity:.5}
+    .fv{font-size:13px; font-weight:900; margin-top:1px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+
+    /* The line being sung is the only thing at full weight. Everything above it
+       fades because it is spent; everything below is dimmed because it has not
+       happened. The eye should never have to hunt for where we are. */
+    .lyr{flex:1; overflow:hidden; padding:24px 24px 0}
+    .ln{margin:0 0 20px; font-size:23px; line-height:1.2; font-weight:800;
+        letter-spacing:-.02em; opacity:.32}
+    .ln.gone{opacity:.2}
+    /* The sung line is the page's full ink with a lime shadow behind it. Setting
+       it in violet read as low contrast on the dark skin, and the accent does
+       more work as the shadow than as the letterform. */
+    .ln.on{opacity:1; font-size:31px; font-weight:900; color:var(--ink);
+           text-shadow:3px 3px 0 var(--lime)}
+    .ln.next{opacity:.5}
+
+    .lfoot{display:flex; align-items:center; gap:12px; padding:12px 22px 14px}
+    .lbar{flex:1; height:10px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); overflow:hidden}
+    .lbar i{display:block; height:100%; width:52%; background:var(--violet)}
+    .lt{font-size:11px; font-weight:700}
   </style>
 </helmet>
 <div class="screen {{theme}}">
-  <div class="bar">
-    <span class="crumb">Museroom</span>
-    <span class="pill acc" style="background:var(--lime)">2 in range</span>
+  <div class="pbar">
+    <button class="ib" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+    </button>
+    <div class="from">
+      <div class="fk">Lyrics</div>
+      <div class="fv">Nights &middot; Frank Ocean</div>
+    </div>
+    <button class="ib" aria-label="Translate">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5h8M7.5 3.5v2M9.6 5.5c0 3.6-2.4 6.6-6.1 8.1M5 9.4c1.2 2.2 3 3.6 5.4 4.4"/><path d="m12.5 20.5 4-10 4 10M13.9 17.4h5.2"/></svg>
+    </button>
   </div>
 
-  <div class="body">
-    <h2 class="h2 bang p">NEARBY</h2>
-
-    <div class="chips" style="margin:12px 0 2px">
-      <button class="chip ">Friends</button>
-      <button class="chip sel">Nearby</button>
-      <button class="chip">Requests</button>
-    </div>
-
-
-    <div class="radar r d2">
-      <span class="sweep"></span>
-      <i style="width:60px;height:60px"></i>
-      <i style="width:118px;height:118px"></i>
-      <i style="width:176px;height:176px"></i>
-      <span class="blip" style="left:118px;top:56px"></span>
-      <span class="blip" style="left:52px;top:120px;animation-delay:.5s"></span>
-    </div>
-
-    <div class="toggle r d3">
-      <div class="t">
-        <b>Broadcasting</b>
-        <span>A code that changes every 15 minutes. Not your name.</span>
-      </div>
-      <span class="sw" role="switch" aria-checked="true" aria-label="Proximity"></span>
-    </div>
-
-    <div class="near r d4">
-      <span class="cv" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"></span>
-      <div class="m">
-        <b>@arun_v</b>
-        <span>Nights</span>
-        <em>Frank Ocean</em>
-      </div>
-      <button class="btn sm">Listen too</button>
-    </div>
-
-    <div class="near r d5">
-      <span class="cv" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"></span>
-      <div class="m">
-        <b>@thebasement</b>
-        <span>F o r C e r t a i n</span>
-        <em>PARTYNEXTDOOR</em>
-      </div>
-      <button class="btn sm">Listen too</button>
-    </div>
+  <div class="lyr">
+    <p class="ln gone">You don't know how little you matter</p>
+    <p class="ln gone">Until you're all alone</p>
+    <p class="ln gone">In the middle of Arkansas</p>
+    <p class="ln on p">With a little rock left in the tank</p>
+    <p class="ln next">Til' we're gone</p>
+    <p class="ln">Every night fucks every day up</p>
+    <p class="ln">Every day patches the night up</p>
   </div>
 
-  <div class="mini-p">
-    <div class="mp-bar"><i></i></div>
-    <div class="mp-row">
-      <div class="mp-art"><span></span></div>
-      <div class="mp-meta">
-        <div class="mp-t">Teenage Fever</div>
-        <div class="mp-a">Drake &middot; More Life</div>
-      </div>
-      <button class="mp-b" aria-label="Play">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>
-      </button>
-      <button class="mp-b" aria-label="Next">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5.2 16 12 6 18.8z"/><rect x="17" y="5" width="3.2" height="14" rx="1.1"/></svg>
-      </button>
-    </div>
+  <div class="lfoot">
+    <span class="pill">LRCLIB</span>
+    <div class="lbar"><i></i></div>
+    <span class="mono lt">2:41</span>
   </div>
-  <nav class="nav">
-    <a href="#" class="HOME">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.6V20h13V9.6"/><path d="M9.8 20v-5.4h4.4V20"/></svg></span>
-      <span>Home</span>
-    </a>
-    <a href="#" class="LIBRARY">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.5" width="4" height="15" rx="1.4"/><rect x="9" y="4.5" width="4" height="15" rx="1.4"/><path d="M15.6 6.2 19.4 5l2.1 13.4-3.8 1.2z"/></svg></span>
-      <span>Library</span>
-    </a>
-    <a href="#" class="ROOMS">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M7.6 7.6a6.2 6.2 0 0 0 0 8.8M16.4 16.4a6.2 6.2 0 0 0 0-8.8"/><path d="M4.3 4.3a10.9 10.9 0 0 0 0 15.4M19.7 19.7a10.9 10.9 0 0 0 0-15.4"/></svg></span>
-      <span>Rooms</span>
-    </a>
-    <a href="#" class="BOARD">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4.2v1.6A3.4 3.4 0 0 0 7 10.4M17 5.5h2.8v1.6a3.4 3.4 0 0 1-2.8 3.3"/><path d="M12 14v3.5M8.5 20.5h7"/></svg></span>
-      <span>Board</span>
-    </a>
-    <a href="#" class="YOU">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c0-3.9 3.4-6.3 7.5-6.3s7.5 2.4 7.5 6.3"/></svg></span>
-      <span>You</span>
-    </a>
-  </nav>
+
 </div>
 </x-dc>
 <script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>

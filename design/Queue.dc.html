@@ -221,138 +221,106 @@
     @media (prefers-reduced-motion: reduce){
       *,*::before,*::after{animation:none !important; transition:none !important}
     }
+    .pbar{display:flex; align-items:center; gap:12px; padding:48px 20px 8px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink)}
+    .from{flex:1; text-align:center; min-width:0}
+    .fk{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; opacity:.5}
+    .fv{font-size:13px; font-weight:900; margin-top:1px}
+    .qhead{display:flex; gap:8px; padding:6px 20px 4px; overflow:hidden}
     .body{flex:1; overflow:hidden; padding:0 20px}
-    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--pink)}
-    .radar{position:relative; margin:12px auto 0; width:190px; height:190px;
-           border-radius:999px; border:3px solid var(--ink); background:var(--card);
-           box-shadow:5px 5px 0 var(--ink); overflow:hidden}
-    .radar i{position:absolute; left:50%; top:50%; border:2.5px solid var(--ink);
-             border-radius:999px; transform:translate(-50%,-50%); opacity:.32}
-    .sweep{position:absolute; inset:0; border-radius:999px;
-      background:conic-gradient(from 0deg, rgba(123,75,255,.55), rgba(123,75,255,0) 78deg);
-      animation:spin 2.6s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .blip{position:absolute; width:15px; height:15px; border-radius:999px;
-          background:var(--pink); border:2.5px solid var(--on); animation:beat 1.7s ease-in-out infinite}
-    .toggle{margin-top:16px; padding:14px 16px; display:flex; align-items:center; gap:14px;
-            background:var(--violet); color:#fff; border:3px solid var(--ink);
-            border-radius:18px; box-shadow:5px 5px 0 var(--ink)}
-    .toggle .t{flex:1}
-    .toggle .t b{display:block; font-size:16px; font-weight:900}
-    .toggle .t span{display:block; font-size:11px; line-height:1.4; opacity:.85; margin-top:2px}
-    .sw{flex:none; width:62px; height:34px; border-radius:999px; border:3px solid var(--on);
-        background:var(--lime); position:relative; cursor:pointer;
-        box-shadow:3px 3px 0 var(--on)}
-    .sw::after{content:""; position:absolute; top:2px; left:30px; width:24px; height:24px;
-               border-radius:999px; background:#fff; border:2.5px solid var(--on);
-               transition:left .18s cubic-bezier(.2,.9,.3,1.4)}
-    .sw.off{background:var(--card)}
-    .sw.off::after{left:2px}
-    .near{margin-top:12px; padding:12px; display:flex; gap:11px; align-items:center;
-          background:var(--card); border:3px solid var(--ink); border-radius:16px;
-          box-shadow:4px 4px 0 var(--ink)}
-    .near .cv{flex:none; width:52px; height:52px; border-radius:11px; border:3px solid var(--ink)}
-    .near .m{flex:1; min-width:0}
-    .near .m b{display:block; font-size:14px; font-weight:900}
-    .near .m span{display:block; font-size:12px; font-weight:700; white-space:nowrap;
-                  overflow:hidden; text-overflow:ellipsis}
-    .near .m em{display:block; font-style:normal; font-size:11px; opacity:.6; font-weight:600}
-    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
-                 box-shadow:3px 3px 0 var(--on)}
+
+    .grip{flex:none; width:16px; font-size:11px; line-height:1; letter-spacing:-3px;
+          opacity:.35; cursor:grab; writing-mode:vertical-rl}
+    .qlab{margin:14px 0 2px; font-size:9px; font-weight:900; letter-spacing:.18em;
+          text-transform:uppercase; opacity:.5}
+
+    /* The playing row is a card, not a highlighted line: it is the one row that
+       is a different kind of thing from the rows around it. */
+    .row.now{padding:10px 12px; margin-top:8px; background:var(--lime); color:var(--on);
+             border:3px solid var(--on); border-radius:16px; box-shadow:4px 4px 0 var(--on)}
+    .row.now .rt{color:var(--on)}
+    .row.now .rs{opacity:.72}
+    .row.now .th{border-color:var(--on)}
+    .row.now .grip{opacity:.5}
+
+    .bars{flex:none; display:flex; align-items:flex-end; gap:3px; height:18px; width:20px}
+    .bars i{width:4px; background:var(--on); border-radius:1px; animation:eq .9s ease-in-out infinite}
+    .bars i:nth-child(1){height:60%; animation-delay:0s}
+    .bars i:nth-child(2){height:100%; animation-delay:.15s}
+    .bars i:nth-child(3){height:40%; animation-delay:.3s}
+    @keyframes eq{0%,100%{transform:scaleY(.45)} 50%{transform:scaleY(1)}}
+
+    /* A track someone in the room asked for keeps their name on it, so the host
+       is never deciding about a song with no story attached. */
+    .row.guest .rs{color:var(--pink); opacity:1; font-weight:800}
   </style>
 </helmet>
 <div class="screen {{theme}}">
-  <div class="bar">
-    <span class="crumb">Museroom</span>
-    <span class="pill acc" style="background:var(--lime)">2 in range</span>
+  <div class="pbar">
+    <button class="ib" aria-label="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg>
+    </button>
+    <div class="from">
+      <div class="fk">Queue</div>
+      <div class="fv">Blonde &middot; 12 tracks</div>
+    </div>
+    <button class="ib" aria-label="Clear">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5"/></svg>
+    </button>
+  </div>
+
+  <div class="qhead">
+    <button class="chip sel">Shuffle</button>
+    <button class="chip">Repeat</button>
+    <button class="chip">Save as playlist</button>
   </div>
 
   <div class="body">
-    <h2 class="h2 bang p">NEARBY</h2>
-
-    <div class="chips" style="margin:12px 0 2px">
-      <button class="chip ">Friends</button>
-      <button class="chip sel">Nearby</button>
-      <button class="chip">Requests</button>
+    <div class="row now p d1">
+      <span class="grip">&#8942;&#8942;</span>
+      <div class="th" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"><span></span></div>
+      <div class="rm"><div class="rt">Nights</div><div class="rs">Frank Ocean &middot; playing</div></div>
+      <span class="bars"><i></i><i></i><i></i></span>
     </div>
 
+    <div class="qlab">Up next</div>
 
-    <div class="radar r d2">
-      <span class="sweep"></span>
-      <i style="width:60px;height:60px"></i>
-      <i style="width:118px;height:118px"></i>
-      <i style="width:176px;height:176px"></i>
-      <span class="blip" style="left:118px;top:56px"></span>
-      <span class="blip" style="left:52px;top:120px;animation-delay:.5s"></span>
+    <div class="row r d2">
+      <span class="grip">&#8942;&#8942;</span>
+      <div class="th" style="background:linear-gradient(150deg,#7B4BFF,#FF4D8D)"><span></span></div>
+      <div class="rm"><div class="rt">Solo (Reprise)</div><div class="rs">Frank Ocean &middot; 1:19</div></div>
+      <div class="dots">&#8942;</div>
+    </div>
+    <div class="row r d3">
+      <span class="grip">&#8942;&#8942;</span>
+      <div class="th" style="background:linear-gradient(150deg,#54D6F5,#CDFF3E)"><span></span></div>
+      <div class="rm"><div class="rt">Pretty Sweet</div><div class="rs">Frank Ocean &middot; 2:40</div></div>
+      <div class="dots">&#8942;</div>
+    </div>
+    <div class="row r d4">
+      <span class="grip">&#8942;&#8942;</span>
+      <div class="th" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"><span></span></div>
+      <div class="rm"><div class="rt">Facebook Story</div><div class="rs">Frank Ocean &middot; 1:08</div></div>
+      <div class="dots">&#8942;</div>
+    </div>
+    <div class="row r d5">
+      <span class="grip">&#8942;&#8942;</span>
+      <div class="th" style="background:linear-gradient(150deg,#FF4D8D,#54D6F5)"><span></span></div>
+      <div class="rm"><div class="rt">Close to You</div><div class="rs">Frank Ocean &middot; 1:26</div></div>
+      <div class="dots">&#8942;</div>
     </div>
 
-    <div class="toggle r d3">
-      <div class="t">
-        <b>Broadcasting</b>
-        <span>A code that changes every 15 minutes. Not your name.</span>
-      </div>
-      <span class="sw" role="switch" aria-checked="true" aria-label="Proximity"></span>
-    </div>
-
-    <div class="near r d4">
-      <span class="cv" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"></span>
-      <div class="m">
-        <b>@arun_v</b>
-        <span>Nights</span>
-        <em>Frank Ocean</em>
-      </div>
-      <button class="btn sm">Listen too</button>
-    </div>
-
-    <div class="near r d5">
-      <span class="cv" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"></span>
-      <div class="m">
-        <b>@thebasement</b>
-        <span>F o r C e r t a i n</span>
-        <em>PARTYNEXTDOOR</em>
-      </div>
-      <button class="btn sm">Listen too</button>
+    <div class="qlab">Added by the room</div>
+    <div class="row r d6 guest">
+      <span class="grip">&#8942;&#8942;</span>
+      <div class="th" style="background:linear-gradient(150deg,#7B4BFF,#54D6F5)"><span></span></div>
+      <div class="rm"><div class="rt">Weird Fishes / Arpeggi</div><div class="rs">asked by @sanaya</div></div>
+      <div class="dots">&#8942;</div>
     </div>
   </div>
 
-  <div class="mini-p">
-    <div class="mp-bar"><i></i></div>
-    <div class="mp-row">
-      <div class="mp-art"><span></span></div>
-      <div class="mp-meta">
-        <div class="mp-t">Teenage Fever</div>
-        <div class="mp-a">Drake &middot; More Life</div>
-      </div>
-      <button class="mp-b" aria-label="Play">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>
-      </button>
-      <button class="mp-b" aria-label="Next">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5.2 16 12 6 18.8z"/><rect x="17" y="5" width="3.2" height="14" rx="1.1"/></svg>
-      </button>
-    </div>
-  </div>
-  <nav class="nav">
-    <a href="#" class="HOME">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.6V20h13V9.6"/><path d="M9.8 20v-5.4h4.4V20"/></svg></span>
-      <span>Home</span>
-    </a>
-    <a href="#" class="LIBRARY">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.5" width="4" height="15" rx="1.4"/><rect x="9" y="4.5" width="4" height="15" rx="1.4"/><path d="M15.6 6.2 19.4 5l2.1 13.4-3.8 1.2z"/></svg></span>
-      <span>Library</span>
-    </a>
-    <a href="#" class="ROOMS">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M7.6 7.6a6.2 6.2 0 0 0 0 8.8M16.4 16.4a6.2 6.2 0 0 0 0-8.8"/><path d="M4.3 4.3a10.9 10.9 0 0 0 0 15.4M19.7 19.7a10.9 10.9 0 0 0 0-15.4"/></svg></span>
-      <span>Rooms</span>
-    </a>
-    <a href="#" class="BOARD">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4.2v1.6A3.4 3.4 0 0 0 7 10.4M17 5.5h2.8v1.6a3.4 3.4 0 0 1-2.8 3.3"/><path d="M12 14v3.5M8.5 20.5h7"/></svg></span>
-      <span>Board</span>
-    </a>
-    <a href="#" class="YOU">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c0-3.9 3.4-6.3 7.5-6.3s7.5 2.4 7.5 6.3"/></svg></span>
-      <span>You</span>
-    </a>
-  </nav>
 </div>
 </x-dc>
 <script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>

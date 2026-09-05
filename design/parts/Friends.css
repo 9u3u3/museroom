@@ -30,5 +30,5 @@
       font-size:14px; font-weight:600; box-shadow:3px 3px 0 var(--ink); color:var(--ink)}
     .search input::placeholder{color:currentColor; opacity:.42}
     .search input:focus{outline:none; background:#FFFDF5}
-    .nav .FRIENDS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
                   box-shadow:3px 3px 0 var(--on)}

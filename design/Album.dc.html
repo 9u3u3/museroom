@@ -221,97 +221,94 @@
     @media (prefers-reduced-motion: reduce){
       *,*::before,*::after{animation:none !important; transition:none !important}
     }
+    .pbar{display:flex; align-items:center; justify-content:space-between; gap:12px;
+          padding:48px 20px 6px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+        transition:transform .12s ease, box-shadow .12s ease}
+    .ib:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .ib.big{width:54px; height:54px}
     .body{flex:1; overflow:hidden; padding:0 20px}
-    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--pink)}
-    .radar{position:relative; margin:12px auto 0; width:190px; height:190px;
-           border-radius:999px; border:3px solid var(--ink); background:var(--card);
-           box-shadow:5px 5px 0 var(--ink); overflow:hidden}
-    .radar i{position:absolute; left:50%; top:50%; border:2.5px solid var(--ink);
-             border-radius:999px; transform:translate(-50%,-50%); opacity:.32}
-    .sweep{position:absolute; inset:0; border-radius:999px;
-      background:conic-gradient(from 0deg, rgba(123,75,255,.55), rgba(123,75,255,0) 78deg);
-      animation:spin 2.6s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .blip{position:absolute; width:15px; height:15px; border-radius:999px;
-          background:var(--pink); border:2.5px solid var(--on); animation:beat 1.7s ease-in-out infinite}
-    .toggle{margin-top:16px; padding:14px 16px; display:flex; align-items:center; gap:14px;
-            background:var(--violet); color:#fff; border:3px solid var(--ink);
-            border-radius:18px; box-shadow:5px 5px 0 var(--ink)}
-    .toggle .t{flex:1}
-    .toggle .t b{display:block; font-size:16px; font-weight:900}
-    .toggle .t span{display:block; font-size:11px; line-height:1.4; opacity:.85; margin-top:2px}
-    .sw{flex:none; width:62px; height:34px; border-radius:999px; border:3px solid var(--on);
-        background:var(--lime); position:relative; cursor:pointer;
-        box-shadow:3px 3px 0 var(--on)}
-    .sw::after{content:""; position:absolute; top:2px; left:30px; width:24px; height:24px;
-               border-radius:999px; background:#fff; border:2.5px solid var(--on);
-               transition:left .18s cubic-bezier(.2,.9,.3,1.4)}
-    .sw.off{background:var(--card)}
-    .sw.off::after{left:2px}
-    .near{margin-top:12px; padding:12px; display:flex; gap:11px; align-items:center;
-          background:var(--card); border:3px solid var(--ink); border-radius:16px;
-          box-shadow:4px 4px 0 var(--ink)}
-    .near .cv{flex:none; width:52px; height:52px; border-radius:11px; border:3px solid var(--ink)}
-    .near .m{flex:1; min-width:0}
-    .near .m b{display:block; font-size:14px; font-weight:900}
-    .near .m span{display:block; font-size:12px; font-weight:700; white-space:nowrap;
-                  overflow:hidden; text-overflow:ellipsis}
-    .near .m em{display:block; font-style:normal; font-size:11px; opacity:.6; font-weight:600}
-    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
-                 box-shadow:3px 3px 0 var(--on)}
+
+    /* The cover sits beside the title rather than above it, because an album
+       page that opens with a full-width square pushes the first track off the
+       screen and the track list is what the page is for. */
+    .hero{display:flex; gap:14px; align-items:flex-end; margin-top:6px}
+    .hc{position:relative; flex:none; width:132px; height:132px; border-radius:18px;
+        border:3px solid var(--ink); overflow:hidden; box-shadow:6px 6px 0 var(--ink)}
+    .hc span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.2px, transparent 2.3px);
+      background-size:11px 11px; opacity:.2}
+    .hm{flex:1; min-width:0; padding-bottom:2px}
+    .ht{margin:0; font-size:28px; line-height:1; font-weight:900; letter-spacing:-.03em}
+    .hs{margin:7px 0 0; font-size:14px; font-weight:800; color:var(--violet)}
+    .hd{margin:5px 0 0; font-size:10px; font-weight:700; letter-spacing:.08em;
+        text-transform:uppercase; opacity:.55}
+
+    .acts{display:flex; align-items:center; gap:10px; margin-top:16px}
+
+    .tracks{margin-top:8px}
+    .num{flex:none; width:22px; text-align:center; font-size:12px; font-weight:700; opacity:.45}
+    .off{flex:none; color:var(--sky); font-weight:900; font-size:14px}
+    .row.now{background:var(--lime); color:var(--on); border:3px solid var(--on);
+             border-radius:14px; box-shadow:4px 4px 0 var(--on);
+             padding:8px 10px; margin:4px 0}
+    .row.now .rt{color:var(--on)}
+    .row.now .num{opacity:.6}
+    .bars{flex:none; display:flex; align-items:flex-end; gap:3px; height:16px; width:18px}
+    .bars i{width:4px; background:var(--on); border-radius:1px; animation:eq .9s ease-in-out infinite}
+    .bars i:nth-child(1){height:60%}
+    .bars i:nth-child(2){height:100%; animation-delay:.15s}
+    .bars i:nth-child(3){height:40%; animation-delay:.3s}
+    @keyframes eq{0%,100%{transform:scaleY(.45)} 50%{transform:scaleY(1)}}
+
+    /* A pushed surface keeps its parent tab lit; you did not leave it. */
+    .nav .LIBRARY{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+               box-shadow:3px 3px 0 var(--on)}
   </style>
 </helmet>
 <div class="screen {{theme}}">
-  <div class="bar">
-    <span class="crumb">Museroom</span>
-    <span class="pill acc" style="background:var(--lime)">2 in range</span>
+  <div class="pbar">
+    <button class="ib" aria-label="Back">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 7.5 12l7.5 7.5"/></svg>
+    </button>
+    <span class="crumb">Album</span>
+    <button class="ib" aria-label="More">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
+    </button>
   </div>
 
   <div class="body">
-    <h2 class="h2 bang p">NEARBY</h2>
-
-    <div class="chips" style="margin:12px 0 2px">
-      <button class="chip ">Friends</button>
-      <button class="chip sel">Nearby</button>
-      <button class="chip">Requests</button>
-    </div>
-
-
-    <div class="radar r d2">
-      <span class="sweep"></span>
-      <i style="width:60px;height:60px"></i>
-      <i style="width:118px;height:118px"></i>
-      <i style="width:176px;height:176px"></i>
-      <span class="blip" style="left:118px;top:56px"></span>
-      <span class="blip" style="left:52px;top:120px;animation-delay:.5s"></span>
-    </div>
-
-    <div class="toggle r d3">
-      <div class="t">
-        <b>Broadcasting</b>
-        <span>A code that changes every 15 minutes. Not your name.</span>
+    <div class="hero">
+      <div class="hc p d1" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D 60%,#7B4BFF)"><span></span></div>
+      <div class="hm r d2">
+        <h1 class="ht">Blonde</h1>
+        <p class="hs">Frank Ocean</p>
+        <p class="hd">Album &middot; 2016 &middot; 17 tracks &middot; 60 min</p>
       </div>
-      <span class="sw" role="switch" aria-checked="true" aria-label="Proximity"></span>
     </div>
 
-    <div class="near r d4">
-      <span class="cv" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"></span>
-      <div class="m">
-        <b>@arun_v</b>
-        <span>Nights</span>
-        <em>Frank Ocean</em>
-      </div>
-      <button class="btn sm">Listen too</button>
+    <div class="acts r d3">
+      <button class="btn lime" style="flex:1">Play</button>
+      <button class="ib big" aria-label="Shuffle">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6.5h3.6c3.4 0 3.4 11 6.8 11h4.4M3.5 17.5h3.6c3.4 0 3.4-11 6.8-11h4.4"/><path d="m16.6 3.6 2.9 2.9-2.9 2.9M16.6 14.6l2.9 2.9-2.9 2.9"/></svg>
+      </button>
+      <button class="ib big" aria-label="Download">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v10.5"/><path d="m7.5 10 4.5 4 4.5-4"/><path d="M4.5 19.5h15"/></svg>
+      </button>
+      <button class="ib big" aria-label="Add to library">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
     </div>
 
-    <div class="near r d5">
-      <span class="cv" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"></span>
-      <div class="m">
-        <b>@thebasement</b>
-        <span>F o r C e r t a i n</span>
-        <em>PARTYNEXTDOOR</em>
-      </div>
-      <button class="btn sm">Listen too</button>
+    <div class="tracks">
+      <div class="row r d4"><span class="num mono">1</span><div class="rm"><div class="rt">Nikes</div><div class="rs">5:14</div></div><span class="off">&#10003;</span><div class="dots">&#8942;</div></div>
+      <div class="row r d5"><span class="num mono">2</span><div class="rm"><div class="rt">Ivy</div><div class="rs">4:09</div></div><span class="off">&#10003;</span><div class="dots">&#8942;</div></div>
+      <div class="row now r d6"><span class="num mono">3</span><div class="rm"><div class="rt">Pink + White</div><div class="rs">Playing now</div></div><span class="bars"><i></i><i></i><i></i></span><div class="dots">&#8942;</div></div>
+      <div class="row r d7"><span class="num mono">4</span><div class="rm"><div class="rt">Be Yourself</div><div class="rs">1:26</div></div><div class="dots">&#8942;</div></div>
+      <div class="row r d8"><span class="num mono">5</span><div class="rm"><div class="rt">Solo</div><div class="rs">4:17</div></div><div class="dots">&#8942;</div></div>
+      <div class="row r d8"><span class="num mono">6</span><div class="rm"><div class="rt">Skyline To</div><div class="rs">3:16</div></div><div class="dots">&#8942;</div></div>
     </div>
   </div>
 
@@ -355,7 +352,7 @@
   </nav>
 </div>
 </x-dc>
-<script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
 class Component extends DCLogic {
   renderVals() {
     return { theme: this.props.dark ? "dark" : "light" };

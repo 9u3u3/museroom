@@ -1,0 +1,37 @@
+    .body{flex:1; overflow:hidden; padding:0 20px}
+
+    /* The name is set into the banner rather than under it. A hard black
+       Bangers word on a colour field is the loudest thing the kit can do, and
+       an artist page is the one place that is the point. */
+    .banner{position:relative; height:236px; flex:none; overflow:hidden;
+            border-bottom:3px solid var(--ink);
+            background:linear-gradient(158deg,#7B4BFF 0%,#FF4D8D 55%,#FF9E2B 100%)}
+    .banner .ht{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.4px, transparent 2.5px);
+      background-size:12px 12px; opacity:.22; mix-blend-mode:multiply}
+    .back{position:absolute; left:20px; top:48px}
+    .ib{width:42px; height:42px; display:grid; place-items:center; border:3px solid var(--ink);
+        border-radius:999px; background:var(--card); color:var(--ink); cursor:pointer;
+        box-shadow:3px 3px 0 var(--ink)}
+    .aname{position:absolute; left:18px; right:18px; bottom:16px; margin:0;
+           font-size:46px; line-height:.88; color:#FBF6EA;
+           text-shadow:4px 4px 0 #14110D}
+
+    .arow{display:flex; align-items:center; justify-content:space-between; gap:12px;
+          margin-top:14px}
+    .acts{display:flex; align-items:center; gap:10px; margin-top:14px}
+
+    .strip{display:flex; gap:12px; overflow:hidden}
+    .alb{width:108px; flex:none}
+    .ac{position:relative; width:108px; height:108px; border-radius:14px;
+        border:3px solid var(--ink); overflow:hidden; box-shadow:4px 4px 0 var(--ink)}
+    .ac span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2px, transparent 2.1px);
+      background-size:10px 10px; opacity:.2}
+    .an{font-size:12px; font-weight:900; margin-top:7px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+    .as{font-size:10px; font-weight:600; opacity:.6}
+
+    /* A pushed surface keeps its parent tab lit; you did not leave it. */
+    .nav .LIBRARY{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+               box-shadow:3px 3px 0 var(--on)}

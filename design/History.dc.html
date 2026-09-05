@@ -114,6 +114,92 @@
     .nav .sel{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
               box-shadow:3px 3px 0 var(--on)}
 
+    /* Song rows, chips and section headers -------------------------------
+       These repeat on Home, Search, Library, Album, Artist, Playlist and the
+       queue, so they live with the tokens rather than being redrawn per screen. */
+    .sect{display:flex; align-items:baseline; justify-content:space-between;
+          gap:10px; margin:20px 0 10px}
+    .sect h3{margin:0; font-family:"Bangers","Impact",sans-serif; font-size:22px;
+             letter-spacing:.03em; font-weight:400}
+    .sect a{font-size:10px; font-weight:900; letter-spacing:.14em;
+            text-transform:uppercase; color:var(--ink); opacity:.55}
+
+    .chips{display:flex; gap:8px; overflow:hidden; padding:2px 0 2px}
+    .chip{flex:none; height:34px; padding:0 14px; display:inline-flex; align-items:center;
+          border:2.5px solid var(--ink); border-radius:999px; background:var(--card);
+          color:var(--ink); font-family:"Archivo",sans-serif; font-weight:900; font-size:11px;
+          letter-spacing:.1em; text-transform:uppercase; cursor:pointer;
+          box-shadow:3px 3px 0 var(--ink); transition:transform .12s ease, box-shadow .12s ease}
+    .chip:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .chip.sel{background:var(--ink); color:var(--paper)}
+
+    /* One track, in a list. The art is a square with the halftone dot screen
+       over it, the same treatment the big cover gets, so a 44px thumbnail and a
+       full-bleed cover read as the same object. */
+    .row{display:flex; align-items:center; gap:12px; padding:9px 0}
+    .row .th{flex:none; width:46px; height:46px; border-radius:10px; overflow:hidden;
+             position:relative; border:2.5px solid var(--ink)}
+    .row .th span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 1.7px, transparent 1.8px);
+      background-size:8px 8px; opacity:.2}
+    .row .rm{flex:1; min-width:0}
+    .row .rt{font-size:14px; font-weight:800; white-space:nowrap; overflow:hidden;
+             text-overflow:ellipsis}
+    .row .rs{font-size:11px; font-weight:600; opacity:.6; margin-top:2px;
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .row .dots{flex:none; width:26px; text-align:center; font-weight:900; opacity:.45;
+               letter-spacing:1px; cursor:pointer}
+    .row.now .rt{color:var(--violet)}
+
+    /* Search field, shared by the search screen and the library filter. */
+    .find{display:flex; align-items:center; gap:10px; height:50px; padding:0 16px;
+          background:var(--card); border:3px solid var(--ink); border-radius:999px;
+          box-shadow:4px 4px 0 var(--ink)}
+    .find input{flex:1; min-width:0; border:0; outline:0; background:transparent;
+                color:var(--ink); font-family:"Archivo",sans-serif; font-weight:700;
+                font-size:14px}
+    .find input::placeholder{color:var(--ink); opacity:.42}
+
+    /* Mini player --------------------------------------------------------
+       It sits on the nav rather than floating over the list, because a bar that
+       hovers hides the last row of every screen it appears on. */
+    .mini-p{margin-top:auto; background:var(--card); border-top:3px solid var(--ink)}
+    .mp-bar{height:5px; background:rgba(20,17,13,.14)}
+    .mp-bar i{display:block; height:100%; width:34%; background:var(--violet)}
+    .screen.dark .mp-bar{background:rgba(246,240,226,.16)}
+    .mp-row{display:flex; align-items:center; gap:11px; padding:9px 14px 9px 12px}
+    .mp-art{flex:none; width:40px; height:40px; border-radius:9px; border:2.5px solid var(--ink);
+            position:relative; overflow:hidden;
+            background:linear-gradient(150deg,#7B4BFF,#FF4D8D)}
+    .mp-art span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 1.6px, transparent 1.7px);
+      background-size:8px 8px; opacity:.2}
+    .mp-meta{flex:1; min-width:0}
+    .mp-t{font-size:13px; font-weight:900; white-space:nowrap; overflow:hidden;
+          text-overflow:ellipsis}
+    .mp-a{font-size:10px; font-weight:600; opacity:.6; margin-top:1px;
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .mp-b{flex:none; width:38px; height:38px; display:grid; place-items:center;
+          border:2.5px solid var(--ink); border-radius:999px; background:var(--card);
+          color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+          transition:transform .12s ease, box-shadow .12s ease}
+    .mp-b:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .mini-p + .nav{margin-top:0; border-top-width:0}
+
+    /* Transport ----------------------------------------------------------
+       The round buttons on the player and in the room. */
+    .tp{display:flex; align-items:center; justify-content:center; gap:16px}
+    .tp button{display:grid; place-items:center; width:56px; height:56px;
+               border:3px solid var(--ink); border-radius:999px; background:var(--card);
+               color:var(--ink); cursor:pointer; box-shadow:4px 4px 0 var(--ink);
+               transition:transform .12s cubic-bezier(.2,.9,.3,1.4), box-shadow .12s ease}
+    .tp button:hover{transform:translate(2px,2px); box-shadow:2px 2px 0 var(--ink)}
+    .tp button:active{transform:translate(4px,4px); box-shadow:0 0 0 var(--ink)}
+    .tp .big{width:78px; height:78px; background:var(--lime); color:var(--on);
+             border-color:var(--on); box-shadow:5px 5px 0 var(--on)}
+    .tp .big:hover{box-shadow:3px 3px 0 var(--on)}
+    .tp .ghost{width:44px; height:44px; border-width:2.5px; box-shadow:3px 3px 0 var(--ink)}
+
     /* Motion ------------------------------------------------------------- */
     @keyframes rise{from{opacity:0; transform:translateY(20px)} to{opacity:1; transform:translateY(0)}}
     @keyframes popin{0%{opacity:0; transform:scale(.82) rotate(-6deg)}
@@ -166,7 +252,7 @@
              overflow:hidden; text-overflow:ellipsis}
     .it .m span{display:block; font-size:11px; opacity:.62; font-weight:600}
     .it .t{font-family:"Space Mono",monospace; font-size:12px; font-weight:700}
-    .nav .NOW{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+    .nav .HOME{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
               box-shadow:3px 3px 0 var(--on)}
   </style>
 </helmet>
@@ -216,18 +302,34 @@
     </div>
   </div>
 
+  <div class="mini-p">
+    <div class="mp-bar"><i></i></div>
+    <div class="mp-row">
+      <div class="mp-art"><span></span></div>
+      <div class="mp-meta">
+        <div class="mp-t">Teenage Fever</div>
+        <div class="mp-a">Drake &middot; More Life</div>
+      </div>
+      <button class="mp-b" aria-label="Play">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>
+      </button>
+      <button class="mp-b" aria-label="Next">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5.2 16 12 6 18.8z"/><rect x="17" y="5" width="3.2" height="14" rx="1.1"/></svg>
+      </button>
+    </div>
+  </div>
   <nav class="nav">
-    <a href="#" class="NOW">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 14v-4M8.5 18V6M13 15V9M17.5 20V4M21.5 13v-2"/></svg></span>
-      <span>Now</span>
+    <a href="#" class="HOME">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9.6V20h13V9.6"/><path d="M9.8 20v-5.4h4.4V20"/></svg></span>
+      <span>Home</span>
     </a>
-    <a href="#" class="FRIENDS">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M2.5 20c0-3.3 2.9-5.4 6.5-5.4s6.5 2.1 6.5 5.4"/><path d="M16.5 5.2a3.4 3.4 0 0 1 0 6.4M18 14.9c2.1.6 3.5 2.3 3.5 5.1"/></svg></span>
-      <span>Friends</span>
+    <a href="#" class="LIBRARY">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.5" width="4" height="15" rx="1.4"/><rect x="9" y="4.5" width="4" height="15" rx="1.4"/><path d="M15.6 6.2 19.4 5l2.1 13.4-3.8 1.2z"/></svg></span>
+      <span>Library</span>
     </a>
-    <a href="#" class="NEARBY">
-      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="2.2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 16.2a6 6 0 0 0 0-8.4"/><path d="M4.6 4.6a10.4 10.4 0 0 0 0 14.8M19.4 19.4a10.4 10.4 0 0 0 0-14.8"/></svg></span>
-      <span>Nearby</span>
+    <a href="#" class="ROOMS">
+      <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M7.6 7.6a6.2 6.2 0 0 0 0 8.8M16.4 16.4a6.2 6.2 0 0 0 0-8.8"/><path d="M4.3 4.3a10.9 10.9 0 0 0 0 15.4M19.7 19.7a10.9 10.9 0 0 0 0-15.4"/></svg></span>
+      <span>Rooms</span>
     </a>
     <a href="#" class="BOARD">
       <span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4.2v1.6A3.4 3.4 0 0 0 7 10.4M17 5.5h2.8v1.6a3.4 3.4 0 0 1-2.8 3.3"/><path d="M12 14v3.5M8.5 20.5h7"/></svg></span>

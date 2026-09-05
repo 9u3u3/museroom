@@ -1,0 +1,40 @@
+    .body{flex:1; overflow:hidden; padding:0 20px}
+    .sbar{gap:10px; padding:52px 20px 12px}
+    .ib{flex:none; width:46px; height:46px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+        transition:transform .12s ease, box-shadow .12s ease}
+    .ib:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .sbar .find{flex:1; min-width:0}
+    .clr{font-size:20px; font-weight:700; opacity:.45; cursor:pointer; line-height:1}
+
+    .best{display:flex; align-items:center; gap:12px; margin-top:14px; padding:12px;
+          background:var(--card); border:3px solid var(--ink); border-radius:18px;
+          box-shadow:5px 5px 0 var(--ink)}
+    .bc{flex:none; width:66px; height:66px; border-radius:999px; border:3px solid var(--ink);
+        position:relative; overflow:hidden}
+    .bc span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 1.9px, transparent 2px);
+      background-size:9px 9px; opacity:.2}
+    .bm{flex:1; min-width:0}
+    .bk{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; opacity:.5}
+    .bt{font-size:19px; font-weight:900; line-height:1.1; margin-top:2px}
+    .bs{font-size:11px; font-weight:600; opacity:.6; margin-top:2px}
+
+    .strip{display:flex; gap:12px; overflow:hidden}
+    .alb{width:108px; flex:none}
+    .ac{position:relative; width:108px; height:108px; border-radius:14px;
+        border:3px solid var(--ink); overflow:hidden; box-shadow:4px 4px 0 var(--ink)}
+    .ac span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2px, transparent 2.1px);
+      background-size:10px 10px; opacity:.2}
+    .an{font-size:12px; font-weight:900; margin-top:7px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+    .as{font-size:10px; font-weight:600; opacity:.6}
+
+    .hist{display:flex; flex-wrap:wrap; gap:8px}
+    .hist .chip{text-transform:none; letter-spacing:.02em; font-size:12px}
+
+    /* A pushed surface keeps its parent tab lit; you did not leave it. */
+    .nav .HOME{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+               box-shadow:3px 3px 0 var(--on)}

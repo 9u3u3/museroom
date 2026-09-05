@@ -1,0 +1,62 @@
+    .screen{background:var(--paper)}
+    .pbar{display:flex; align-items:center; gap:12px; padding:48px 20px 10px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink);
+        transition:transform .12s ease, box-shadow .12s ease}
+    .ib:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+    .from{flex:1; text-align:center; min-width:0}
+    .fk{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; opacity:.5}
+    .fv{font-size:13px; font-weight:900; margin-top:1px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+
+    .cover{position:relative; margin:6px 24px 0; aspect-ratio:1; border-radius:22px;
+           border:3px solid var(--ink); box-shadow:8px 8px 0 var(--ink); overflow:hidden;
+           background:linear-gradient(158deg,#FF9E2B 0%,#FF4D8D 55%,#7B4BFF 100%)}
+    .cover .ht{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.2px, transparent 2.3px);
+      background-size:11px 11px; opacity:.2; mix-blend-mode:multiply}
+    .src{position:absolute; left:14px; top:14px; background:var(--lime); color:var(--on);
+         border-color:var(--on); transform:rotate(-4deg)}
+
+    .head{display:flex; align-items:flex-start; gap:12px; padding:20px 24px 0}
+    .hm{flex:1; min-width:0}
+    .ptitle{margin:0; font-size:27px; line-height:1.06; font-weight:900; letter-spacing:-.03em;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+    .pby{margin:6px 0 0; font-size:14px; font-weight:700; opacity:.68}
+    .heart{flex:none; width:48px; height:48px; display:grid; place-items:center;
+           border:3px solid var(--on); border-radius:999px; background:var(--pink);
+           color:var(--on); cursor:pointer; box-shadow:4px 4px 0 var(--on)}
+    .heart:hover{transform:translate(2px,2px); box-shadow:2px 2px 0 var(--on)}
+
+    .scrub{margin:18px 24px 0}
+    .scrub .rail{height:14px; border:3px solid var(--ink); border-radius:999px;
+                 background:var(--card); box-shadow:3px 3px 0 var(--ink)}
+    .scrub .fill{position:relative; height:100%; width:52%; border-radius:999px;
+                 background:var(--violet);
+                 background-image:repeating-linear-gradient(115deg,rgba(255,255,255,.32) 0 6px,transparent 6px 13px)}
+    .knob{position:absolute; right:-9px; top:50%; transform:translateY(-50%);
+          width:20px; height:20px; border-radius:999px; background:var(--lime);
+          border:3px solid var(--on); box-shadow:2px 2px 0 var(--on)}
+    .clock{display:flex; justify-content:space-between; margin-top:10px; font-size:11px;
+           font-weight:700; letter-spacing:.06em; opacity:.75}
+
+    .tp{margin-top:20px}
+    .tray{display:flex; justify-content:space-between; gap:8px; margin:20px 22px 0}
+    .tb{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
+        padding:10px 4px; border:2.5px solid var(--ink); border-radius:14px;
+        background:var(--card); color:var(--ink); cursor:pointer;
+        font-family:"Archivo",sans-serif; font-weight:900; font-size:9px;
+        letter-spacing:.11em; text-transform:uppercase;
+        box-shadow:3px 3px 0 var(--ink); transition:transform .12s ease, box-shadow .12s ease}
+    .tb:hover{transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink)}
+
+    .roomcta{display:flex; align-items:center; justify-content:center; gap:10px;
+             margin:16px 22px 26px; min-height:56px; width:calc(100% - 44px);
+             border:3px solid var(--on); border-radius:999px; background:var(--lime);
+             color:var(--on); font-family:"Archivo",sans-serif; font-weight:900;
+             font-size:14px; letter-spacing:.08em; text-transform:uppercase;
+             cursor:pointer; box-shadow:5px 5px 0 var(--on);
+             transition:transform .12s cubic-bezier(.2,.9,.3,1.4), box-shadow .12s ease}
+    .roomcta:hover{transform:translate(2px,2px); box-shadow:3px 3px 0 var(--on)}
+    .roomcta:active{transform:translate(5px,5px); box-shadow:0 0 0 var(--on)}

@@ -1,0 +1,28 @@
+    .pbar{display:flex; align-items:center; gap:12px; padding:48px 20px 6px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink)}
+    .from{flex:1; text-align:center; min-width:0}
+    .fk{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; opacity:.5}
+    .fv{font-size:13px; font-weight:900; margin-top:1px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+
+    /* The line being sung is the only thing at full weight. Everything above it
+       fades because it is spent; everything below is dimmed because it has not
+       happened. The eye should never have to hunt for where we are. */
+    .lyr{flex:1; overflow:hidden; padding:24px 24px 0}
+    .ln{margin:0 0 20px; font-size:23px; line-height:1.2; font-weight:800;
+        letter-spacing:-.02em; opacity:.32}
+    .ln.gone{opacity:.2}
+    /* The sung line is the page's full ink with a lime shadow behind it. Setting
+       it in violet read as low contrast on the dark skin, and the accent does
+       more work as the shadow than as the letterform. */
+    .ln.on{opacity:1; font-size:31px; font-weight:900; color:var(--ink);
+           text-shadow:3px 3px 0 var(--lime)}
+    .ln.next{opacity:.5}
+
+    .lfoot{display:flex; align-items:center; gap:12px; padding:12px 22px 14px}
+    .lbar{flex:1; height:10px; border:2.5px solid var(--ink); border-radius:999px;
+          background:var(--card); overflow:hidden}
+    .lbar i{display:block; height:100%; width:52%; background:var(--violet)}
+    .lt{font-size:11px; font-weight:700}

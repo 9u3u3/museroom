@@ -222,96 +222,87 @@
       *,*::before,*::after{animation:none !important; transition:none !important}
     }
     .body{flex:1; overflow:hidden; padding:0 20px}
-    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--pink)}
-    .radar{position:relative; margin:12px auto 0; width:190px; height:190px;
-           border-radius:999px; border:3px solid var(--ink); background:var(--card);
-           box-shadow:5px 5px 0 var(--ink); overflow:hidden}
-    .radar i{position:absolute; left:50%; top:50%; border:2.5px solid var(--ink);
-             border-radius:999px; transform:translate(-50%,-50%); opacity:.32}
-    .sweep{position:absolute; inset:0; border-radius:999px;
-      background:conic-gradient(from 0deg, rgba(123,75,255,.55), rgba(123,75,255,0) 78deg);
-      animation:spin 2.6s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .blip{position:absolute; width:15px; height:15px; border-radius:999px;
-          background:var(--pink); border:2.5px solid var(--on); animation:beat 1.7s ease-in-out infinite}
-    .toggle{margin-top:16px; padding:14px 16px; display:flex; align-items:center; gap:14px;
-            background:var(--violet); color:#fff; border:3px solid var(--ink);
-            border-radius:18px; box-shadow:5px 5px 0 var(--ink)}
-    .toggle .t{flex:1}
-    .toggle .t b{display:block; font-size:16px; font-weight:900}
-    .toggle .t span{display:block; font-size:11px; line-height:1.4; opacity:.85; margin-top:2px}
-    .sw{flex:none; width:62px; height:34px; border-radius:999px; border:3px solid var(--on);
-        background:var(--lime); position:relative; cursor:pointer;
-        box-shadow:3px 3px 0 var(--on)}
-    .sw::after{content:""; position:absolute; top:2px; left:30px; width:24px; height:24px;
-               border-radius:999px; background:#fff; border:2.5px solid var(--on);
-               transition:left .18s cubic-bezier(.2,.9,.3,1.4)}
-    .sw.off{background:var(--card)}
-    .sw.off::after{left:2px}
-    .near{margin-top:12px; padding:12px; display:flex; gap:11px; align-items:center;
-          background:var(--card); border:3px solid var(--ink); border-radius:16px;
-          box-shadow:4px 4px 0 var(--ink)}
-    .near .cv{flex:none; width:52px; height:52px; border-radius:11px; border:3px solid var(--ink)}
-    .near .m{flex:1; min-width:0}
-    .near .m b{display:block; font-size:14px; font-weight:900}
-    .near .m span{display:block; font-size:12px; font-weight:700; white-space:nowrap;
-                  overflow:hidden; text-overflow:ellipsis}
-    .near .m em{display:block; font-style:normal; font-size:11px; opacity:.6; font-weight:600}
-    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
-                 box-shadow:3px 3px 0 var(--on)}
+
+    /* The name is set into the banner rather than under it. A hard black
+       Bangers word on a colour field is the loudest thing the kit can do, and
+       an artist page is the one place that is the point. */
+    .banner{position:relative; height:236px; flex:none; overflow:hidden;
+            border-bottom:3px solid var(--ink);
+            background:linear-gradient(158deg,#7B4BFF 0%,#FF4D8D 55%,#FF9E2B 100%)}
+    .banner .ht{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2.4px, transparent 2.5px);
+      background-size:12px 12px; opacity:.22; mix-blend-mode:multiply}
+    .back{position:absolute; left:20px; top:48px}
+    .ib{width:42px; height:42px; display:grid; place-items:center; border:3px solid var(--ink);
+        border-radius:999px; background:var(--card); color:var(--ink); cursor:pointer;
+        box-shadow:3px 3px 0 var(--ink)}
+    .aname{position:absolute; left:18px; right:18px; bottom:16px; margin:0;
+           font-size:46px; line-height:.88; color:#FBF6EA;
+           text-shadow:4px 4px 0 #14110D}
+
+    .arow{display:flex; align-items:center; justify-content:space-between; gap:12px;
+          margin-top:14px}
+    .acts{display:flex; align-items:center; gap:10px; margin-top:14px}
+
+    .strip{display:flex; gap:12px; overflow:hidden}
+    .alb{width:108px; flex:none}
+    .ac{position:relative; width:108px; height:108px; border-radius:14px;
+        border:3px solid var(--ink); overflow:hidden; box-shadow:4px 4px 0 var(--ink)}
+    .ac span{position:absolute; inset:0;
+      background-image:radial-gradient(#14110D 2px, transparent 2.1px);
+      background-size:10px 10px; opacity:.2}
+    .an{font-size:12px; font-weight:900; margin-top:7px; white-space:nowrap;
+        overflow:hidden; text-overflow:ellipsis}
+    .as{font-size:10px; font-weight:600; opacity:.6}
+
+    /* A pushed surface keeps its parent tab lit; you did not leave it. */
+    .nav .LIBRARY{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+               box-shadow:3px 3px 0 var(--on)}
   </style>
 </helmet>
 <div class="screen {{theme}}">
-  <div class="bar">
-    <span class="crumb">Museroom</span>
-    <span class="pill acc" style="background:var(--lime)">2 in range</span>
+  <div class="banner">
+    <span class="ht"></span>
+    <button class="ib back" aria-label="Back">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 7.5 12l7.5 7.5"/></svg>
+    </button>
+    <h1 class="aname bang p">FRANK OCEAN</h1>
   </div>
 
   <div class="body">
-    <h2 class="h2 bang p">NEARBY</h2>
-
-    <div class="chips" style="margin:12px 0 2px">
-      <button class="chip ">Friends</button>
-      <button class="chip sel">Nearby</button>
-      <button class="chip">Requests</button>
+    <div class="arow r d2">
+      <span class="pill">4.1M subscribers</span>
+      <button class="btn sm">Subscribe</button>
     </div>
 
-
-    <div class="radar r d2">
-      <span class="sweep"></span>
-      <i style="width:60px;height:60px"></i>
-      <i style="width:118px;height:118px"></i>
-      <i style="width:176px;height:176px"></i>
-      <span class="blip" style="left:118px;top:56px"></span>
-      <span class="blip" style="left:52px;top:120px;animation-delay:.5s"></span>
+    <div class="acts r d3">
+      <button class="btn lime" style="flex:1">Play</button>
+      <button class="btn paper" style="flex:1">Shuffle</button>
+      <button class="btn pink sm" style="min-height:54px">Radio</button>
     </div>
 
-    <div class="toggle r d3">
-      <div class="t">
-        <b>Broadcasting</b>
-        <span>A code that changes every 15 minutes. Not your name.</span>
-      </div>
-      <span class="sw" role="switch" aria-checked="true" aria-label="Proximity"></span>
+    <div class="sect"><h3>Top songs</h3><a href="#">All</a></div>
+    <div class="row r d4">
+      <div class="th" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"><span></span></div>
+      <div class="rm"><div class="rt">Nights</div><div class="rs">Blonde &middot; 412M plays</div></div>
+      <div class="dots">&#8942;</div>
+    </div>
+    <div class="row r d5">
+      <div class="th" style="background:linear-gradient(150deg,#7B4BFF,#FF4D8D)"><span></span></div>
+      <div class="rm"><div class="rt">Ivy</div><div class="rs">Blonde &middot; 388M plays</div></div>
+      <div class="dots">&#8942;</div>
+    </div>
+    <div class="row r d6">
+      <div class="th" style="background:linear-gradient(150deg,#54D6F5,#CDFF3E)"><span></span></div>
+      <div class="rm"><div class="rt">Thinkin Bout You</div><div class="rs">channel ORANGE &middot; 601M plays</div></div>
+      <div class="dots">&#8942;</div>
     </div>
 
-    <div class="near r d4">
-      <span class="cv" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"></span>
-      <div class="m">
-        <b>@arun_v</b>
-        <span>Nights</span>
-        <em>Frank Ocean</em>
-      </div>
-      <button class="btn sm">Listen too</button>
-    </div>
-
-    <div class="near r d5">
-      <span class="cv" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"></span>
-      <div class="m">
-        <b>@thebasement</b>
-        <span>F o r C e r t a i n</span>
-        <em>PARTYNEXTDOOR</em>
-      </div>
-      <button class="btn sm">Listen too</button>
+    <div class="sect"><h3>Albums</h3><a href="#">All</a></div>
+    <div class="strip">
+      <div class="alb r d7"><div class="ac" style="background:linear-gradient(150deg,#FF9E2B,#7B4BFF)"><span></span></div><div class="an">Blonde</div><div class="as">2016</div></div>
+      <div class="alb r d8"><div class="ac" style="background:linear-gradient(150deg,#54D6F5,#FF4D8D)"><span></span></div><div class="an">channel ORANGE</div><div class="as">2012</div></div>
+      <div class="alb r d8"><div class="ac" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"><span></span></div><div class="an">Endless</div><div class="as">2016</div></div>
     </div>
   </div>
 
@@ -355,7 +346,7 @@
   </nav>
 </div>
 </x-dc>
-<script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
 class Component extends DCLogic {
   renderVals() {
     return { theme: this.props.dark ? "dark" : "light" };

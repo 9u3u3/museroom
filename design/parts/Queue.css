@@ -1,0 +1,34 @@
+    .pbar{display:flex; align-items:center; gap:12px; padding:48px 20px 8px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink)}
+    .from{flex:1; text-align:center; min-width:0}
+    .fk{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; opacity:.5}
+    .fv{font-size:13px; font-weight:900; margin-top:1px}
+    .qhead{display:flex; gap:8px; padding:6px 20px 4px; overflow:hidden}
+    .body{flex:1; overflow:hidden; padding:0 20px}
+
+    .grip{flex:none; width:16px; font-size:11px; line-height:1; letter-spacing:-3px;
+          opacity:.35; cursor:grab; writing-mode:vertical-rl}
+    .qlab{margin:14px 0 2px; font-size:9px; font-weight:900; letter-spacing:.18em;
+          text-transform:uppercase; opacity:.5}
+
+    /* The playing row is a card, not a highlighted line: it is the one row that
+       is a different kind of thing from the rows around it. */
+    .row.now{padding:10px 12px; margin-top:8px; background:var(--lime); color:var(--on);
+             border:3px solid var(--on); border-radius:16px; box-shadow:4px 4px 0 var(--on)}
+    .row.now .rt{color:var(--on)}
+    .row.now .rs{opacity:.72}
+    .row.now .th{border-color:var(--on)}
+    .row.now .grip{opacity:.5}
+
+    .bars{flex:none; display:flex; align-items:flex-end; gap:3px; height:18px; width:20px}
+    .bars i{width:4px; background:var(--on); border-radius:1px; animation:eq .9s ease-in-out infinite}
+    .bars i:nth-child(1){height:60%; animation-delay:0s}
+    .bars i:nth-child(2){height:100%; animation-delay:.15s}
+    .bars i:nth-child(3){height:40%; animation-delay:.3s}
+    @keyframes eq{0%,100%{transform:scaleY(.45)} 50%{transform:scaleY(1)}}
+
+    /* A track someone in the room asked for keeps their name on it, so the host
+       is never deciding about a song with no story attached. */
+    .row.guest .rs{color:var(--pink); opacity:1; font-weight:800}

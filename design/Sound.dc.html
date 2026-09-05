@@ -221,97 +221,128 @@
     @media (prefers-reduced-motion: reduce){
       *,*::before,*::after{animation:none !important; transition:none !important}
     }
+    .pbar{display:flex; align-items:center; justify-content:space-between; gap:12px;
+          padding:48px 20px 4px}
+    .ib{flex:none; width:42px; height:42px; display:grid; place-items:center;
+        border:3px solid var(--ink); border-radius:999px; background:var(--card);
+        color:var(--ink); cursor:pointer; box-shadow:3px 3px 0 var(--ink)}
     .body{flex:1; overflow:hidden; padding:0 20px}
-    .h2{margin:0; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--pink)}
-    .radar{position:relative; margin:12px auto 0; width:190px; height:190px;
-           border-radius:999px; border:3px solid var(--ink); background:var(--card);
-           box-shadow:5px 5px 0 var(--ink); overflow:hidden}
-    .radar i{position:absolute; left:50%; top:50%; border:2.5px solid var(--ink);
-             border-radius:999px; transform:translate(-50%,-50%); opacity:.32}
-    .sweep{position:absolute; inset:0; border-radius:999px;
-      background:conic-gradient(from 0deg, rgba(123,75,255,.55), rgba(123,75,255,0) 78deg);
-      animation:spin 2.6s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .blip{position:absolute; width:15px; height:15px; border-radius:999px;
-          background:var(--pink); border:2.5px solid var(--on); animation:beat 1.7s ease-in-out infinite}
-    .toggle{margin-top:16px; padding:14px 16px; display:flex; align-items:center; gap:14px;
-            background:var(--violet); color:#fff; border:3px solid var(--ink);
-            border-radius:18px; box-shadow:5px 5px 0 var(--ink)}
-    .toggle .t{flex:1}
-    .toggle .t b{display:block; font-size:16px; font-weight:900}
-    .toggle .t span{display:block; font-size:11px; line-height:1.4; opacity:.85; margin-top:2px}
-    .sw{flex:none; width:62px; height:34px; border-radius:999px; border:3px solid var(--on);
-        background:var(--lime); position:relative; cursor:pointer;
-        box-shadow:3px 3px 0 var(--on)}
-    .sw::after{content:""; position:absolute; top:2px; left:30px; width:24px; height:24px;
-               border-radius:999px; background:#fff; border:2.5px solid var(--on);
-               transition:left .18s cubic-bezier(.2,.9,.3,1.4)}
-    .sw.off{background:var(--card)}
-    .sw.off::after{left:2px}
-    .near{margin-top:12px; padding:12px; display:flex; gap:11px; align-items:center;
-          background:var(--card); border:3px solid var(--ink); border-radius:16px;
-          box-shadow:4px 4px 0 var(--ink)}
-    .near .cv{flex:none; width:52px; height:52px; border-radius:11px; border:3px solid var(--ink)}
-    .near .m{flex:1; min-width:0}
-    .near .m b{display:block; font-size:14px; font-weight:900}
-    .near .m span{display:block; font-size:12px; font-weight:700; white-space:nowrap;
-                  overflow:hidden; text-overflow:ellipsis}
-    .near .m em{display:block; font-style:normal; font-size:11px; opacity:.6; font-weight:600}
-    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
-                 box-shadow:3px 3px 0 var(--on)}
+    .h2{margin:0 0 12px; font-size:34px; line-height:.92; text-shadow:4px 4px 0 var(--pink)}
+
+    .acct{display:flex; align-items:center; gap:12px; padding:13px 14px;
+          background:var(--violet); color:#fff; border:3px solid var(--ink);
+          border-radius:16px; box-shadow:5px 5px 0 var(--ink)}
+    .acct .am{flex:1; min-width:0}
+    .ak{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase; opacity:.75}
+    .at{font-size:16px; font-weight:900; margin-top:1px}
+    .as2{font-size:10px; font-weight:700; opacity:.8; margin-top:3px; line-height:1.35}
+
+    .grp{margin-top:14px; padding:14px; background:var(--card); border:3px solid var(--ink);
+         border-radius:16px; box-shadow:4px 4px 0 var(--ink)}
+    .gk{font-size:9px; font-weight:900; letter-spacing:.16em; text-transform:uppercase;
+        opacity:.55; margin-bottom:10px}
+    .segwide{display:flex; border:3px solid var(--ink); border-radius:999px; overflow:hidden}
+    .sg{flex:1; height:40px; border:0; background:transparent; color:var(--ink);
+        font-family:"Archivo",sans-serif; font-weight:900; font-size:11px;
+        letter-spacing:.12em; text-transform:uppercase; cursor:pointer}
+    .sg.sel{background:var(--lime); color:var(--on)}
+    .hint{margin:9px 2px 0; font-size:10px; font-weight:700; opacity:.55; line-height:1.4}
+
+    .line{display:flex; align-items:center; justify-content:space-between; gap:12px;
+          padding:9px 0}
+    .line + .line{border-top:2px solid rgba(20,17,13,.1)}
+    .screen.dark .line + .line{border-top-color:rgba(246,240,226,.12)}
+    .lt{font-size:13px; font-weight:800}
+    .ls{font-size:10px; font-weight:600; opacity:.58; margin-top:2px}
+
+    .sw{flex:none; width:50px; height:28px; border:3px solid var(--ink); border-radius:999px;
+        background:var(--card); position:relative; box-shadow:2px 2px 0 var(--ink)}
+    .sw i{position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:999px;
+          background:var(--ink)}
+    .sw.on{background:var(--lime)}
+    .sw.on i{left:auto; right:2px}
+    /* A setting the app overrides is drawn as off and dimmed rather than removed,
+       so the reason it is unavailable stays readable next to it. */
+    .sw.off{opacity:.35}
+
+    .eq{display:flex; align-items:flex-end; gap:7px; height:86px; padding:0 2px}
+    .eq i{flex:1; background:var(--violet); border:2.5px solid var(--ink);
+          border-radius:5px 5px 0 0}
+    .eqf{display:flex; justify-content:space-between; margin-top:7px; font-size:9px;
+         font-weight:700; opacity:.5}
+
+    /* A pushed surface keeps its parent tab lit; you did not leave it. */
+    .nav .YOU{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+               box-shadow:3px 3px 0 var(--on)}
   </style>
 </helmet>
 <div class="screen {{theme}}">
-  <div class="bar">
-    <span class="crumb">Museroom</span>
-    <span class="pill acc" style="background:var(--lime)">2 in range</span>
+  <div class="pbar">
+    <button class="ib" aria-label="Back">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4.5 7.5 12l7.5 7.5"/></svg>
+    </button>
+    <span class="crumb">Settings</span>
+    <span style="width:42px"></span>
   </div>
 
   <div class="body">
-    <h2 class="h2 bang p">NEARBY</h2>
+    <h2 class="h2 bang p">SOUND</h2>
 
-    <div class="chips" style="margin:12px 0 2px">
-      <button class="chip ">Friends</button>
-      <button class="chip sel">Nearby</button>
-      <button class="chip">Requests</button>
-    </div>
-
-
-    <div class="radar r d2">
-      <span class="sweep"></span>
-      <i style="width:60px;height:60px"></i>
-      <i style="width:118px;height:118px"></i>
-      <i style="width:176px;height:176px"></i>
-      <span class="blip" style="left:118px;top:56px"></span>
-      <span class="blip" style="left:52px;top:120px;animation-delay:.5s"></span>
-    </div>
-
-    <div class="toggle r d3">
-      <div class="t">
-        <b>Broadcasting</b>
-        <span>A code that changes every 15 minutes. Not your name.</span>
+    <!-- The account is first because nothing below it works well without one:
+         quality, library and history all come from being signed in. -->
+    <div class="acct r d1">
+      <div class="am">
+        <div class="ak">YouTube Music</div>
+        <div class="at">Not signed in</div>
+        <div class="as2">Sign in for your library, quick picks and history.</div>
       </div>
-      <span class="sw" role="switch" aria-checked="true" aria-label="Proximity"></span>
+      <button class="btn sm lime">Sign in</button>
     </div>
 
-    <div class="near r d4">
-      <span class="cv" style="background:linear-gradient(150deg,#CDFF3E,#7B4BFF)"></span>
-      <div class="m">
-        <b>@arun_v</b>
-        <span>Nights</span>
-        <em>Frank Ocean</em>
+    <div class="grp r d2">
+      <div class="gk">Streaming quality</div>
+      <div class="segwide">
+        <button class="sg">Low</button>
+        <button class="sg sel">High</button>
+        <button class="sg">Max</button>
       </div>
-      <button class="btn sm">Listen too</button>
+      <p class="hint">Max uses about 150 MB an hour on mobile data.</p>
     </div>
 
-    <div class="near r d5">
-      <span class="cv" style="background:linear-gradient(150deg,#FF9E2B,#FF4D8D)"></span>
-      <div class="m">
-        <b>@thebasement</b>
-        <span>F o r C e r t a i n</span>
-        <em>PARTYNEXTDOOR</em>
+    <div class="grp r d3">
+      <div class="line">
+        <div><div class="lt">Cache songs</div><div class="ls">1.4 GB of 4 GB used</div></div>
+        <span class="sw on"><i></i></span>
       </div>
-      <button class="btn sm">Listen too</button>
+      <div class="line">
+        <div><div class="lt">Normalise volume</div><div class="ls">Even loudness across tracks</div></div>
+        <span class="sw on"><i></i></span>
+      </div>
+      <div class="line">
+        <div><div class="lt">Skip silence</div><div class="ls">Jump long gaps at track ends</div></div>
+        <span class="sw"><i></i></span>
+      </div>
+      <div class="line">
+        <div><div class="lt">Crossfade</div><div class="ls">Off in a room, always</div></div>
+        <span class="sw off"><i></i></span>
+      </div>
+    </div>
+
+    <div class="grp r d4">
+      <div class="gk">Equalizer</div>
+      <div class="eq">
+        <i style="height:38%"></i><i style="height:62%"></i><i style="height:48%"></i>
+        <i style="height:74%"></i><i style="height:55%"></i><i style="height:40%"></i>
+        <i style="height:66%"></i><i style="height:52%"></i>
+      </div>
+      <div class="eqf mono"><span>60</span><span>230</span><span>910</span><span>3.6k</span><span>14k</span></div>
+    </div>
+
+    <div class="grp r d5">
+      <div class="line">
+        <div><div class="lt">Sleep timer</div><div class="ls">Off</div></div>
+        <button class="btn sm paper">Set</button>
+      </div>
     </div>
   </div>
 
@@ -355,7 +386,7 @@
   </nav>
 </div>
 </x-dc>
-<script data-dc-script data-props='{"dark":{"editor":"boolean","default":true,"section":"Theme"}}'>
+<script data-dc-script data-props='{"dark":{"editor":"boolean","default":false,"section":"Theme"}}'>
 class Component extends DCLogic {
   renderVals() {
     return { theme: this.props.dark ? "dark" : "light" };

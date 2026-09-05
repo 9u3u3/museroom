@@ -34,5 +34,5 @@
     .near .m span{display:block; font-size:12px; font-weight:700; white-space:nowrap;
                   overflow:hidden; text-overflow:ellipsis}
     .near .m em{display:block; font-style:normal; font-size:11px; opacity:.6; font-weight:600}
-    .nav .NEARBY{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
+    .nav .ROOMS{background:var(--lime); color:var(--on); border:2.5px solid var(--on);
                  box-shadow:3px 3px 0 var(--on)}
