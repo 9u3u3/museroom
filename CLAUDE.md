@@ -85,6 +85,8 @@ until it is granted again.
 | `app/src/main/assets/` | `room.js` and `adblock.js`, injected into the hidden WebView |
 | `supabase/migrations/` | Schema, RLS, security-definer RPCs, leaderboard roll-ups |
 | `design/` | Static HTML artboards for the design system (`node design/build.mjs`) |
+| `player/` | Museroom's own playback: the InnerTube client, stream resolution, ExoPlayer |
+| `plans/` | Decisions taken before the code, in prose. Read before changing what they cover |
 | `docs/` | The website, the APK, and `version.json` |
 
 Five tabs: Now, Friends, Nearby, Board, You (`ui/MuseroomApp.kt`). `PersonCard`
@@ -144,6 +146,15 @@ a `RoomPlayer` cued to the same recording and released on one moment written in
 the shared clock. `sync/TogetherHost.kt` is the host's side of it — the queue,
 the search, the schedule, and the handover from whatever was playing natively.
 Being level then is not a trick; there is simply no player ahead of the clock.
+
+**Where this is going.** `plans/own-player.md` is the decision to stop renting
+YouTube Music's page and play the audio ourselves, with Media3 over a stream
+resolved through the InnerTube API, plus the browsing screens that become
+possible once we have a real player. Nothing in it is built. The one thing to
+know before touching `sync/` is that the plan keeps `RoomPlayer`'s public
+surface exactly as it is and replaces only its guts, so every invariant below
+is written against something that survives. The screens for it are designed and
+built in `design/`.
 
 The plan behind it is `plans/together-mode.md`, including the things it
 deliberately does not do. Step 6 of that plan (using `room_ready_for` to shrink
@@ -342,6 +353,13 @@ schema claims get verified out of band. The Supabase CLI is present at
 `/usr/bin/supabase`.
 
 ## Releasing
+
+**Versions are `a.b.c` from 5.9.0 onwards.** Everything up to 5.8 was two-part
+and is left alone; 5.8 is read as 5.8.0 when comparing. Patch for a fix that
+changes no behaviour anyone asked for, minor for a feature, major for a change
+in what the app fundamentally is. `6.0.0` is spoken for: it is the release where
+the YouTube Music WebView stops being how Museroom plays music. `versionCode`
+still only ever goes up by one, and it is what the updater actually compares.
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
 2. `./gradlew :app:assembleRelease` (signs with `keystore/museroom-release.jks`,
