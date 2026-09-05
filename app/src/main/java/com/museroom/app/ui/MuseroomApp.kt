@@ -71,7 +71,11 @@ import com.museroom.app.ui.screens.BoardScreen
 import com.museroom.app.ui.screens.FeatureTour
 import com.museroom.app.ui.screens.FriendsScreen
 import com.museroom.app.ui.screens.NearbyScreen
+import com.museroom.app.ui.screens.MiniPlayer
 import com.museroom.app.ui.screens.NowScreen
+import com.museroom.app.ui.screens.PlayerScreen
+import com.museroom.app.ui.screens.SearchScreen
+import com.museroom.app.player.Playback
 import com.museroom.app.ui.screens.OnboardingScreen
 import com.museroom.app.ui.screens.PersonCard
 import com.museroom.app.ui.screens.TourState
@@ -104,6 +108,14 @@ fun MuseroomApp() {
     // beside the four you live on.
     var requestsOpen by remember { mutableStateOf(false) }
     BackHandler(enabled = requestsOpen) { requestsOpen = false }
+
+    // Neither is a tab either, and for the same reason. Search is somewhere you
+    // go with a question and leave with an answer, and the player is one track
+    // rather than one of the five places the app lives.
+    var searchOpen by remember { mutableStateOf(false) }
+    var playerOpen by remember { mutableStateOf(false) }
+    BackHandler(enabled = searchOpen) { searchOpen = false }
+    BackHandler(enabled = playerOpen) { playerOpen = false }
 
     LaunchedEffect(following?.hostId) {
         if (following != null) {
@@ -142,24 +154,44 @@ fun MuseroomApp() {
         // different screens and each of them wants the same page.
         PersonCard()
 
+        // The player is Museroom's own, so it has to be told where it lives
+        // before anybody can press play.
+        LaunchedEffect(Unit) { Playback.attach(context) }
+
         Column(Modifier.fillMaxSize()) {
-            TopBar(openRequests = { requestsOpen = true })
-                    Box(Modifier.weight(1f)) {
-                if (requestsOpen) RequestsScreen() else when (tab) {
-                    Tab.Now -> NowScreen()
-                    Tab.Friends -> FriendsScreen()
-                    Tab.Nearby -> NearbyScreen()
-                    Tab.Board -> BoardScreen()
-                    Tab.You -> YouScreen()
+            if (!searchOpen) TopBar(
+                openRequests = { requestsOpen = true },
+                openSearch = { searchOpen = true },
+            )
+            Box(Modifier.weight(1f)) {
+                when {
+                    searchOpen -> SearchScreen(onClose = { searchOpen = false })
+                    requestsOpen -> RequestsScreen()
+                    else -> when (tab) {
+                        Tab.Now -> NowScreen()
+                        Tab.Friends -> FriendsScreen()
+                        Tab.Nearby -> NearbyScreen()
+                        Tab.Board -> BoardScreen()
+                        Tab.You -> YouScreen()
+                    }
                 }
             }
-            BottomNav(tab) { tab = it; requestsOpen = false }
+            MiniPlayer(onOpen = { playerOpen = true })
+            BottomNav(tab) { tab = it; requestsOpen = false; searchOpen = false }
+        }
+
+        // Over everything, including the person card, because while it is up it
+        // is the only thing being looked at.
+        if (playerOpen) {
+            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                PlayerScreen(onClose = { playerOpen = false })
+            }
         }
     }
 }
 
 @Composable
-private fun TopBar(openRequests: () -> Unit) {
+private fun TopBar(openRequests: () -> Unit, openSearch: () -> Unit) {
     val c = Neo.colors
     val context = LocalContext.current
     val auth = remember { AuthRepository.get(context) }
@@ -188,6 +220,13 @@ private fun TopBar(openRequests: () -> Unit) {
             style = bangers(26).copy(color = c.ink),
         )
         Spacer(Modifier.weight(1f))
+        com.museroom.app.ui.screens.RoundIcon(
+            NeoIcons.Search,
+            "Search",
+            onClick = openSearch,
+            diameter = 38.dp,
+            icon = 17.dp,
+        )
         if (session != null) RequestsButton(open = openRequests)
         HeaderStats(signedIn = session != null)
     }

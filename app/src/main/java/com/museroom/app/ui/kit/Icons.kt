@@ -40,6 +40,21 @@ object NeoIcons {
     const val Lock = "M4 12.6a2.6 2.6 0 0 1 2.6-2.6h10.8a2.6 2.6 0 0 1 2.6 2.6v5.3a2.6 2.6 0 0 1-2.6 2.6H6.6A2.6 2.6 0 0 1 4 17.9zM8 10V7.2a4 4 0 0 1 8 0V10"
     const val Search = "M11 4.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13M15.8 15.8 20 20"
 
+    // Transport. Drawn as outlines like everything else in the kit, because a
+    // solid glyph beside a three-pixel stroke reads as a different app.
+    const val Play = "M7.5 5.2 18.5 12 7.5 18.8z"
+    const val Pause = "M8.6 4.8v14.4M15.4 4.8v14.4"
+    const val Next = "M6.5 5.2 15.5 12l-9 6.8zM18.5 5v14"
+    const val Previous = "M17.5 5.2 8.5 12l9 6.8zM5.5 5v14"
+    const val Shuffle = "M3.5 6.5h3.6c3.4 0 3.4 11 6.8 11h4.4M3.5 17.5h3.6c3.4 0 3.4-11 6.8-11h4.4" +
+        "M16.6 3.6l2.9 2.9-2.9 2.9M16.6 14.6l2.9 2.9-2.9 2.9"
+    const val Repeat = "M7 5.5h9a4 4 0 0 1 4 4v1M17 18.5H8a4 4 0 0 1-4-4v-1" +
+        "M9.6 2.9 6.8 5.5l2.8 2.6M14.4 21.1l2.8-2.6-2.8-2.6"
+    const val Chevron = "M6 9.5 12 15.5 18 9.5"
+    const val Back = "M15 4.5 7.5 12l7.5 7.5"
+    const val Dots = "M12 5.6v.1M12 12v.1M12 18.4v.1"
+    const val Queue = "M4 6h12M4 12h12M4 18h8M17.5 15l3 3-3 3"
+
     /**
      * A tray: a box with a slot cut out of the top edge, which is the shape
      * that reads as "things are waiting in here" at 24 pixels without needing

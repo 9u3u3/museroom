@@ -34,6 +34,36 @@ object Artwork {
 
     fun cached(title: String, artist: String): Bitmap? = cache.get(key(title, artist))
 
+    /**
+     * A cover we already know the address of.
+     *
+     * Anything Museroom plays itself came from YouTube, which publishes a still
+     * for every video, so there is nothing to look up by name. Kept in the same
+     * cache under the URL as its key: a picture is a picture whichever way we
+     * came to hear about it.
+     */
+    fun cachedUrl(url: String): Bitmap? = cache.get(url)
+
+    suspend fun fromUrl(url: String): Bitmap? {
+        if (url.isBlank()) return null
+        cache.get(url)?.let { return it }
+        synchronized(misses) { if (url in misses) return null }
+        return withContext(Dispatchers.IO) {
+            val bitmap = runCatching {
+                http.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    response.body?.byteStream()?.use(BitmapFactory::decodeStream)
+                }
+            }.getOrNull()
+            if (bitmap == null) {
+                synchronized(misses) { misses += url }
+            } else {
+                cache.put(url, bitmap)
+            }
+            bitmap
+        }
+    }
+
     suspend fun fetch(title: String, artist: String): Bitmap? {
         val key = key(title, artist)
         cache.get(key)?.let { return it }
