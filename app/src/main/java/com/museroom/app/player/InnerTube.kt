@@ -39,6 +39,7 @@ object InnerTube {
 
     private const val SEARCH = "https://music.youtube.com/youtubei/v1/search?prettyPrint=false"
     private const val NEXT = "https://music.youtube.com/youtubei/v1/next?prettyPrint=false"
+    private const val BROWSE = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
 
     /**
      * YouTube Music's "songs" filter, as the site itself sends it.
@@ -72,6 +73,39 @@ object InnerTube {
          * or cropping the art.
          */
         val artworkUrl: String = "",
+        /** Where this song came from, so a result is somewhere you can go. */
+        val artistId: String = "",
+        val albumId: String = "",
+    )
+
+    /** An album or a single, as a card on an artist's page. */
+    data class Card(
+        val browseId: String,
+        val title: String,
+        val subtitle: String,
+        val artworkUrl: String,
+    )
+
+    data class Album(
+        val browseId: String,
+        val title: String,
+        val artist: String,
+        val artistId: String,
+        /** "Album • 2018", as YouTube Music writes it. */
+        val kind: String,
+        /** "21 songs • 1 hour, 14 minutes". */
+        val detail: String,
+        val artworkUrl: String,
+        val tracks: List<Found>,
+    )
+
+    data class Artist(
+        val browseId: String,
+        val name: String,
+        val listeners: String,
+        val artworkUrl: String,
+        val songs: List<Found>,
+        val albums: List<Card>,
     )
 
     /** Songs matching a query, best first, or empty if the search found none. */
@@ -142,6 +176,203 @@ object InnerTube {
         return queued(text, limit + 1).filterNot { it.id == seedId }.take(limit)
     }
 
+    /** One browse call, or an empty string when it did not answer. */
+    private fun browse(browseId: String): String {
+        if (browseId.isBlank()) return ""
+        val body = buildJsonObject {
+            putJsonObject("context") {
+                putJsonObject("client") {
+                    put("clientName", CLIENT)
+                    put("clientVersion", CLIENT_VERSION)
+                    put("hl", "en")
+                    put("gl", "US")
+                }
+            }
+            put("browseId", browseId)
+        }
+        val request = Request.Builder()
+            .url(BROWSE)
+            .header("User-Agent", USER_AGENT)
+            .header("Origin", "https://music.youtube.com")
+            .post(body.toString().toRequestBody(jsonMedia))
+            .build()
+        return http.newCall(request).execute().use { response ->
+            if (response.isSuccessful) response.body?.string().orEmpty() else ""
+        }
+    }
+
+    fun album(browseId: String): Album? = albumFrom(browseId, browse(browseId))
+
+    /**
+     * An album page.
+     *
+     * The track rows here are shaped differently from search results: the
+     * second line is a play count rather than an artist, and the length lives
+     * in a fixed column instead of the title's own runs. So the artist comes
+     * from the header, which is right anyway — every track on an album is by
+     * whoever the album is by.
+     */
+    fun albumFrom(browseId: String, payload: String): Album? {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return null
+        val header = firstObject(root, "musicResponsiveHeaderRenderer") ?: return null
+        val title = header["title"]?.let(::runsIn).orEmpty()
+        if (title.isBlank()) return null
+        val artist = header["straplineTextOne"]?.let(::runsIn).orEmpty()
+
+        val tracks = mutableListOf<Found>()
+        walkKey(root, "musicResponsiveListItemRenderer") { item ->
+            val id = firstString(item, "videoId") ?: return@walkKey
+            val name = item["flexColumns"]?.jsonArray?.firstOrNull()?.let(::runsIn).orEmpty()
+            if (name.isBlank()) return@walkKey
+            tracks += Found(
+                id = id,
+                title = name,
+                artist = artist,
+                album = title,
+                durationMs = item["fixedColumns"]?.let(::runsIn)?.let(::clock) ?: 0,
+                artworkUrl = enlarge(firstString(header["thumbnail"], "url").orEmpty()),
+                artistId = firstBrowseId(header["straplineTextOne"], "ARTIST"),
+                albumId = browseId,
+            )
+        }
+
+        return Album(
+            browseId = browseId,
+            title = title,
+            artist = artist,
+            artistId = firstBrowseId(header["straplineTextOne"], "ARTIST"),
+            kind = header["subtitle"]?.let(::runsIn).orEmpty(),
+            detail = header["secondSubtitle"]?.let(::runsIn).orEmpty(),
+            artworkUrl = enlarge(firstString(header["thumbnail"], "url").orEmpty()),
+            tracks = tracks,
+        )
+    }
+
+    fun artist(browseId: String): Artist? = artistFrom(browseId, browse(browseId))
+
+    /**
+     * An artist's page: the songs people actually play, and the records.
+     *
+     * The shelves are read for what they contain rather than by their headings,
+     * because the headings are localised and move about. Songs are the rows;
+     * everything with a browse id and a cover is a record.
+     */
+    fun artistFrom(browseId: String, payload: String): Artist? {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return null
+        val header = firstObject(root, "musicImmersiveHeaderRenderer")
+            ?: firstObject(root, "musicVisualHeaderRenderer")
+            ?: return null
+        val name = header["title"]?.let(::runsIn).orEmpty()
+        if (name.isBlank()) return null
+
+        val songs = mutableListOf<Found>()
+        walkKey(root, "musicResponsiveListItemRenderer") { item ->
+            val id = firstString(item, "videoId") ?: return@walkKey
+            val columns = item["flexColumns"]?.jsonArray ?: return@walkKey
+            val title = columns.firstOrNull()?.let(::runsIn).orEmpty()
+            if (title.isBlank()) return@walkKey
+            songs += Found(
+                id = id,
+                title = title,
+                artist = name,
+                album = "",
+                durationMs = item["fixedColumns"]?.let(::runsIn)?.let(::clock) ?: 0,
+                artworkUrl = biggestThumbnail(item),
+                artistId = browseId,
+            )
+        }
+
+        val albums = mutableListOf<Card>()
+        val seen = mutableSetOf<String>()
+        walkKey(root, "musicTwoRowItemRenderer") { card ->
+            val id = firstBrowseId(card, "ALBUM")
+            if (id.isBlank() || !seen.add(id)) return@walkKey
+            albums += Card(
+                browseId = id,
+                title = card["title"]?.let(::runsIn).orEmpty(),
+                subtitle = card["subtitle"]?.let(::runsIn).orEmpty(),
+                artworkUrl = biggestThumbnail(card),
+            )
+        }
+
+        return Artist(
+            browseId = browseId,
+            name = name,
+            listeners = header["monthlyListenerCount"]?.let(::runsIn).orEmpty(),
+            artworkUrl = enlarge(firstString(header["thumbnail"], "url").orEmpty()),
+            songs = songs,
+            albums = albums,
+        )
+    }
+
+    /** The first browse id under here whose page is of the kind asked for. */
+    private fun firstBrowseId(
+        element: kotlinx.serialization.json.JsonElement?,
+        pageType: String,
+    ): String {
+        element ?: return ""
+        var found = ""
+        fun visit(e: kotlinx.serialization.json.JsonElement) {
+            if (found.isNotEmpty()) return
+            when (e) {
+                is JsonObject -> {
+                    val browse = e["browseEndpoint"] as? JsonObject
+                    if (browse != null) {
+                        val page = runCatching {
+                            browse["browseEndpointContextSupportedConfigs"]!!.jsonObject[
+                                "browseEndpointContextMusicConfig",
+                            ]!!.jsonObject["pageType"]!!.jsonPrimitive.content
+                        }.getOrNull().orEmpty()
+                        if (page.endsWith(pageType)) {
+                            found = runCatching { browse["browseId"]!!.jsonPrimitive.content }
+                                .getOrDefault("")
+                            if (found.isNotEmpty()) return
+                        }
+                    }
+                    e.values.forEach { visit(it) }
+                }
+                is kotlinx.serialization.json.JsonArray -> e.forEach { visit(it) }
+                else -> Unit
+            }
+        }
+        visit(element)
+        return found
+    }
+
+    private fun firstObject(
+        element: kotlinx.serialization.json.JsonElement,
+        key: String,
+    ): JsonObject? {
+        var found: JsonObject? = null
+        fun visit(e: kotlinx.serialization.json.JsonElement) {
+            if (found != null) return
+            when (e) {
+                is JsonObject -> {
+                    (e[key] as? JsonObject)?.let { found = it; return }
+                    e.values.forEach { visit(it) }
+                }
+                is kotlinx.serialization.json.JsonArray -> e.forEach { visit(it) }
+                else -> Unit
+            }
+        }
+        visit(element)
+        return found
+    }
+
+    private fun walkKey(
+        element: kotlinx.serialization.json.JsonElement,
+        key: String,
+        onItem: (JsonObject) -> Unit,
+    ) {
+        when (element) {
+            is JsonObject -> for ((k, v) in element) {
+                if (k == key && v is JsonObject) onItem(v) else walkKey(v, key, onItem)
+            }
+            is kotlinx.serialization.json.JsonArray -> element.forEach { walkKey(it, key, onItem) }
+            else -> Unit
+        }
+    }
+
     /** The songs in a queue response, in the order the radio put them. */
     fun queued(payload: String, limit: Int = 25): List<Found> {
         val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull()
@@ -164,6 +395,8 @@ object InnerTube {
                 album = byline.getOrNull(1)?.takeUnless { it.contains(" views") }.orEmpty(),
                 durationMs = item["lengthText"]?.let(::runsIn)?.let(::clock) ?: 0,
                 artworkUrl = biggestThumbnail(item),
+                artistId = firstBrowseId(item, "ARTIST"),
+                albumId = firstBrowseId(item, "ALBUM"),
             )
         }
         return found
@@ -214,6 +447,8 @@ object InnerTube {
                 album = if (parts.size > 2) parts[parts.size - 2] else "",
                 durationMs = duration,
                 artworkUrl = biggestThumbnail(item),
+                artistId = firstBrowseId(item, "ARTIST"),
+                albumId = firstBrowseId(item, "ALBUM"),
             )
         }
         return found
@@ -256,7 +491,7 @@ object InnerTube {
      * soft, and the fix is a different number rather than a different request:
      * the host resizes on demand.
      */
-    private fun enlarge(url: String): String =
+    fun enlarge(url: String): String =
         if (url.isBlank()) url
         else Regex("=w\\d+-h\\d+").replace(url, "=w544-h544")
 
@@ -272,7 +507,8 @@ object InnerTube {
         }
     }
 
-    private fun firstString(element: kotlinx.serialization.json.JsonElement, key: String): String? {
+    private fun firstString(element: kotlinx.serialization.json.JsonElement?, key: String): String? {
+        element ?: return null
         when (element) {
             is JsonObject -> {
                 for ((k, v) in element) {

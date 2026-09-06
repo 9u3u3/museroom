@@ -69,6 +69,8 @@ import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.halftone
 import com.museroom.app.ui.screens.BoardScreen
 import com.museroom.app.ui.screens.FeatureTour
+import com.museroom.app.ui.screens.AlbumScreen
+import com.museroom.app.ui.screens.ArtistScreen
 import com.museroom.app.ui.screens.LibraryScreen
 import com.museroom.app.ui.screens.RoomsScreen
 import com.museroom.app.ui.screens.MiniPlayer
@@ -93,6 +95,12 @@ import java.time.ZoneId
  * the sticker Library needed. Nothing was removed; one of them stopped being a
  * destination and became a filter.
  */
+/** Somewhere you were pushed to, rather than a place the rail knows about. */
+sealed interface Browse {
+    data class Album(val id: String) : Browse
+    data class Artist(val id: String) : Browse
+}
+
 enum class Tab(val label: String, val icon: String) {
     Now("Home", NeoIcons.Home),
     Library("Library", NeoIcons.Library),
@@ -122,8 +130,20 @@ fun MuseroomApp() {
     // rather than one of the five places the app lives.
     var searchOpen by remember { mutableStateOf(false) }
     var playerOpen by remember { mutableStateOf(false) }
+
+    /**
+     * A record or a person, pushed over whatever tab you were on.
+     *
+     * A list rather than a single page, because the way round these is
+     * artist to album to artist again, and back should retrace that rather
+     * than dumping you at the tab you started from.
+     */
+    var trail by remember { mutableStateOf(listOf<Browse>()) }
+    val here = trail.lastOrNull()
+
     BackHandler(enabled = searchOpen) { searchOpen = false }
     BackHandler(enabled = playerOpen) { playerOpen = false }
+    BackHandler(enabled = here != null) { trail = trail.dropLast(1) }
 
     LaunchedEffect(following?.hostId) {
         if (following != null) {
@@ -173,7 +193,20 @@ fun MuseroomApp() {
             )
             Box(Modifier.weight(1f)) {
                 when {
-                    searchOpen -> SearchScreen(onClose = { searchOpen = false })
+                    here is Browse.Album -> AlbumScreen(
+                        browseId = here.id,
+                        onBack = { trail = trail.dropLast(1) },
+                        onOpenArtist = { trail = trail + Browse.Artist(it) },
+                    )
+                    here is Browse.Artist -> ArtistScreen(
+                        browseId = here.id,
+                        onBack = { trail = trail.dropLast(1) },
+                        onOpenAlbum = { trail = trail + Browse.Album(it) },
+                    )
+                    searchOpen -> SearchScreen(
+                        onClose = { searchOpen = false },
+                        onOpenArtist = { searchOpen = false; trail = listOf(Browse.Artist(it)) },
+                    )
                     requestsOpen -> RequestsScreen()
                     else -> when (tab) {
                         Tab.Now -> NowScreen(onOpenPlayer = { playerOpen = true })
@@ -185,7 +218,7 @@ fun MuseroomApp() {
                 }
             }
             MiniPlayer(onOpen = { playerOpen = true })
-            BottomNav(tab) { tab = it; requestsOpen = false; searchOpen = false }
+            BottomNav(tab) { tab = it; requestsOpen = false; searchOpen = false; trail = emptyList() }
         }
 
         // Over everything, including the person card, because while it is up it
@@ -201,7 +234,14 @@ fun MuseroomApp() {
                     .halftone(c.ink, alpha = if (c.dark) 0.10f else 0.07f),
             ) {
                 Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                    PlayerScreen(onClose = { playerOpen = false })
+                    PlayerScreen(
+                    onClose = { playerOpen = false },
+                    onOpenArtist = {
+                        playerOpen = false
+                        searchOpen = false
+                        trail = listOf(Browse.Artist(it))
+                    },
+                )
                 }
             }
         }

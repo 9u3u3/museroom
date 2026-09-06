@@ -80,6 +80,45 @@ class PlayerStreamsTest {
         assertTrue(songs.none { it.album.contains("views") })
     }
 
+    // --------------------------------------------------------------- pages --
+
+    private fun resource(name: String) =
+        javaClass.classLoader!!.getResourceAsStream(name)!!.bufferedReader().use { it.readText() }
+
+    @Test
+    fun `an album page reads its header and its tracks`() {
+        val album = InnerTube.albumFrom("MPREb_edMvNe5E5s6", resource("album-page.json"))!!
+        assertEquals("Hard To Imagine The Neighbourhood Ever Changing", album.title)
+        assertEquals("The Neighbourhood", album.artist)
+        assertEquals("Album • 2018", album.kind)
+        assertEquals(3, album.tracks.size)
+        // Every track on an album is by whoever the album is by, and the rows
+        // themselves say a play count where a search result says an artist.
+        assertTrue(album.tracks.all { it.artist == "The Neighbourhood" })
+        assertEquals(209_000L, album.tracks.first().durationMs)
+    }
+
+    @Test
+    fun `an artist page reads its songs and its records`() {
+        val artist = InnerTube.artistFrom("UC1cnYMXqKdazz-gDPKaDFyg", resource("artist-page.json"))!!
+        assertEquals("The Neighbourhood", artist.name)
+        assertEquals(3, artist.songs.size)
+        assertEquals("Sweater Weather", artist.songs.first().title)
+        assertEquals(3, artist.albums.size)
+        assertTrue(artist.albums.all { it.browseId.startsWith("MPREb") })
+    }
+
+    @Test
+    fun `a page that is not one comes back null rather than half-read`() {
+        assertNull(InnerTube.albumFrom("x", """{"contents":{}}"""))
+        assertNull(InnerTube.artistFrom("x", "not json"))
+    }
+
+    @Test
+    fun `a search result knows where it came from`() {
+        assertTrue(InnerTube.results(songs).first().artistId.startsWith("UC"))
+    }
+
     // ------------------------------------------------------------- the cache --
 
     private fun stream(id: String, expiresAtMs: Long) = Streams.Stream(

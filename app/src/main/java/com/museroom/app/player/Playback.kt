@@ -152,18 +152,32 @@ object Playback {
         }
     }
 
+    /** An album page, off the main thread, or null if it would not load. */
+    suspend fun album(browseId: String): InnerTube.Album? = withContext(Dispatchers.IO) {
+        runCatching { InnerTube.album(browseId) }.getOrNull()
+    }
+
+    suspend fun artist(browseId: String): InnerTube.Artist? = withContext(Dispatchers.IO) {
+        runCatching { InnerTube.artist(browseId) }.getOrNull()
+    }
+
+    /** What a page's rows turn into when somebody presses one. */
+    fun tracksOf(found: List<InnerTube.Found>) = found.map(::asTrack)
+
     /** Songs that go with one you played, off the main thread. */
     suspend fun radio(seedId: String): List<LocalPlayer.Track> = withContext(Dispatchers.IO) {
         runCatching { InnerTube.radio(seedId).map(::asTrack) }.getOrDefault(emptyList())
     }
 
-    private fun asTrack(found: InnerTube.Found) = LocalPlayer.Track(
+    fun asTrack(found: InnerTube.Found) = LocalPlayer.Track(
         id = found.id,
         title = found.title,
         artist = listOf(found.artist, found.album)
             .filter(String::isNotBlank).joinToString(" · "),
         durationMs = found.durationMs,
         cover = found.artworkUrl,
+        artistId = found.artistId,
+        albumId = found.albumId,
     )
 
     /** Searching, off the main thread, with a miss returning an empty list. */

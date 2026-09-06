@@ -11,6 +11,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,7 +68,7 @@ import kotlinx.coroutines.delay
  * room's notification has followed since it was written.
  */
 @Composable
-fun PlayerScreen(onClose: () -> Unit) {
+fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
     val c = Neo.colors
     val track by Playback.current.collectAsStateWithLifecycle()
     val snapshot by Playback.snapshot.collectAsStateWithLifecycle()
@@ -166,9 +167,13 @@ fun PlayerScreen(onClose: () -> Unit) {
             Text(
                 song.artist,
                 style = MaterialTheme.typography.bodyLarge,
-                color = c.ink.copy(alpha = 0.68f),
+                color = if (song.artistId.isBlank()) c.ink.copy(alpha = 0.68f) else c.violet,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) { if (song.artistId.isNotBlank()) onOpenArtist(song.artistId) },
             )
         }
         // Said here as well as on the bar, because this is the screen somebody

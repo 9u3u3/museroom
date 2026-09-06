@@ -83,6 +83,9 @@ object LocalPlayer {
         val durationMs: Long = 0,
         /** Empty when we only know the id, which is when the still has to do. */
         val cover: String = "",
+        /** Where it came from, when we were told. Empty is normal and fine. */
+        val artistId: String = "",
+        val albumId: String = "",
     ) {
         val artworkUrl: String
             get() = cover.ifBlank { "https://i.ytimg.com/vi/$id/hqdefault.jpg" }

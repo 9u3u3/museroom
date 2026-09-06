@@ -65,7 +65,7 @@ private val recents = mutableListOf<String>()
  * a screen where the most common action needs two hands.
  */
 @Composable
-fun SearchScreen(onClose: () -> Unit) {
+fun SearchScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
     val c = Neo.colors
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<LocalPlayer.Track>>(emptyList()) }
@@ -184,6 +184,7 @@ fun SearchScreen(onClose: () -> Unit) {
                                 Playback.play(results, i, from = "Search")
                             },
                             trailing = { Heart(track, size = 20) },
+                            onOpenArtist = onOpenArtist,
                         )
                     }
                     item { Spacer(Modifier.height(120.dp)) }
@@ -247,6 +248,15 @@ fun TrackRow(
     onClick: () -> Unit,
     appearAfter: Int = 0,
     trailing: (@Composable () -> Unit)? = null,
+    onOpenArtist: ((String) -> Unit)? = null,
+    /**
+     * What the second line says, when the usual answer would be noise.
+     *
+     * On an album page the artist and the record are printed at the top, so
+     * repeating them on all twenty rows says nothing and crowds out the one
+     * thing the row does know on its own, which is how long it is.
+     */
+    subtitle: String? = null,
 ) {
     val c = Neo.colors
     Row(
@@ -272,16 +282,21 @@ fun TrackRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val goes = onOpenArtist != null && track.artistId.isNotBlank() && subtitle == null
             Text(
-                listOfNotNull(
+                subtitle ?: listOfNotNull(
                     track.artist.takeIf { it.isNotBlank() },
                     track.durationMs.takeIf { it > 0 }?.let(::clockOf),
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 fontSize = 11.sp,
-                color = c.ink.copy(alpha = 0.6f),
+                color = if (goes) c.violet.copy(alpha = 0.85f) else c.ink.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = if (!goes) Modifier else Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { onOpenArtist!!(track.artistId) },
             )
         }
         // Both, not one or the other. The bars say which row this is and the
