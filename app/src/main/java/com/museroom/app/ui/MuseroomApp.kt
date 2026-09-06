@@ -72,6 +72,7 @@ import com.museroom.app.ui.screens.FeatureTour
 import com.museroom.app.ui.screens.AlbumScreen
 import com.museroom.app.ui.screens.ArtistScreen
 import com.museroom.app.ui.screens.LibraryScreen
+import com.museroom.app.ui.screens.PlaylistScreen
 import com.museroom.app.ui.screens.RoomsScreen
 import com.museroom.app.ui.screens.MiniPlayer
 import com.museroom.app.ui.screens.NowScreen
@@ -99,6 +100,7 @@ import java.time.ZoneId
 sealed interface Browse {
     data class Album(val id: String) : Browse
     data class Artist(val id: String) : Browse
+    data class Playlist(val id: Long) : Browse
 }
 
 enum class Tab(val label: String, val icon: String) {
@@ -198,6 +200,10 @@ fun MuseroomApp() {
                         onBack = { trail = trail.dropLast(1) },
                         onOpenArtist = { trail = trail + Browse.Artist(it) },
                     )
+                    here is Browse.Playlist -> PlaylistScreen(
+                        id = here.id,
+                        onBack = { trail = trail.dropLast(1) },
+                    )
                     here is Browse.Artist -> ArtistScreen(
                         browseId = here.id,
                         onBack = { trail = trail.dropLast(1) },
@@ -206,11 +212,15 @@ fun MuseroomApp() {
                     searchOpen -> SearchScreen(
                         onClose = { searchOpen = false },
                         onOpenArtist = { searchOpen = false; trail = listOf(Browse.Artist(it)) },
+                        onOpenAlbum = { searchOpen = false; trail = listOf(Browse.Album(it)) },
                     )
                     requestsOpen -> RequestsScreen()
                     else -> when (tab) {
                         Tab.Now -> NowScreen(onOpenPlayer = { playerOpen = true })
-                        Tab.Library -> LibraryScreen(onOpenPlayer = { playerOpen = true })
+                        Tab.Library -> LibraryScreen(
+                            onOpenPlayer = { playerOpen = true },
+                            onOpenPlaylist = { trail = listOf(Browse.Playlist(it)) },
+                        )
                         Tab.Rooms -> RoomsScreen()
                         Tab.Board -> BoardScreen()
                         Tab.You -> YouScreen()

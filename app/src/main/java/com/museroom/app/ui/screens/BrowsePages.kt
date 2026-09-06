@@ -129,6 +129,7 @@ fun AlbumScreen(browseId: String, onBack: () -> Unit, onOpenArtist: (String) -> 
                     onClick = { Playback.play(tracks, i, from = found.title) },
                     trailing = { Heart(track, size = 20) },
                     subtitle = if (track.durationMs > 0) clockOf(track.durationMs) else " ",
+                    number = i + 1,
                 )
             }
             item { Spacer(Modifier.height(120.dp)) }

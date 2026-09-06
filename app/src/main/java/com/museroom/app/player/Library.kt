@@ -2,6 +2,9 @@ package com.museroom.app.player
 
 import android.content.Context
 import com.museroom.app.data.LibrarySongEntity
+import com.museroom.app.data.PlaylistEntity
+import com.museroom.app.data.PlaylistSongEntity
+import com.museroom.app.data.PlaylistSummary
 import com.museroom.app.data.MuseroomDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +32,7 @@ object Library {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var dao: com.museroom.app.data.LibraryDao? = null
+    private var lists: com.museroom.app.data.PlaylistDao? = null
 
     private val empty = kotlinx.coroutines.flow.MutableStateFlow<List<LocalPlayer.Track>>(emptyList())
 
@@ -50,6 +54,11 @@ object Library {
     var songCount: StateFlow<Int> = kotlinx.coroutines.flow.MutableStateFlow(0)
         private set
 
+    /** Lists somebody made, newest first. */
+    var playlists: StateFlow<List<PlaylistSummary>> =
+        kotlinx.coroutines.flow.MutableStateFlow(emptyList())
+        private set
+
     fun attach(context: Context) {
         if (dao != null) return
         val library = MuseroomDatabase.get(context).library()
@@ -62,6 +71,80 @@ object Library {
             .stateIn(scope, SharingStarted.Eagerly, emptyList())
         likedCount = library.likedCount().stateIn(scope, SharingStarted.Eagerly, 0)
         songCount = library.count().stateIn(scope, SharingStarted.Eagerly, 0)
+
+        val playlistDao = MuseroomDatabase.get(context).playlists()
+        lists = playlistDao
+        playlists = playlistDao.summaries().stateIn(scope, SharingStarted.Eagerly, emptyList())
+    }
+
+    // ----------------------------------------------------------- playlists --
+
+    fun newPlaylist(name: String, andAdd: LocalPlayer.Track? = null) {
+        val playlistDao = lists ?: return
+        val clean = name.trim().ifBlank { "New playlist" }
+        scope.launch {
+            val id = playlistDao.create(PlaylistEntity(name = clean, createdAt = System.currentTimeMillis()))
+            andAdd?.let { addToPlaylist(id, it) }
+        }
+    }
+
+    fun renamePlaylist(id: Long, name: String) {
+        val playlistDao = lists ?: return
+        val clean = name.trim()
+        if (clean.isBlank()) return
+        scope.launch { playlistDao.rename(id, clean) }
+    }
+
+    fun deletePlaylist(id: Long) {
+        val playlistDao = lists ?: return
+        scope.launch {
+            playlistDao.empty(id)
+            playlistDao.delete(id)
+        }
+    }
+
+    fun songsIn(id: Long) = lists?.songsIn(id)?.map { it.map(::asTrack) }
+        ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    fun playlist(id: Long) = lists?.playlist(id) ?: kotlinx.coroutines.flow.flowOf(null)
+
+    /**
+     * Puts a song in a list, writing the song first if we do not know it.
+     *
+     * A playlist row points at the library rather than copying the title into
+     * itself, so a song added from a search result has to exist there before it
+     * can be pointed at.
+     */
+    fun addToPlaylist(id: Long, track: LocalPlayer.Track) {
+        val playlistDao = lists ?: return
+        val library = dao ?: return
+        if (track.id.isBlank()) return
+        scope.launch {
+            if (library.song(track.id) == null) {
+                library.put(
+                    LibrarySongEntity(
+                        id = track.id,
+                        title = track.title,
+                        artist = track.artist,
+                        album = track.album,
+                        durationMs = track.durationMs,
+                        cover = track.cover,
+                    ),
+                )
+            }
+            playlistDao.add(
+                PlaylistSongEntity(
+                    playlistId = id,
+                    songId = track.id,
+                    position = playlistDao.nextPosition(id),
+                ),
+            )
+        }
+    }
+
+    fun removeFromPlaylist(id: Long, songId: String) {
+        val playlistDao = lists ?: return
+        scope.launch { playlistDao.remove(id, songId) }
     }
 
     /** Notes that a track was played, which is a fact rather than a preference. */
@@ -73,7 +156,7 @@ object Library {
                 id = track.id,
                 title = track.title,
                 artist = track.artist,
-                album = "",
+                album = track.album,
                 durationMs = track.durationMs,
                 cover = track.cover,
                 at = System.currentTimeMillis(),
@@ -103,7 +186,7 @@ object Library {
                         id = track.id,
                         title = track.title,
                         artist = track.artist,
-                        album = "",
+                        album = track.album,
                         durationMs = track.durationMs,
                         cover = track.cover,
                         liked = true,
@@ -126,6 +209,7 @@ object Library {
         id = row.id,
         title = row.title,
         artist = row.artist,
+        album = row.album,
         durationMs = row.durationMs,
         cover = row.cover,
     )

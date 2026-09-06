@@ -50,6 +50,7 @@ import com.museroom.app.player.Playback
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
+import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.ui.kit.hardShadow
 import kotlinx.coroutines.delay
@@ -65,7 +66,11 @@ private val recents = mutableListOf<String>()
  * a screen where the most common action needs two hands.
  */
 @Composable
-fun SearchScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
+fun SearchScreen(
+    onClose: () -> Unit,
+    onOpenArtist: (String) -> Unit = {},
+    onOpenAlbum: (String) -> Unit = {},
+) {
     val c = Neo.colors
     var query by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<LocalPlayer.Track>>(emptyList()) }
@@ -185,6 +190,7 @@ fun SearchScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
                             },
                             trailing = { Heart(track, size = 20) },
                             onOpenArtist = onOpenArtist,
+                            onOpenAlbum = onOpenAlbum,
                         )
                     }
                     item { Spacer(Modifier.height(120.dp)) }
@@ -257,6 +263,15 @@ fun TrackRow(
      * thing the row does know on its own, which is how long it is.
      */
     subtitle: String? = null,
+    /**
+     * Its place on a record, shown instead of a cover.
+     *
+     * Twenty rows of the same sleeve is twenty copies of the picture already at
+     * the top of the page. A number says the one thing the cover cannot: which
+     * track this is.
+     */
+    number: Int? = null,
+    onOpenAlbum: ((String) -> Unit)? = null,
 ) {
     val c = Neo.colors
     Row(
@@ -272,7 +287,13 @@ fun TrackRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        TrackCover(track.id, track.artworkUrl, Modifier.size(46.dp))
+        if (number != null) {
+            Box(Modifier.size(width = 26.dp, height = 46.dp), contentAlignment = Alignment.Center) {
+                MonoText("$number", size = 13, color = c.ink.copy(alpha = 0.45f))
+            }
+        } else {
+            TrackCover(track.id, track.artworkUrl, Modifier.size(46.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 track.title,
@@ -282,22 +303,30 @@ fun TrackRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val goes = onOpenArtist != null && track.artistId.isNotBlank() && subtitle == null
-            Text(
-                subtitle ?: listOfNotNull(
-                    track.artist.takeIf { it.isNotBlank() },
-                    track.durationMs.takeIf { it > 0 }?.let(::clockOf),
-                ).joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                fontSize = 11.sp,
-                color = if (goes) c.violet.copy(alpha = 0.85f) else c.ink.copy(alpha = 0.6f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = if (!goes) Modifier else Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onOpenArtist!!(track.artistId) },
-            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = c.ink.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                // The artist and the record are two different places, so they
+                // are two different things to press rather than one line that
+                // has to pick which one it meant.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Leg(track.artist, track.artistId, onOpenArtist)
+                    if (track.artist.isNotBlank() && track.album.isNotBlank()) Dot()
+                    Leg(track.album, track.albumId, onOpenAlbum)
+                    val length = track.durationMs.takeIf { it > 0 }?.let(::clockOf)
+                    if (length != null) {
+                        if (track.artist.isNotBlank() || track.album.isNotBlank()) Dot()
+                        Leg(length, "", null)
+                    }
+                }
+            }
         }
         // Both, not one or the other. The bars say which row this is and the
         // heart is a thing to press, and hiding the control on the row somebody
@@ -306,3 +335,31 @@ fun TrackRow(
         trailing?.invoke()
     }
 }
+
+/** One part of a row's second line, violet when it goes somewhere. */
+@Composable
+private fun Leg(text: String, id: String, onOpen: ((String) -> Unit)?) {
+    if (text.isBlank()) return
+    val c = Neo.colors
+    val goes = onOpen != null && id.isNotBlank()
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        fontSize = 11.sp,
+        color = if (goes) c.violet.copy(alpha = 0.85f) else c.ink.copy(alpha = 0.6f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = if (!goes) Modifier else Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+        ) { onOpen!!(id) },
+    )
+}
+
+@Composable
+private fun Dot() = Text(
+    " · ",
+    style = MaterialTheme.typography.bodySmall,
+    fontSize = 11.sp,
+    color = Neo.colors.ink.copy(alpha = 0.45f),
+)

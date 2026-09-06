@@ -39,7 +39,7 @@ import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.hardShadow
 
-private enum class Shelf(val label: String) { Liked("Liked"), Songs("Songs") }
+private enum class Shelf(val label: String) { Playlists("Playlists"), Liked("Liked"), Songs("Songs") }
 
 /**
  * Everything this phone knows, which is a shorter list than it sounds.
@@ -49,9 +49,9 @@ private enum class Shelf(val label: String) { Liked("Liked"), Songs("Songs") }
  * there. They arrive with the pages behind them.
  */
 @Composable
-fun LibraryScreen(onOpenPlayer: () -> Unit) {
+fun LibraryScreen(onOpenPlayer: () -> Unit, onOpenPlaylist: (Long) -> Unit = {}) {
     val c = Neo.colors
-    var shelf by remember { mutableStateOf(Shelf.Liked) }
+    var shelf by remember { mutableStateOf(Shelf.Playlists) }
 
     val liked by Library.liked.collectAsStateWithLifecycle()
     val songs by Library.songs.collectAsStateWithLifecycle()
@@ -64,8 +64,13 @@ fun LibraryScreen(onOpenPlayer: () -> Unit) {
         Spacer(Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val lists by Library.playlists.collectAsStateWithLifecycle()
             Shelf.entries.forEach { option ->
-                val count = if (option == Shelf.Liked) liked.size else songs.size
+                val count = when (option) {
+                    Shelf.Playlists -> lists.size
+                    Shelf.Liked -> liked.size
+                    Shelf.Songs -> songs.size
+                }
                 Chip(
                     text = if (count > 0) "${option.label} $count" else option.label,
                     selected = shelf == option,
@@ -74,7 +79,12 @@ fun LibraryScreen(onOpenPlayer: () -> Unit) {
             }
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(10.dp))
+
+        if (shelf == Shelf.Playlists) {
+            PlaylistGrid(onOpen = onOpenPlaylist)
+            return@Column
+        }
 
         if (shown.isEmpty()) {
             Spacer(Modifier.height(20.dp))

@@ -172,8 +172,8 @@ object Playback {
     fun asTrack(found: InnerTube.Found) = LocalPlayer.Track(
         id = found.id,
         title = found.title,
-        artist = listOf(found.artist, found.album)
-            .filter(String::isNotBlank).joinToString(" · "),
+        artist = found.artist,
+        album = found.album,
         durationMs = found.durationMs,
         cover = found.artworkUrl,
         artistId = found.artistId,

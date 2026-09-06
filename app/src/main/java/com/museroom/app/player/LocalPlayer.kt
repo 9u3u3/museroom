@@ -80,6 +80,8 @@ object LocalPlayer {
         val id: String,
         val title: String = "",
         val artist: String = "",
+        /** Kept apart from the artist, because they lead to different pages. */
+        val album: String = "",
         val durationMs: Long = 0,
         /** Empty when we only know the id, which is when the still has to do. */
         val cover: String = "",

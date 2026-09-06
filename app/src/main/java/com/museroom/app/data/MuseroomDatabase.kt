@@ -8,8 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [PlayEventEntity::class, ListeningSessionEntity::class, LibrarySongEntity::class],
-    version = 2,
+    entities = [
+        PlayEventEntity::class,
+        ListeningSessionEntity::class,
+        LibrarySongEntity::class,
+        PlaylistEntity::class,
+        PlaylistSongEntity::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 abstract class MuseroomDatabase : RoomDatabase() {
@@ -17,6 +23,8 @@ abstract class MuseroomDatabase : RoomDatabase() {
     abstract fun dao(): MuseroomDao
 
     abstract fun library(): LibraryDao
+
+    abstract fun playlists(): PlaylistDao
 
     companion object {
 
@@ -51,6 +59,33 @@ abstract class MuseroomDatabase : RoomDatabase() {
             }
         }
 
+        /** Lists somebody made, added without disturbing the songs. */
+        private val TO_PLAYLISTS = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS playlists (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS playlist_songs (
+                        playlistId INTEGER NOT NULL,
+                        songId TEXT NOT NULL,
+                        position INTEGER NOT NULL,
+                        PRIMARY KEY(playlistId, songId)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_playlist_songs_playlistId ON playlist_songs (playlistId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_playlist_songs_songId ON playlist_songs (songId)")
+            }
+        }
+
         @Volatile
         private var instance: MuseroomDatabase? = null
 
@@ -60,7 +95,7 @@ abstract class MuseroomDatabase : RoomDatabase() {
                     context.applicationContext,
                     MuseroomDatabase::class.java,
                     "museroom.db",
-                ).addMigrations(TO_LIBRARY).build().also { instance = it }
+                ).addMigrations(TO_LIBRARY, TO_PLAYLISTS).build().also { instance = it }
             }
     }
 }

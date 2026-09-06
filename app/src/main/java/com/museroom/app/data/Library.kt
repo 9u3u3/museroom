@@ -5,6 +5,7 @@ import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
@@ -104,4 +105,99 @@ interface LibraryDao {
 
     @Query("DELETE FROM library_songs WHERE liked = 0")
     suspend fun forgetUnliked()
+}
+
+/**
+ * A list somebody made.
+ *
+ * Nothing about it is synced anywhere. A playlist here is this phone's, which
+ * is the honest shape while there is no YouTube account behind the app; a
+ * playlist that quietly failed to reach an account would be worse than one that
+ * never claimed to.
+ */
+@Entity(tableName = "playlists")
+data class PlaylistEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val createdAt: Long,
+)
+
+/**
+ * A song's place in a list.
+ *
+ * Position is stored rather than inferred from insertion order, because the
+ * whole point of a playlist is that somebody decided what follows what.
+ */
+@Entity(
+    tableName = "playlist_songs",
+    primaryKeys = ["playlistId", "songId"],
+    indices = [Index("playlistId"), Index("songId")],
+)
+data class PlaylistSongEntity(
+    val playlistId: Long,
+    val songId: String,
+    val position: Int,
+)
+
+/** A list and how much is in it, which is all a tile needs. */
+data class PlaylistSummary(
+    val id: Long,
+    val name: String,
+    val songs: Int,
+    /** The newest cover in it, for the tile. Empty while the list is. */
+    val cover: String,
+)
+
+@Dao
+interface PlaylistDao {
+
+    @Insert
+    suspend fun create(playlist: PlaylistEntity): Long
+
+    @Query("UPDATE playlists SET name = :name WHERE id = :id")
+    suspend fun rename(id: Long, name: String)
+
+    @Query("DELETE FROM playlists WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM playlist_songs WHERE playlistId = :id")
+    suspend fun empty(id: Long)
+
+    @Query("SELECT * FROM playlists WHERE id = :id")
+    fun playlist(id: Long): Flow<PlaylistEntity?>
+
+    @Query(
+        """
+        SELECT p.id AS id, p.name AS name,
+               (SELECT COUNT(*) FROM playlist_songs WHERE playlistId = p.id) AS songs,
+               COALESCE((
+                   SELECT s.cover FROM playlist_songs ps
+                   JOIN library_songs s ON s.id = ps.songId
+                   WHERE ps.playlistId = p.id AND s.cover <> ''
+                   ORDER BY ps.position DESC LIMIT 1
+               ), '') AS cover
+        FROM playlists p
+        ORDER BY p.createdAt DESC
+        """,
+    )
+    fun summaries(): Flow<List<PlaylistSummary>>
+
+    @Query(
+        """
+        SELECT s.* FROM playlist_songs ps
+        JOIN library_songs s ON s.id = ps.songId
+        WHERE ps.playlistId = :id
+        ORDER BY ps.position ASC
+        """,
+    )
+    fun songsIn(id: Long): Flow<List<LibrarySongEntity>>
+
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM playlist_songs WHERE playlistId = :id")
+    suspend fun nextPosition(id: Long): Int
+
+    @Insert(onConflict = androidx.room.OnConflictStrategy.IGNORE)
+    suspend fun add(entry: PlaylistSongEntity)
+
+    @Query("DELETE FROM playlist_songs WHERE playlistId = :id AND songId = :songId")
+    suspend fun remove(id: Long, songId: String)
 }

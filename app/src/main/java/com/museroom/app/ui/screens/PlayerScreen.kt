@@ -55,7 +55,9 @@ import com.museroom.app.player.Playback
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoIcons
+import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoPill
+import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.ui.kit.hardShadow
 import kotlinx.coroutines.delay
 
@@ -77,6 +79,7 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
     val index by Playback.index.collectAsStateWithLifecycle()
 
     var showQueue by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
 
     // The engine never polls, because nothing in it needs to know where it is
     // between events. A moving scrub bar does, so the screen showing one asks,
@@ -89,6 +92,10 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
     }
 
     val song = track ?: return
+    if (saving) {
+        SaveToPlaylist(song, onDismiss = { saving = false })
+        return
+    }
 
     Column(
         Modifier
@@ -217,6 +224,19 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
                 NeoIcons.Next, "Next",
                 onClick = { Playback.next() },
                 diameter = 54.dp, icon = 22.dp, rest = 4.dp,
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            NeoButton(
+                text = "Save to playlist",
+                tone = NeoTone.Paper,
+                small = true,
+                onClick = { saving = true },
             )
         }
 
