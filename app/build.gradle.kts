@@ -1,8 +1,8 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.kotlin.serialization)
@@ -18,7 +18,7 @@ fun env(key: String): String = (localEnv.getProperty(key) ?: "").trim()
 
 android {
     namespace = "com.museroom.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.museroom.app"
@@ -59,12 +59,18 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    // Java 21 because the extraction library is compiled to it. From AGP 9 the
+    // Android plugin brings Kotlin itself, so this lives here rather than in a
+    // separate plugin's block.
+    kotlin {
+        jvmToolchain(21)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+        }
     }
 
     buildFeatures {
