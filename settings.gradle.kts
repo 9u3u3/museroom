@@ -17,6 +17,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Only for the extraction library, which is published nowhere else.
+        // Scoped so a typo in any other coordinate cannot silently resolve here.
+        maven("https://jitpack.io") {
+            content { includeGroup("com.github.MetrolistGroup.innertubex") }
+        }
     }
 }
 

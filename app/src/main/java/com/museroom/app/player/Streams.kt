@@ -1,6 +1,7 @@
 package com.museroom.app.player
 
 import android.util.Log
+import kotlinx.coroutines.runBlocking
 
 /**
  * Turning a video id into something ExoPlayer can read, and remembering it.
@@ -14,15 +15,15 @@ import android.util.Log
 object Streams {
 
     /** What the listener asked for, not what the network happened to allow. */
-    enum class Quality(val ceilingBitrate: Int) {
+    enum class Quality {
         /** For a metered connection. The cheapest thing that is still music. */
-        Low(72_000),
+        Low,
 
         /** The default. Indistinguishable from Max on a phone speaker or buds. */
-        High(140_000),
+        High,
 
         /** Whatever the best offered format is, however large. */
-        Max(Int.MAX_VALUE),
+        Max,
     }
 
     /** A URL and everything needed to use it, including when it stops working. */
@@ -38,21 +39,18 @@ object Streams {
         val loudnessDb: Double?,
         val client: String,
         val expiresAtMs: Long,
+        /**
+         * How much may be asked for at once.
+         *
+         * Not a tuning knob. Some of these addresses refuse a request that is
+         * not a range, and some refuse a range that is too large, and which is
+         * which depends on the client that issued it. The extractor knows, so
+         * it says, and the player asks for exactly that.
+         */
+        val boundedRange: Boolean = false,
+        val chunkBytes: Long = 0,
     ) {
         fun freshAt(nowMs: Long): Boolean = nowMs < expiresAtMs
-    }
-
-    /**
-     * The best format for a quality, or null if there were none.
-     *
-     * Highest bitrate that fits under the ceiling, and if nothing fits, the
-     * quietest thing on offer rather than nothing: a listener on Low would
-     * rather hear the track at whatever bitrate exists than be told no.
-     */
-    fun pick(formats: List<InnerTube.Format>, quality: Quality): InnerTube.Format? {
-        if (formats.isEmpty()) return null
-        val within = formats.filter { it.bitrate <= quality.ceilingBitrate }
-        return within.maxByOrNull { it.bitrate } ?: formats.minByOrNull { it.bitrate }
     }
 
     // ------------------------------------------------------------- the cache --
@@ -134,34 +132,38 @@ object Streams {
         cached(videoId, nowMs)?.let { if (avoid.isEmpty()) return it }
 
         val generation = generation(videoId)
-        val answer = InnerTube.play(videoId, avoid)
-        val format = pick(answer.formats, quality)
-            ?: throw InnerTube.Unplayable("NO_FORMAT", "nothing playable for $videoId")
+        val found = runBlocking { Extraction.extract(videoId, quality, avoid) }
 
         val stream = Stream(
             videoId = videoId,
-            url = format.url,
-            // The endpoint hands out URLs on the understanding that the client
-            // it answered is the one that will fetch them, so the request that
-            // follows has to keep saying the same thing.
-            headers = mapOf(
-                "User-Agent" to (InnerTube.clients.first { it.name == answer.client }.userAgent),
-            ),
-            itag = format.itag,
-            mimeType = format.mimeType,
-            bitrate = format.bitrate,
-            contentLength = format.contentLength,
-            durationMs = if (format.durationMs > 0) format.durationMs else answer.durationMs,
-            loudnessDb = format.loudnessDb,
-            client = answer.client,
-            // Deliberately short of the stated life. A URL that expires while a
-            // track is halfway through it stops mid-song, and thirty seconds of
-            // unused shelf life is cheaper than that.
-            expiresAtMs = nowMs + (answer.expiresInSeconds - 30).coerceAtLeast(30) * 1000L,
+            url = found.audioUrl,
+            // The address was issued to whichever client asked for it, on the
+            // understanding that the same client would come and fetch it.
+            headers = found.headers,
+            itag = found.itag,
+            mimeType = listOfNotNull(
+                found.mimeType,
+                found.codecs?.takeIf { it.isNotBlank() }?.let { "codecs=\"$it\"" },
+            ).joinToString("; "),
+            bitrate = found.bitrate ?: 0,
+            contentLength = found.contentLengthBytes ?: -1,
+            durationMs = (found.mediaMetadata?.durationSeconds ?: 0L) * 1000,
+            loudnessDb = found.loudnessDb,
+            client = found.clientName,
+            // Deliberately short of the stated life. An address that expires
+            // while a track is halfway through it stops mid-song, and thirty
+            // seconds of unused shelf life is cheaper than that.
+            expiresAtMs = found.expiresAt
+                ?.let { it.toEpochMilliseconds() - 30_000 }
+                ?.coerceAtLeast(nowMs + 30_000)
+                ?: (nowMs + 5 * 60_000),
+            boundedRange = found.requireBoundedRange || found.useRangeChunks,
+            chunkBytes = found.rangeChunkSizeBytes,
         )
         Log.i(
             "MuseroomPlayer",
-            "resolved $videoId via ${answer.client}, itag ${format.itag} at ${format.bitrate}bps",
+            "resolved $videoId via ${stream.client}, itag ${stream.itag} at ${stream.bitrate}bps" +
+                if (stream.boundedRange) ", ${stream.chunkBytes} byte chunks" else "",
         )
         remember(stream, generation)
         return stream

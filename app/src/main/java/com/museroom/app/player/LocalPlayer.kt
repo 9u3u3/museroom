@@ -135,6 +135,7 @@ object LocalPlayer {
     /** Called once, from the application. Cheap: nothing is built until asked. */
     fun attach(context: Context) {
         if (app == null) app = context.applicationContext
+        Extraction.attach(context)
     }
 
     private fun require(): ExoPlayer {
@@ -200,20 +201,20 @@ object LocalPlayer {
             val located = spec.withUri(Uri.parse(stream.url))
                 .withRequestHeaders(spec.httpRequestHeaders + stream.headers)
 
-            // Every read is a bounded range, and never a large one.
+            // Ask for exactly as much as this address is willing to serve.
             //
-            // Two refusals were measured against the real server, both answered
-            // 403 with no explanation. A GET with no Range header at all is
-            // refused, which is the shape ExoPlayer uses by default when it
-            // wants a file from the start. So is a Range that covers most of
-            // the track: a four megabyte file serves 0-1048575 and refuses
-            // 0-2097151. Whatever the rule is, asking a megabyte at a time is
-            // inside it, and a megabyte is about a minute of audio.
+            // Some of them refuse a request with no Range header at all, which
+            // is the shape ExoPlayer uses by default when it wants a file from
+            // the start; some refuse a range that covers too much of the track.
+            // Which rule applies depends on the client that issued the address,
+            // so the extractor says and this obeys rather than guessing.
+            if (!stream.boundedRange) return@Factory located
+            val cap = stream.chunkBytes.takeIf { it > 0 } ?: CHUNK_BYTES
             val remaining = stream.contentLength - located.position
             val asked = when {
-                located.length != C.LENGTH_UNSET.toLong() -> minOf(located.length, CHUNK_BYTES)
-                remaining > 0 -> minOf(remaining, CHUNK_BYTES)
-                else -> CHUNK_BYTES
+                located.length != C.LENGTH_UNSET.toLong() -> minOf(located.length, cap)
+                remaining > 0 -> minOf(remaining, cap)
+                else -> cap
             }
             located.subrange(0, asked)
         }
@@ -222,7 +223,7 @@ object LocalPlayer {
     /** A session's worth of listening, not a library. Downloads come later. */
     private const val CACHE_BYTES = 512L * 1024 * 1024
 
-    /** The largest range the server was willing to serve, measured not guessed. */
+    /** Used only when an address asks for bounded reads without saying how big. */
     private const val CHUNK_BYTES = 1L * 1024 * 1024
 
     // ----------------------------------------------------------------- driving --
