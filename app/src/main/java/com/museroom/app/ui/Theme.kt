@@ -1,5 +1,6 @@
 package com.museroom.app.ui
 
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -134,7 +135,14 @@ fun MuseroomTheme(
         )
     }
 
-    CompositionLocalProvider(LocalNeo provides neo) {
+    // The ink is provided as the content colour as well as in the scheme.
+    // Without it, any Text that does not name a colour falls back to
+    // LocalContentColor, which outside a Material Surface is plain black — so
+    // on the dark skin a title nobody thought to colour came out invisible.
+    CompositionLocalProvider(
+        LocalNeo provides neo,
+        LocalContentColor provides neo.ink,
+    ) {
         MaterialTheme(colorScheme = scheme, typography = NeoType, content = content)
     }
 }

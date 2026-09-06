@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.media.Avatars
 import com.museroom.app.net.AuthRepository
@@ -48,17 +49,24 @@ import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoButton
+import com.museroom.app.ui.kit.DropTitle
 import com.museroom.app.ui.kit.NeoCard
+import com.museroom.app.ui.kit.NeoChip
+import com.museroom.app.ui.kit.NeoPill
+import com.museroom.app.ui.kit.NeoTabs
+import com.museroom.app.ui.kit.hardShadow
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.formatMinutes
 
 /**
  * The top 100, read from precomputed ranks.
  *
- * Rows all the way down, including the first three. A podium spends the top of
- * the screen on three names and makes the fourth look like an afterthought,
- * which is the wrong shape for a list somebody is scrolling to find themselves
- * in. The leaders are marked instead of staged.
+ * The first three are staged and the rest are rows. A podium was argued
+ * against once, on the grounds that it makes fourth place look like an
+ * afterthought — which is true, and is also what a leaderboard is for. The
+ * design settles it: three blocks of colour at different heights say who won
+ * without anybody having to read a number, and your own row keeps the loud
+ * violet at whatever depth it sits, so finding yourself is still one glance.
  */
 @Composable
 fun BoardScreen() {
@@ -88,6 +96,21 @@ fun BoardScreen() {
         loading = false
     }
 
+    Column(Modifier.fillMaxSize()) {
+    TabBar(
+        left = {
+            Crumb(
+                when (period) {
+                    BoardPeriod.Day -> "Today · resets at midnight"
+                    BoardPeriod.Week -> "This week · resets Monday"
+                    BoardPeriod.Month -> "This month"
+                    BoardPeriod.All -> "Everything ever counted"
+                },
+            )
+        },
+        right = { NeoPill(sort.label, fill = c.lime, accent = true) },
+    )
+
     Column(
         Modifier
             .fillMaxSize()
@@ -96,48 +119,45 @@ fun BoardScreen() {
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenTitle("Top 100", drop = c.lime)
+        DropTitle("Top 100", size = 34, drop = c.lime)
 
         if (session == null) {
-            SignInPanel("Sign in to be ranked.")
+            SignInPanel("Sign in to be ranked.", heading = false)
             return@Column
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            BoardPeriod.entries.forEach { p ->
-                NeoButton(
-                    text = when (p) {
-                        BoardPeriod.Day -> "Day"
-                        BoardPeriod.Week -> "Week"
-                        BoardPeriod.Month -> "Month"
-                        BoardPeriod.All -> "All"
-                    },
-                    small = true,
-                    tone = if (p == period) NeoTone.Violet else NeoTone.Paper,
-                    onClick = { period = p },
-                )
-            }
-        }
+        NeoTabs(
+            options = BoardPeriod.entries.map {
+                when (it) {
+                    BoardPeriod.Day -> "Day"
+                    BoardPeriod.Week -> "Week"
+                    BoardPeriod.Month -> "Month"
+                    BoardPeriod.All -> "All"
+                }
+            },
+            selected = BoardPeriod.entries.indexOf(period),
+            onPick = { period = BoardPeriod.entries[it] },
+            height = 42.dp,
+            radius = 50.dp,
+        )
 
         // Two questions, not one. Minutes say who sat there longest; likes say
         // whose taste other people actually turned up for.
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BoardSort.entries.forEach { option ->
-                NeoButton(
-                    text = option.label,
-                    small = true,
-                    tone = if (option == sort) NeoTone.Pink else NeoTone.Paper,
-                    onClick = { sort = option },
-                )
+                NeoChip(option.label, sort == option, { sort = option })
             }
         }
 
         val me = session?.userId
-        entries.forEach { entry ->
+        val top = entries.filter { it.rank <= 3 }.sortedBy { it.rank }
+        if (top.size == 3) Podium(top, sort)
+
+        entries.filter { it.rank > 3 }.forEach { entry ->
             BoardRow(entry, mine = entry.userId == me, sort = sort)
         }
 
-        entries.firstOrNull { it.userId == me }?.takeIf { it.rank > 3 }?.let {
+        entries.firstOrNull { it.userId == me }?.let {
             Spacer(Modifier.size(4.dp))
             BoardRow(it, mine = true, sort = sort)
         }
@@ -147,6 +167,70 @@ fun BoardScreen() {
             loading && entries.isEmpty() -> NeoCard { Note("Working out the ranks.") }
             entries.isEmpty() -> NeoCard {
                 Note("Nobody has finished a track yet this period.")
+            }
+        }
+    }
+    }
+}
+
+/**
+ * The first three, as three blocks of colour at three heights.
+ *
+ * First is in the middle and tallest, which is the shape everybody already
+ * reads as a podium; second is on the left because that is the way a page is
+ * read and it puts the winner between the two runners-up rather than beside
+ * them. The colours are the kit's three accents, so the block itself says the
+ * position and the number on it only confirms.
+ */
+@Composable
+private fun Podium(top: List<BoardEntry>, sort: BoardSort) {
+    val c = Neo.colors
+    val order = listOfNotNull(
+        top.getOrNull(1)?.let { it to (c.sky to 104.dp) },
+        top.getOrNull(0)?.let { it to (c.lime to 132.dp) },
+        top.getOrNull(2)?.let { it to (c.pink to 88.dp) },
+    )
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        order.forEach { (entry, look) ->
+            val (fill, tall) = look
+            val shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
+            Column(
+                Modifier
+                    .weight(if (entry.rank == 1) 1.15f else 1f)
+                    .height(tall)
+                    .hardShadow(4.dp, c.onAccent, shape)
+                    .clip(shape)
+                    .background(fill)
+                    .border(3.dp, c.onAccent, shape)
+                    .clickable { Person.show(entry.userId, entry.handle) }
+                    .padding(horizontal = 6.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("${entry.rank}", style = bangers(30).copy(color = c.onAccent))
+                Spacer(Modifier.size(5.dp))
+                Text(
+                    entry.handle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 11.sp,
+                    color = c.onAccent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (sort == BoardSort.Likes) {
+                        "${entry.likes} " + if (entry.likes == 1L) "like" else "likes"
+                    } else {
+                        formatMinutes(entry.creditedMs)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.sp,
+                    color = c.onAccent.copy(alpha = 0.72f),
+                    maxLines = 1,
+                )
             }
         }
     }

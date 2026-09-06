@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -42,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +63,7 @@ import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.NeoButton
+import com.museroom.app.ui.kit.LiveDot
 import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.ui.kit.hardShadow
@@ -80,6 +84,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun PlayerScreen(
     onClose: () -> Unit,
+    onOpenLyrics: () -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
     onOpenQueue: () -> Unit = {},
     onStartedRoom: () -> Unit = {},
@@ -100,8 +105,8 @@ fun PlayerScreen(
         .collectAsStateWithLifecycle()
 
     var saving by remember { mutableStateOf(false) }
-    var reading by remember { mutableStateOf(false) }
     var timing by remember { mutableStateOf(false) }
+    var menu by remember { mutableStateOf(false) }
 
     // The engine never polls, because nothing in it needs to know where it is
     // between events. A moving scrub bar does, so the screen showing one asks,
@@ -118,14 +123,13 @@ fun PlayerScreen(
         SaveToPlaylist(song, onDismiss = { saving = false })
         return
     }
-    if (reading) {
-        LyricsScreen(onClose = { reading = false })
-        return
-    }
+    if (menu) TrackSheet(song, onDismiss = { menu = false })
 
     Column(
         Modifier
             .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(horizontal = 22.dp),
     ) {
         Spacer(Modifier.height(8.dp))
@@ -153,10 +157,11 @@ fun PlayerScreen(
                 )
             }
             RoundIcon(
-                NeoIcons.Queue,
-                "Queue",
-                onClick = onOpenQueue,
+                NeoIcons.Dots,
+                "More",
+                onClick = { menu = true },
                 diameter = 42.dp,
+                weight = 3.6f,
             )
         }
 
@@ -166,18 +171,33 @@ fun PlayerScreen(
         // track changing is the only thing on this screen worth interrupting
         // somebody for.
         val pop = rememberPop(song.id)
-        TrackCover(
-            id = song.id,
-            url = song.artworkUrl,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .scale(pop),
-            radius = 22.dp,
-            shadow = 8.dp,
-            stroke = 3.dp,
-            dot = 11.dp,
-        )
+        Box {
+            TrackCover(
+                id = song.id,
+                url = song.artworkUrl,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .scale(pop),
+                radius = 22.dp,
+                shadow = 8.dp,
+                stroke = 3.dp,
+                dot = 11.dp,
+            )
+            // Whose player this is, stuck on the corner of the sleeve at a
+            // slight angle so it reads as a sticker rather than as a caption.
+            // It matters because the same cover appears on a screen where
+            // Spotify is the one making the sound.
+            NeoPill(
+                "Museroom",
+                fill = c.lime,
+                accent = true,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(14.dp)
+                    .rotate(-4f),
+            )
+        }
 
         Spacer(Modifier.height(20.dp))
 
@@ -190,7 +210,7 @@ fun PlayerScreen(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Heart(song, size = 26)
+            Heart(song, size = 26, framed = true)
         }
         if (song.artist.isNotBlank()) {
             Spacer(Modifier.height(6.dp))
@@ -285,7 +305,7 @@ fun PlayerScreen(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Tray(NeoIcons.Notes, "Lyrics", Modifier.weight(1f)) { reading = true }
+            Tray(NeoIcons.Notes, "Lyrics", Modifier.weight(1f), onClick = onOpenLyrics)
             Tray(NeoIcons.Queue, "Queue", Modifier.weight(1f), onClick = onOpenQueue)
             Tray(NeoIcons.Plus, "Save", Modifier.weight(1f)) { saving = true }
             Tray(
@@ -302,8 +322,9 @@ fun PlayerScreen(
         // hearing something and somebody else hearing it too.
         NeoButton(
             text = if (hosting) "Playing in your room" else "Start a room with this",
-            tone = if (hosting) NeoTone.Paper else NeoTone.Violet,
+            tone = if (hosting) NeoTone.Paper else NeoTone.Lime,
             enabled = signedIn != null,
+            leading = { LiveDot(size = 10.dp) },
             modifier = Modifier.fillMaxWidth(),
             onClick = {
                 val query = listOf(song.title, song.artist)
@@ -514,21 +535,21 @@ private fun Scrubber(
                     .clip(shape)
                     .background(c.violet),
             )
-            // The knob is only there while it is being used. A dot parked on a
-            // bar reads as a control; a bar on its own reads as a reading.
-            val knob by animateFloatAsState(if (dragging) 1f else 0f, tween(120), label = "knob")
-            if (knob > 0f) {
-                val density = LocalDensity.current
-                Box(
-                    Modifier
-                        .offset(x = with(density) { (eased * width).toDp() } - 10.dp)
-                        .size(20.dp)
-                        .scale(knob)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(c.lime)
-                        .border(3.dp, c.onAccent, RoundedCornerShape(percent = 50)),
-                )
-            }
+            // The knob sits on the bar whether or not a finger is down. A rail
+            // with nothing on it reads as a readout, and this one is the way
+            // you move through a song; it grows under the thumb rather than
+            // appearing out of nothing.
+            val knob by animateFloatAsState(if (dragging) 1.25f else 1f, tween(120), label = "knob")
+            val density = LocalDensity.current
+            Box(
+                Modifier
+                    .offset(x = with(density) { (eased * width).toDp() } - 10.dp)
+                    .size(20.dp)
+                    .scale(knob)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(c.lime)
+                    .border(3.dp, c.onAccent, RoundedCornerShape(percent = 50)),
+            )
         }
         Spacer(Modifier.height(9.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

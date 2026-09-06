@@ -41,6 +41,7 @@ import com.museroom.app.player.Playback
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoIcons
+import com.museroom.app.ui.kit.NeoBar
 import com.museroom.app.ui.kit.NeoPill
 import kotlinx.coroutines.delay
 
@@ -87,34 +88,16 @@ fun LyricsScreen(onClose: () -> Unit) {
         if (current >= 0) scroll.animateScrollToItem((current - 2).coerceAtLeast(0))
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            RoundIcon(NeoIcons.Chevron, "Close", onClick = onClose, diameter = 42.dp)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "LYRICS",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.W900,
-                    letterSpacing = 1.6.sp,
-                    fontSize = 9.sp,
-                    color = c.ink.copy(alpha = 0.5f),
-                )
-                Text(
-                    listOfNotNull(
-                        song?.title?.takeIf { it.isNotBlank() },
-                        song?.artist?.takeIf { it.isNotBlank() },
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+    Column(Modifier.fillMaxSize()) {
+        SheetBar(
+            kicker = "Lyrics",
+            value = listOfNotNull(
+                song?.title?.takeIf { it.isNotBlank() },
+                song?.artist?.takeIf { it.isNotBlank() },
+            ).joinToString(" · ").ifBlank { "Nothing playing" },
+            onClose = onClose,
+        )
+        Column(Modifier.fillMaxSize().padding(horizontal = 22.dp)) {
 
         Box(Modifier.weight(1f)) {
             when {
@@ -169,25 +152,11 @@ fun LyricsScreen(onClose: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 NeoPill(found.source)
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(c.ink.copy(alpha = 0.16f)),
-                ) {
-                    val duration = snapshot.durationMs.takeIf { it > 0 } ?: song?.durationMs ?: 0
-                    val fraction =
-                        if (duration > 0) (snapshot.positionMs.toFloat() / duration).coerceIn(0f, 1f)
-                        else 0f
-                    Box(
-                        Modifier
-                            .fillMaxWidth(fraction)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(percent = 50))
-                            .background(c.violet),
-                    )
-                }
+                val duration = snapshot.durationMs.takeIf { it > 0 } ?: song?.durationMs ?: 0
+                val fraction =
+                    if (duration > 0) (snapshot.positionMs.toFloat() / duration).coerceIn(0f, 1f)
+                    else 0f
+                NeoBar(fraction, Modifier.weight(1f), height = 10.dp)
                 MonoText(clockOf(snapshot.positionMs), size = 11)
             }
             if (!found.timed) {
@@ -199,6 +168,7 @@ fun LyricsScreen(onClose: () -> Unit) {
                     modifier = Modifier.padding(bottom = 10.dp),
                 )
             }
+        }
         }
     }
 }

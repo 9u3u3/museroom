@@ -32,6 +32,8 @@ import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoIcon
+import com.museroom.app.ui.kit.Kicker
+import com.museroom.app.ui.kit.NeoChip
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.NeoTone
 
@@ -68,34 +70,26 @@ fun QueueScreen(onBack: () -> Unit) {
         return
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            RoundIcon(NeoIcons.Chevron, "Close", onClick = onBack, diameter = 42.dp)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    "QUEUE",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.W900,
-                    letterSpacing = 1.6.sp,
-                    fontSize = 9.sp,
-                    color = c.ink.copy(alpha = 0.5f),
-                )
-                Text(
-                    listOfNotNull(
-                        from.takeIf { it.isNotBlank() },
-                        if (queue.size == 1) "1 track" else "${queue.size} tracks",
-                    ).joinToString(" · "),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+    Column(Modifier.fillMaxSize()) {
+        SheetBar(
+            kicker = "Queue",
+            value = listOfNotNull(
+                from.takeIf { it.isNotBlank() },
+                if (queue.size == 1) "1 track" else "${queue.size} tracks",
+            ).joinToString(" · "),
+            onClose = onBack,
+            action = {
+                if (queue.isNotEmpty()) {
+                    RoundIcon(
+                        NeoIcons.Close, "Clear the queue",
+                        onClick = { Playback.stop() },
+                        diameter = 42.dp, icon = 18.dp,
+                    )
+                }
+            },
+        )
+
+        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
 
         if (queue.isEmpty()) {
             Note("Nothing queued. Play an album or a search result and it lands here.")
@@ -103,28 +97,21 @@ fun QueueScreen(onBack: () -> Unit) {
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            NeoButton(
+            NeoChip(
                 text = if (shuffle) "Shuffle on" else "Shuffle",
-                tone = if (shuffle) NeoTone.Lime else NeoTone.Paper,
-                small = true,
+                selected = shuffle,
                 onClick = { Playback.setShuffle(!shuffle) },
             )
-            NeoButton(
+            NeoChip(
                 text = when (repeat) {
                     Playback.Repeat.Off -> "Repeat"
                     Playback.Repeat.All -> "Repeat all"
                     Playback.Repeat.One -> "Repeat one"
                 },
-                tone = if (repeat == Playback.Repeat.Off) NeoTone.Paper else NeoTone.Lime,
-                small = true,
+                selected = repeat != Playback.Repeat.Off,
                 onClick = { Playback.cycleRepeat() },
             )
-            NeoButton(
-                text = "Save",
-                tone = NeoTone.Paper,
-                small = true,
-                onClick = { naming = true },
-            )
+            NeoChip("Save as playlist", selected = false, onClick = { naming = true })
         }
 
         Spacer(Modifier.height(12.dp))
@@ -162,14 +149,7 @@ fun QueueScreen(onBack: () -> Unit) {
                         }
                     }
                     Spacer(Modifier.height(14.dp))
-                    Text(
-                        "UP NEXT",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.W900,
-                        letterSpacing = 1.6.sp,
-                        fontSize = 9.sp,
-                        color = c.ink.copy(alpha = 0.5f),
-                    )
+                    Kicker("Up next")
                 }
             }
 
@@ -232,6 +212,7 @@ fun QueueScreen(onBack: () -> Unit) {
                 }
             }
             item { Spacer(Modifier.height(120.dp)) }
+        }
         }
     }
 }

@@ -1,5 +1,11 @@
 package com.museroom.app.ui.screens
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -18,10 +25,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.museroom.app.ui.Neo
@@ -80,22 +96,29 @@ fun OnboardingScreen(onSkip: () -> Unit = {}) {
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp, vertical = 20.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(
-                Modifier
-                    .size(74.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(c.violet)
-                    .border(3.dp, c.onAccent, RoundedCornerShape(20.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                MuseroomMark(size = 48.dp, note = c.onAccent, ghost = c.lime)
+        // The one screen where the wordmark is allowed to be the largest thing
+        // in the app, set on two lines and tipped off true, with the sticker
+        // that says the thing everybody's first question is about.
+        Box(Modifier.fillMaxWidth()) {
+            Box(Modifier.rotate(-3f).padding(top = 18.dp)) {
+                Text(
+                    "MUSE\nROOM",
+                    style = bangers(62).copy(color = c.violet),
+                    modifier = Modifier.padding(start = 6.dp, top = 6.dp),
+                )
+                Text("MUSE\nROOM", style = bangers(62).copy(color = c.ink))
             }
-            Text("MUSEROOM", style = bangers(38).copy(color = c.ink), maxLines = 1)
+            Starburst(
+                "NO\nPLAY STORE\nNEEDED",
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 30.dp),
+            )
         }
 
-        Spacer(Modifier.size(26.dp))
+        Spacer(Modifier.size(30.dp))
 
+        // A speech bubble rather than a plain card, because this paragraph is
+        // the app saying something to the person rather than a label on a
+        // setting, and the tail is what makes the difference readable.
         NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
             Text(
                 "First, let it hear the music.",
@@ -104,11 +127,13 @@ fun OnboardingScreen(onSkip: () -> Unit = {}) {
             )
             Spacer(Modifier.size(6.dp))
             Text(
-                "Museroom reads the media session Android keeps for whatever is playing.",
+                "Android keeps a media session for whatever app is playing. Reading " +
+                    "it is the only way to know what you are listening to.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = c.ink.copy(alpha = 0.8f),
             )
         }
+        Tail()
 
         Spacer(Modifier.size(22.dp))
 
@@ -146,11 +171,19 @@ fun OnboardingScreen(onSkip: () -> Unit = {}) {
         Spacer(Modifier.size(20.dp))
 
         NeoButton(
-            text = "Allow access",
+            text = "Turn on notification access",
             onClick = { NotificationAccess.openSettings(context) },
             modifier = Modifier.fillMaxWidth(),
         )
 
+        Spacer(Modifier.size(10.dp))
+        Text(
+            "Takes you to Android settings. Come straight back.",
+            style = MaterialTheme.typography.bodySmall,
+            color = c.ink.copy(alpha = 0.6f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Spacer(Modifier.size(10.dp))
 
         NeoButton(
@@ -204,5 +237,86 @@ fun OnboardingScreen(onSkip: () -> Unit = {}) {
                 )
             }
         }
+    }
+}
+
+/**
+ * The comic sticker: a lime star with hard ink edges and a word inside it.
+ *
+ * It drifts, slowly, because the one thing on this screen that nobody asked to
+ * read is the one that has to catch the eye on its own.
+ */
+@Composable
+private fun Starburst(text: String, modifier: Modifier = Modifier) {
+    val c = Neo.colors
+    val float = rememberInfiniteTransition(label = "drift")
+    val lift by float.animateFloat(
+        initialValue = 0f,
+        targetValue = -5f,
+        animationSpec = infiniteRepeatable(tween(2200), RepeatMode.Reverse),
+        label = "lift",
+    )
+    val points = remember {
+        PathParser().parsePathString(
+            "M60 3 L69 27 L94 17 L88 43 L115 47 L96 63 L116 82 L90 85 L96 111 " +
+                "L71 100 L60 118 L49 100 L24 111 L30 85 L4 82 L24 63 L5 47 " +
+                "L32 43 L26 17 L51 27 Z",
+        ).toPath()
+    }
+    Box(
+        modifier
+            .size(118.dp)
+            .offset(y = lift.dp)
+            .rotate(-3f),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val scale = size.minDimension / 120f
+            withTransform({ scale(scale, scale, pivot = Offset.Zero) }) {
+                drawPath(points, c.lime)
+                drawPath(
+                    points,
+                    Color(0xFF14110D),
+                    style = Stroke(width = 3f, join = StrokeJoin.Round),
+                )
+            }
+        }
+        Text(
+            text,
+            style = bangers(15).copy(color = Color(0xFF14110D)),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.rotate(9f),
+        )
+    }
+}
+
+/**
+ * The bubble's tail, drawn under the card it belongs to.
+ *
+ * Two triangles rather than one: the ink first, then the card colour inset by
+ * the stroke width, which is how the kit draws every other edge.
+ */
+@Composable
+private fun Tail() {
+    val c = Neo.colors
+    Canvas(
+        Modifier
+            .padding(start = 34.dp)
+            .size(width = 26.dp, height = 19.dp),
+    ) {
+        val ink = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(size.width, 0f)
+            lineTo(size.width * 0.36f, size.height)
+            close()
+        }
+        val fill = Path().apply {
+            moveTo(4.dp.toPx(), 0f)
+            lineTo(size.width - 4.dp.toPx(), 0f)
+            lineTo(size.width * 0.36f, size.height - 6.dp.toPx())
+            close()
+        }
+        drawPath(ink, c.ink)
+        drawPath(fill, c.card)
     }
 }

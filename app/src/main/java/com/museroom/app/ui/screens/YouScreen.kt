@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +69,7 @@ import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.util.NotificationAccess
 import com.museroom.app.ui.kit.NeoDot
 import com.museroom.app.ui.kit.NeoPill
+import com.museroom.app.ui.kit.NeoTabs
 import com.museroom.app.ui.kit.NeoSwitch
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.StayAwake
@@ -84,7 +86,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun YouScreen(onOpenSound: () -> Unit = {}) {
+fun YouScreen(onOpenSound: () -> Unit = {}, onOpenHistory: () -> Unit = {}) {
     val context = LocalContext.current
     val c = Neo.colors
     val scope = rememberCoroutineScope()
@@ -210,6 +212,18 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
         )
     }
 
+    Column(Modifier.fillMaxSize()) {
+    TabBar(
+        left = { Wordmark("You", size = 26) },
+        right = {
+            NeoPill(
+                if (profile?.onGlobalBoard != false) "On the board" else "Off the board",
+                fill = if (profile?.onGlobalBoard != false) Neo.colors.lime else Neo.colors.card,
+                accent = profile?.onGlobalBoard != false,
+            )
+        },
+    )
+
     Column(
         Modifier
             .fillMaxSize()
@@ -218,8 +232,6 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ScreenTitle("You")
-
         // Only when it is off. Somebody who granted it should never see this,
         // and somebody who chose to get on without it needs one place to change
         // their mind — the gate is not shown twice.
@@ -244,6 +256,22 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
                     small = true,
                     onClick = { NotificationAccess.openSettings(context) },
                 )
+            }
+        }
+
+        // The tally has its own screen. It used to be four cards inlined here,
+        // which put a month of listening in the middle of a settings page.
+        NeoCard(radius = 16.dp, shadow = 4.dp, padding = 14.dp) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("The tally", style = MaterialTheme.typography.titleLarge, color = c.ink)
+                    Note("Minutes, top artists, and every entry you can remove.")
+                }
+                NeoButton("Open", tone = NeoTone.Paper, small = true, onClick = onOpenHistory)
             }
         }
 
@@ -306,7 +334,7 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
         }
 
         if (session == null) {
-            SignInPanel("Sign in for a handle, friends and the board.")
+            SignInPanel("Sign in for a handle, friends and the board.", heading = false)
         } else {
             NeoCard(radius = 18.dp, padding = 16.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -381,16 +409,17 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
             }
 
             Label("Who sees what you play", color = c.ink)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Visibility.entries.forEach { v ->
-                    NeoButton(
-                        text = v.key,
-                        small = true,
-                        tone = if (profile?.who == v) NeoTone.Violet else NeoTone.Paper,
-                        onClick = { scope.launch { profiles.setVisibility(v) } },
-                    )
-                }
-            }
+            NeoTabs(
+                options = Visibility.entries.map { it.key },
+                selected = Visibility.entries.indexOf(profile?.who ?: Visibility.entries.first()),
+                onPick = { scope.launch { profiles.setVisibility(Visibility.entries[it]) } },
+            )
+
+            // What Museroom counts, stated rather than assumed. It is a fixed
+            // list and never a question: a browser plays whatever the web
+            // plays, so counting one would mean recording anything somebody
+            // opens. The two people actually use lead it; the rest follow.
+            CountedApps()
 
             NeoCard(radius = 14.dp, shadow = 3.dp, padding = 14.dp) {
                 Row(
@@ -446,7 +475,6 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
             }
         }
 
-        HistorySection()
 
         if (session != null) {
             photoNote?.let { Note(it) }
@@ -602,6 +630,7 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
             )
         }
     }
+    }
 }
 
 /**
@@ -690,6 +719,43 @@ private fun BlockedList() {
                     scope.launch { safety.unblock(person.userId) }
                 })
             }
+        }
+    }
+}
+
+/**
+ * The music apps whose playback is counted.
+ *
+ * The list is long and the two everybody has are the two the design draws, so
+ * those lead and the rest are behind a word. A wall of twenty-two stickers at
+ * the top of a settings page is a list nobody reads and a page nobody scrolls
+ * past.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun CountedApps() {
+    val c = Neo.colors
+    var all by remember { mutableStateOf(false) }
+    val labels = com.museroom.app.media.Sources.labels
+    val shown = if (all) labels else labels.take(2)
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Label("Counted", color = c.ink)
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            shown.forEach { app -> NeoPill(app, fill = c.lime, accent = true) }
+            if (!all) {
+                NeoPill(
+                    "and ${labels.size - shown.size} more",
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { all = true },
+                )
+            }
+            NeoPill("Everything else — ignored")
         }
     }
 }

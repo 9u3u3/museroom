@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -49,7 +50,11 @@ import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.NeoButton
+import com.museroom.app.ui.kit.DropTitle
+import com.museroom.app.ui.kit.Kicker
+import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoCard
+import com.museroom.app.ui.kit.NeoSegment
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.NeoSwitch
 import com.museroom.app.ui.kit.NeoTone
@@ -82,42 +87,40 @@ fun SoundScreen(onBack: () -> Unit) {
     val sleepEndsAt by SleepTimer.endsAt.collectAsStateWithLifecycle()
     val sleepAfterTrack by SleepTimer.afterThisTrack.collectAsStateWithLifecycle()
 
+    Column(Modifier.fillMaxSize()) {
+    PageBar(crumb = "Settings", onBack = onBack)
+
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            RoundIcon(NeoIcons.Back, "Back", onClick = onBack, diameter = 42.dp)
-            Text(
-                "SETTINGS",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.W900,
-                letterSpacing = 1.6.sp,
-                fontSize = 10.sp,
-                color = c.ink.copy(alpha = 0.5f),
-            )
-        }
-
-        Text("SOUND", style = bangers(34).copy(color = c.ink))
+        DropTitle("Sound", size = 34, drop = c.pink)
         Spacer(Modifier.height(14.dp))
 
         // ------------------------------------------------------ the account --
 
-        NeoCard(radius = 16.dp, shadow = 4.dp, padding = 14.dp) {
-            Label("YouTube Music")
-            Spacer(Modifier.height(6.dp))
-            Note("Not signed in.")
-            Spacer(Modifier.height(6.dp))
-            Note(
-                "Museroom plays without an account, which is why there is no " +
-                    "sign-in here yet. Your library, your likes and your history " +
-                    "are this phone's, and they work with the radio off.",
+        // Violet, because it is the only card on the page that is about an
+        // account rather than about the sound, and the design puts the account
+        // first for a reason: on most players nothing below it works well
+        // without one. Here it does, and saying so is the point of the card.
+        NeoAccentCard(fill = c.violet, radius = 16.dp, shadow = 5.dp, padding = 14.dp) {
+            Kicker("YouTube Music", color = Color.White)
+            Spacer(Modifier.height(3.dp))
+            Text(
+                "Not signed in",
+                style = MaterialTheme.typography.titleLarge,
+                fontSize = 16.sp,
+                color = Color.White,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Museroom plays without an account. Your library, your likes and " +
+                    "your history are this phone's, and they work with the radio off.",
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.85f),
             )
         }
 
@@ -126,38 +129,14 @@ fun SoundScreen(onBack: () -> Unit) {
         // ------------------------------------------------------- the quality --
 
         NeoCard(radius = 16.dp, shadow = 4.dp, padding = 14.dp) {
-            Label("Streaming quality")
+            Kicker("Streaming quality")
             Spacer(Modifier.height(10.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(percent = 50))
-                    .border(3.dp, c.ink, RoundedCornerShape(percent = 50)),
-            ) {
-                Streams.Quality.entries.forEach { option ->
-                    val chosen = option == quality
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .background(if (chosen) c.lime else c.card)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { Sound.choose(option) }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            option.name.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.W900,
-                            letterSpacing = 1.2.sp,
-                            fontSize = 11.sp,
-                            color = if (chosen) c.onAccent else c.ink,
-                        )
-                    }
-                }
-            }
+            NeoSegment(
+                options = Streams.Quality.entries.map { it.name },
+                selected = Streams.Quality.entries.indexOf(quality),
+                onPick = { Sound.choose(Streams.Quality.entries[it]) },
+                height = 40.dp,
+            )
             Spacer(Modifier.height(9.dp))
             Note(
                 when (quality) {
@@ -385,6 +364,7 @@ fun SoundScreen(onBack: () -> Unit) {
         }
 
         Spacer(Modifier.height(28.dp))
+    }
     }
 }
 

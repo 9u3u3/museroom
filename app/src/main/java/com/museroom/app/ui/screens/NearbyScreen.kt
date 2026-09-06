@@ -42,6 +42,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.net.AuthRepository
 import com.museroom.app.net.NearbyListener
@@ -145,13 +146,11 @@ fun NearbyScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp),
+            .padding(top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        ScreenTitle("Nearby", drop = c.pink)
-
         if (session == null) {
-            SignInPanel("Sign in so a code in the air can become a person.")
+            SignInPanel("Sign in so a code in the air can become a person.", heading = false)
             return@Column
         }
 
@@ -175,13 +174,26 @@ fun NearbyScreen() {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text(
-                    "On the air",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = androidx.compose.ui.graphics.Color.White,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (wanted) "Broadcasting" else "On the air",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontSize = 16.sp,
+                        color = androidx.compose.ui.graphics.Color.White,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.size(2.dp))
+                    // What is actually going out, said plainly. The token means
+                    // nothing on its own and only the server can map it back to
+                    // a person, which is the whole reason this is safe to leave
+                    // on — so it is worth one line rather than a help page.
+                    Text(
+                        "A code that changes every 15 minutes. Not your name.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.85f),
+                    )
+                }
                 NeoSwitch(checked = wanted, onCheckedChange = { on ->
                     wanted = on
                     if (on) goOnAir() else manager.stop()

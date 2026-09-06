@@ -2,8 +2,11 @@ package com.museroom.app.ui
 
 import android.Manifest
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,7 +15,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,10 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,8 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,51 +44,43 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.museroom.app.data.MuseroomDatabase
 import com.museroom.app.media.NowPlayingRepository
-import com.museroom.app.net.AuthRepository
-import com.museroom.app.net.BoardPeriod
-import com.museroom.app.net.BoardRepository
 import com.museroom.app.net.LikesRepository
+import com.museroom.app.net.RequestsRepository
 import com.museroom.app.net.Updates
 import com.museroom.app.notify.Notifier
 import com.museroom.app.sync.FollowSession
 import com.museroom.app.sync.RoomPresence
 import com.museroom.app.tracking.PlaybackTracker
-import com.museroom.app.ui.kit.Label
-import com.museroom.app.ui.kit.MuseroomMark
-import com.museroom.app.ui.Refreshing
-import androidx.activity.compose.BackHandler
-import com.museroom.app.net.RequestsRepository
-import com.museroom.app.ui.screens.RequestsScreen
-import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoDot
+import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.halftone
+import com.museroom.app.ui.kit.hardShadow
 import com.museroom.app.ui.screens.AccessGate
-import com.museroom.app.ui.screens.BoardScreen
-import com.museroom.app.ui.screens.FeatureTour
 import com.museroom.app.ui.screens.AlbumScreen
 import com.museroom.app.ui.screens.ArtistScreen
-import com.museroom.app.ui.screens.ListingScreen
+import com.museroom.app.ui.screens.BoardScreen
+import com.museroom.app.ui.screens.FeatureTour
+import com.museroom.app.ui.screens.HistoryScreen
 import com.museroom.app.ui.screens.LibraryScreen
-import com.museroom.app.ui.screens.PlaylistScreen
-import com.museroom.app.ui.screens.QueueScreen
-import com.museroom.app.ui.screens.SoundScreen
-import com.museroom.app.ui.screens.RoomsScreen
+import com.museroom.app.ui.screens.ListingScreen
+import com.museroom.app.ui.screens.LyricsScreen
 import com.museroom.app.ui.screens.MiniPlayer
 import com.museroom.app.ui.screens.NowScreen
-import com.museroom.app.ui.screens.PlayerScreen
-import com.museroom.app.ui.screens.SearchScreen
-import com.museroom.app.player.Playback
 import com.museroom.app.ui.screens.OnboardingScreen
 import com.museroom.app.ui.screens.PersonCard
+import com.museroom.app.ui.screens.PlayerScreen
+import com.museroom.app.ui.screens.PlaylistScreen
+import com.museroom.app.ui.screens.QueueScreen
+import com.museroom.app.ui.screens.RequestsScreen
+import com.museroom.app.ui.screens.RoomScreen
+import com.museroom.app.ui.screens.RoomsScreen
+import com.museroom.app.ui.screens.SearchScreen
+import com.museroom.app.ui.screens.SoundScreen
 import com.museroom.app.ui.screens.TourState
 import com.museroom.app.ui.screens.YouScreen
 import com.museroom.app.util.NotificationAccess
-import com.museroom.app.util.formatMinutes
-import java.time.LocalDate
-import java.time.ZoneId
 
 /**
  * Five places, as the design has them.
@@ -99,7 +89,13 @@ import java.time.ZoneId
  * listening with — so they are two chips of one Rooms tab, which is what freed
  * the sticker Library needed. Nothing was removed; one of them stopped being a
  * destination and became a filter.
+ *
+ * The top bar belongs to each screen rather than to the shell. Every artboard
+ * carries a different one: Home has the wordmark, Library has a crumb and a
+ * plus, Board has the week it is showing. A single bar drawn above all five
+ * would have to be the union of those, which is none of them.
  */
+
 /** Somewhere you were pushed to, rather than a place the rail knows about. */
 sealed interface Browse {
     data class Album(val id: String) : Browse
@@ -118,7 +114,23 @@ sealed interface Browse {
 
     data object Queue : Browse
     data object Sound : Browse
+    data object History : Browse
+
+    /**
+     * The room, as a place rather than a card.
+     *
+     * It used to be three cards stacked on Home — who is in the room, what mode
+     * it is in, what is playing — which meant the one thing you are doing was
+     * competing with the shelves for the same column. A room is somewhere you
+     * are, so it gets a screen, and like the player it covers the rail while
+     * you are in it.
+     */
+    data object Room : Browse
 }
+
+/** The pushed surfaces that cover the rail, because they are not a tab. */
+private fun Browse.isFull(): Boolean =
+    this is Browse.Queue || this is Browse.Room
 
 enum class Tab(val label: String, val icon: String) {
     Now("Home", NeoIcons.Home),
@@ -153,6 +165,7 @@ fun MuseroomApp() {
     // rather than one of the five places the app lives.
     var searchOpen by remember { mutableStateOf(false) }
     var playerOpen by remember { mutableStateOf(false) }
+    var lyricsOpen by remember { mutableStateOf(false) }
 
     /**
      * A record or a person, pushed over whatever tab you were on.
@@ -164,14 +177,20 @@ fun MuseroomApp() {
     var trail by remember { mutableStateOf(listOf<Browse>()) }
     val here = trail.lastOrNull()
 
-    BackHandler(enabled = searchOpen) { searchOpen = false }
-    BackHandler(enabled = playerOpen) { playerOpen = false }
+    // Registered innermost-last, because the handler registered last is the
+    // one Compose asks first. Back used to close the player from underneath
+    // the lyrics, which left the words on screen over nothing.
     BackHandler(enabled = here != null) { trail = trail.dropLast(1) }
+    BackHandler(enabled = searchOpen) { searchOpen = false }
+    BackHandler(enabled = playerOpen && !lyricsOpen) { playerOpen = false }
+    BackHandler(enabled = lyricsOpen) { lyricsOpen = false }
 
     LaunchedEffect(following?.hostId) {
         if (following != null) {
-            tab = Tab.Now
             requestsOpen = false
+            searchOpen = false
+            playerOpen = false
+            trail = listOf(Browse.Room)
         }
     }
     val c = Neo.colors
@@ -205,15 +224,18 @@ fun MuseroomApp() {
         // different screens and each of them wants the same page.
         PersonCard()
 
-        // The player is Museroom's own, so it has to be told where it lives
-        // before anybody can press play.
-        LaunchedEffect(Unit) { Playback.attach(context) }
+        // Presence, the requests inbox and this phone's likes, started once
+        // for the whole app rather than by whichever screen happens to be
+        // drawn first.
+        LaunchedEffect(context) {
+            RoomPresence.start(context)
+            RequestsRepository.get(context).start()
+            LikesRepository.get(context).refresh()
+        }
+
+        val covered = searchOpen || (here?.isFull() == true)
 
         Column(Modifier.fillMaxSize()) {
-            if (!searchOpen) TopBar(
-                openRequests = { requestsOpen = true },
-                openSearch = { searchOpen = true },
-            )
             Box(Modifier.weight(1f)) {
                 when {
                     here is Browse.Album -> AlbumScreen(
@@ -222,7 +244,12 @@ fun MuseroomApp() {
                         onOpenArtist = { trail = trail + Browse.Artist(it) },
                     )
                     here is Browse.Queue -> QueueScreen(onBack = { trail = trail.dropLast(1) })
+                    here is Browse.Room -> RoomScreen(
+                        onClose = { trail = trail.dropLast(1) },
+                        onOpenQueue = { trail = trail + Browse.Queue },
+                    )
                     here is Browse.Sound -> SoundScreen(onBack = { trail = trail.dropLast(1) })
+                    here is Browse.History -> HistoryScreen(onBack = { trail = trail.dropLast(1) })
                     here is Browse.Playlist -> PlaylistScreen(
                         id = here.id,
                         onBack = { trail = trail.dropLast(1) },
@@ -247,22 +274,38 @@ fun MuseroomApp() {
                     else -> when (tab) {
                         Tab.Now -> NowScreen(
                             onOpenPlayer = { playerOpen = true },
+                            onOpenSearch = { searchOpen = true },
+                            onOpenHistory = { trail = listOf(Browse.History) },
+                            onOpenRoom = { trail = listOf(Browse.Room) },
                             onOpenRooms = { tab = Tab.Rooms },
                         )
                         Tab.Library -> LibraryScreen(
-                            onOpenPlayer = { playerOpen = true },
+                            onOpenSearch = { searchOpen = true },
                             onOpenPlaylist = { trail = listOf(Browse.Playlist(it)) },
                             onOpenAlbum = { trail = listOf(Browse.Album(it)) },
                             onOpenArtist = { trail = listOf(Browse.Artist(it)) },
                         )
-                        Tab.Rooms -> RoomsScreen()
+                        Tab.Rooms -> RoomsScreen(onOpenRoom = { trail = listOf(Browse.Room) })
                         Tab.Board -> BoardScreen()
-                        Tab.You -> YouScreen(onOpenSound = { trail = listOf(Browse.Sound) })
+                        Tab.You -> YouScreen(
+                            onOpenSound = { trail = listOf(Browse.Sound) },
+                            onOpenHistory = { trail = listOf(Browse.History) },
+                        )
                     }
                 }
             }
-            MiniPlayer(onOpen = { playerOpen = true })
-            BottomNav(tab) { tab = it; requestsOpen = false; searchOpen = false; trail = emptyList() }
+            // The mini player and the rail are one object: the bar sits on the
+            // nav rather than floating over the list, because a bar that hovers
+            // hides the last row of every screen it appears on.
+            if (!covered) {
+                MiniPlayer(onOpen = { playerOpen = true })
+                BottomNav(tab) {
+                    tab = it
+                    requestsOpen = false
+                    searchOpen = false
+                    trail = emptyList()
+                }
+            }
         }
 
         // Over everything, including the person card, because while it is up it
@@ -277,9 +320,9 @@ fun MuseroomApp() {
                     .background(c.paper)
                     .halftone(c.ink, alpha = if (c.dark) 0.10f else 0.07f),
             ) {
-                Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-                    PlayerScreen(
+                PlayerScreen(
                     onClose = { playerOpen = false },
+                    onOpenLyrics = { lyricsOpen = true },
                     onOpenArtist = {
                         playerOpen = false
                         searchOpen = false
@@ -291,190 +334,22 @@ fun MuseroomApp() {
                     },
                     onStartedRoom = {
                         playerOpen = false
-                        tab = Tab.Rooms
-                        trail = emptyList()
+                        trail = listOf(Browse.Room)
                     },
                 )
-                }
             }
         }
-    }
-}
 
-@Composable
-private fun TopBar(openRequests: () -> Unit, openSearch: () -> Unit) {
-    val c = Neo.colors
-    val context = LocalContext.current
-    val auth = remember { AuthRepository.get(context) }
-    val session by auth.session.collectAsStateWithLifecycle()
-
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp),
-    ) {
-        Box(
-            Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(c.violet)
-                .border(2.5.dp, c.onAccent, RoundedCornerShape(11.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            MuseroomMark(size = 24.dp, note = c.onAccent, ghost = c.lime)
-        }
-        Text(
-            text = "MUSEROOM",
-            style = bangers(26).copy(color = c.ink),
-        )
-        Spacer(Modifier.weight(1f))
-        com.museroom.app.ui.screens.RoundIcon(
-            NeoIcons.Search,
-            "Search",
-            onClick = openSearch,
-            diameter = 38.dp,
-            icon = 17.dp,
-        )
-        if (session != null) RequestsButton(open = openRequests)
-        HeaderStats(signedIn = session != null)
-    }
-}
-
-/**
- * The way in to anything waiting on an answer.
- *
- * A dot rather than a number. The exact count of people asking things of you is
- * not a fact worth reading at a glance, and a badge that says 3 invites you to
- * work out which three; a mark that says "something" gets somebody to the page,
- * which is where the answer lives anyway.
- *
- * Hidden entirely when signed out, since nobody can ask an anonymous phone
- * anything.
- */
-@Composable
-private fun RequestsButton(open: () -> Unit) {
-    val c = Neo.colors
-    val context = LocalContext.current
-    val requests = remember { RequestsRepository.get(context) }
-    val waiting by requests.count.collectAsStateWithLifecycle()
-
-    Box {
-        Box(
-            Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(if (waiting > 0) c.sky else c.card)
-                .border(2.5.dp, c.onAccent, RoundedCornerShape(11.dp))
-                .tap { open() },
-            contentAlignment = Alignment.Center,
-        ) {
-            NeoIcon(NeoIcons.Requests, size = 20.dp, color = c.onAccent)
-        }
-        if (waiting > 0) {
-            NeoDot(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 3.dp, y = (-3).dp),
-                ring = c.card,
-            )
-        }
-    }
-}
-
-/**
- * Today's minutes, rank and who's listening along, at a glance, on every
- * screen. It used to take scrolling past a full-bleed album cover to find any
- * of this, which meant it took scrolling past a full-bleed album cover to
- * have a reason to open the app again.
- */
-@Composable
-private fun HeaderStats(signedIn: Boolean) {
-    val c = Neo.colors
-    val context = LocalContext.current
-    val dao = remember { MuseroomDatabase.get(context).dao() }
-    val board = remember { BoardRepository.get(context) }
-    val auth = remember { AuthRepository.get(context) }
-    val session by auth.session.collectAsStateWithLifecycle()
-
-    val startOfToday = remember {
-        LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-    }
-    val todayMs by dao.creditedSince(startOfToday).collectAsStateWithLifecycle(0L)
-    val todayTracks by dao.tracksSince(startOfToday).collectAsStateWithLifecycle(0)
-
-    LaunchedEffect(context) { RoomPresence.start(context) }
-    // One object owns both inboxes, so the dot and the page cannot disagree.
-    LaunchedEffect(context) { RequestsRepository.get(context).start() }
-    // What this phone has already liked, so a heart is filled the first time
-    // a list is drawn rather than filling in a moment later.
-    val likes = remember { LikesRepository.get(context) }
-    LaunchedEffect(session?.userId) { if (session != null) likes.refresh() }
-    val roomMembers by RoomPresence.members.collectAsStateWithLifecycle()
-
-    // A rank a minute stale is still worth showing; nothing here needs the
-    // fresh-to-the-second board read that the Board screen pays for itself.
-    var rank by remember { mutableStateOf<Int?>(null) }
-    Refreshing(session?.userId, everyMs = 60_000) {
-        if (session == null) {
-            rank = null
-            return@Refreshing
-        }
-        board.myRank(BoardPeriod.All).onSuccess { rank = it?.rank }
-    }
-
-    Column(horizontalAlignment = Alignment.End) {
-        if (signedIn) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+        if (lyricsOpen) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(c.paper)
+                    .halftone(c.ink, alpha = if (c.dark) 0.10f else 0.07f),
             ) {
-                if (roomMembers.isNotEmpty()) {
-                    // The number worth opening the app to check: somebody is
-                    // listening along with you right now.
-                    Box(
-                        Modifier
-                            .size(20.dp)
-                            .clip(CircleShape)
-                            .background(c.pink)
-                            .border(2.dp, c.onAccent, CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "${roomMembers.size}",
-                            style = TextStyle(
-                                fontFamily = Archivo, fontWeight = FontWeight.W900,
-                                fontSize = 10.sp, color = c.onAccent,
-                            ),
-                        )
-                    }
-                }
-                rank?.let {
-                    Text(
-                        "#$it",
-                        style = TextStyle(
-                            fontFamily = Archivo, fontWeight = FontWeight.W900,
-                            fontSize = 11.sp, color = c.onAccent,
-                        ),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(c.lime)
-                            .border(2.dp, c.onAccent, RoundedCornerShape(50))
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                    )
-                }
+                LyricsScreen(onClose = { lyricsOpen = false })
             }
-            Spacer(Modifier.size(3.dp))
         }
-        Text(
-            "${formatMinutes(todayMs)} · $todayTracks trk",
-            style = TextStyle(
-                fontFamily = Archivo, fontWeight = FontWeight.W800,
-                fontSize = 11.sp, color = c.ink.copy(alpha = 0.75f),
-            ),
-        )
     }
 }
 
@@ -489,80 +364,75 @@ private fun BottomNav(current: Tab, onPick: (Tab) -> Unit) {
     // rather than a message, so it wants a dot on the way in rather than
     // something that has to be read and dismissed.
     val newer by Updates.newer.collectAsStateWithLifecycle()
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(c.card)
-            .border(width = 0.dp, color = c.card)
-            .padding(top = 0.dp),
-    ) {
-        Column(Modifier.fillMaxWidth()) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(3.dp)
-                    .background(c.ink),
-            )
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(c.card)
-                    .padding(
-                        start = 8.dp,
-                        end = 8.dp,
-                        top = 9.dp,
-                        bottom = 9.dp + WindowInsets.navigationBars
-                            .asPaddingValues()
-                            .calculateBottomPadding(),
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Tab.entries.forEach { entry ->
-                    val on = entry == current
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(13.dp))
-                            .then(
-                                if (on) {
-                                    Modifier
-                                        .background(c.lime)
-                                        .border(2.5.dp, c.onAccent, RoundedCornerShape(13.dp))
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .tap { onPick(entry) }
-                            .padding(vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Box {
-                            NeoIcon(
-                                entry.icon,
-                                size = 21.dp,
-                                color = if (on) c.onAccent else c.ink.copy(alpha = 0.72f),
-                            )
-                            if (entry == Tab.You && newer != null) {
-                                NeoDot(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .offset(x = 4.dp, y = (-3).dp),
-                                    ring = if (on) c.lime else c.card,
-                                )
+    val context = LocalContext.current
+    val requests = remember { RequestsRepository.get(context) }
+    val waiting by requests.count.collectAsStateWithLifecycle()
+
+    Column(Modifier.fillMaxWidth().background(c.card)) {
+        Box(Modifier.fillMaxWidth().height(3.dp).background(c.ink))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 6.dp,
+                    end = 6.dp,
+                    top = 10.dp,
+                    bottom = 10.dp + WindowInsets.navigationBars
+                        .asPaddingValues()
+                        .calculateBottomPadding(),
+                ),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Tab.entries.forEach { entry ->
+                val on = entry == current
+                val shape = RoundedCornerShape(13.dp)
+                val lift by animateDpAsState(if (on) 3.dp else 0.dp, tween(140), label = "lift")
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (on) {
+                                Modifier
+                                    .hardShadow(lift, c.onAccent, shape)
+                                    .clip(shape)
+                                    .background(c.lime)
+                                    .border(2.5.dp, c.onAccent, shape)
+                            } else {
+                                Modifier.clip(shape)
                             }
-                        }
-                        Text(
-                            text = entry.label.uppercase(),
-                            style = androidx.compose.ui.text.TextStyle(
-                                fontFamily = Archivo,
-                                fontWeight = FontWeight.W900,
-                                fontSize = 9.sp,
-                                letterSpacing = 0.9.sp,
-                                color = if (on) c.onAccent else c.ink.copy(alpha = 0.72f),
-                            ),
                         )
+                        .tap { onPick(entry) }
+                        .padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Box {
+                        NeoIcon(
+                            entry.icon,
+                            size = 22.dp,
+                            color = if (on) c.onAccent else c.ink.copy(alpha = 0.72f),
+                        )
+                        val marked = (entry == Tab.You && newer != null) ||
+                            (entry == Tab.Rooms && waiting > 0)
+                        if (marked) {
+                            NeoDot(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 4.dp, y = (-3).dp),
+                                ring = if (on) c.lime else c.card,
+                            )
+                        }
                     }
+                    Text(
+                        text = entry.label.uppercase(),
+                        style = TextStyle(
+                            fontFamily = Archivo,
+                            fontWeight = FontWeight.W900,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.9.sp,
+                            color = if (on) c.onAccent else c.ink.copy(alpha = 0.72f),
+                        ),
+                    )
                 }
             }
         }

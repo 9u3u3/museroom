@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.net.AnsweredListenRequests
 import com.museroom.app.net.AuthRepository
@@ -77,13 +78,11 @@ fun RequestsScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp),
+            .padding(top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        ScreenTitle("Requests", drop = c.sky)
-
         if (session == null) {
-            SignInPanel("Sign in to be asked things.")
+            SignInPanel("Sign in to be asked things.", heading = false)
             return@Column
         }
 
@@ -182,24 +181,27 @@ private fun FriendRequestCard(request: PendingRequest) {
         }
     }
 
-    NeoAccentCard(fill = c.lime, radius = 16.dp) {
+    NeoAccentCard(fill = c.sky, radius = 16.dp) {
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Face(request.profile.handle, request.profile.avatarUrl, 38.dp)
-            Text(
-                request.profile.handle,
-                style = MaterialTheme.typography.titleMedium,
-                color = c.onAccent,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Column(Modifier.weight(1f)) {
+                com.museroom.app.ui.kit.Kicker("Wants to be friends", color = c.onAccent)
+                Text(
+                    "@" + request.profile.handle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 16.sp,
+                    color = c.onAccent,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         Spacer(Modifier.size(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            NeoButton("Accept", small = true, tone = NeoTone.Violet, enabled = !busy, onClick = {
+            NeoButton("Accept", small = true, tone = NeoTone.Lime, enabled = !busy, onClick = {
                 answer(true)
             })
             NeoButton("Decline", small = true, tone = NeoTone.Paper, enabled = !busy, onClick = {

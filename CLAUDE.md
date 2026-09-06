@@ -80,7 +80,7 @@ until it is granted again.
 | `net/` | Supabase: auth, profiles, friends, board, likes, proximity, realtime, `ServerClock`, `Updates` |
 | `proximity/` | BLE advertising and scanning |
 | `notify/` | Notification channels and their actions |
-| `ui/` | Compose screens plus the comic/neobrutalist kit |
+| `ui/` | Compose screens plus the comic/neobrutalist kit (`kit/Kit.kt` is the surfaces and buttons, `kit/Parts.kt` the chips, segments, shelves and sheets, `screens/Bars.kt` the three top bars) |
 | `app/src/main/assets/` | `po_token.html` and `solver/`, run only to mint a bot token |
 | `supabase/migrations/` | Schema, RLS, security-definer RPCs, leaderboard roll-ups |
 | `design/` | Static HTML artboards for the design system (`node design/build.mjs`) |
@@ -92,6 +92,49 @@ Five tabs: Home, Library, Rooms, Board, You (`ui/MuseroomApp.kt`). Rooms is
 three chips — friends, nearby, requests — because all three are people you
 could be listening with. Search lives in the top bar. `PersonCard` is drawn
 once above everything, because a name is tappable on five screens.
+
+**The whole UI was redrawn from a design canvas in September 2026**, twenty-one
+artboards covering every screen. The kit's tokens did not move — the palette,
+the 3px stroke, the hard offset shadow and the three faces were already what the
+design asks for — but almost every screen's composition did. What changed, and
+should not be quietly changed back:
+
+- **The top bar belongs to each screen, not to the shell.** Home carries the
+  wordmark, Library a crumb and a plus, Board the week it is showing, the player
+  what it is playing from. One bar above all five would have to be the union of
+  those, which is none of them. `screens/Bars.kt` has the three shapes:
+  `TabBar`, `PageBar` and `SheetBar`.
+- **Home has no player on it.** A full-bleed cover that folded as the page
+  scrolled was the first thing anybody saw and the last thing anybody used.
+  What is playing lives in the bar above the rail, one tap from the player.
+- **A room is a place, not three cards.** `screens/RoomScreen.kt` is a pushed
+  surface that covers the rail, the way the player does, and joining one opens
+  it. Mode, transport, roster and queue live there rather than competing with
+  the shelves on Home for the same column.
+- **The tally is its own screen** (`screens/HistoryScreen.kt`), reached from the
+  clock in Home's top bar and from the You tab. It used to be four cards
+  inlined in the middle of a settings page.
+- **Every list row ends the same way and the playing row is a card.** `TrackRow`
+  in `screens/SearchScreen.kt` takes `highlight`, which draws the playing row as
+  a lime card with the equalizer bars on it rather than as a tinted line.
+- **Every colour has a job.** Lime means Museroom is the one making the sound.
+  Sky means Museroom is reading another app, or somebody is asking something.
+  Pink is destructive or live. Violet is the wordmark and the progress fill.
+  Reading another app is drawn in sky and never in lime.
+
+Two colour bugs were fixed at the theme level and both will come back if either
+provider is removed. `MuseroomTheme` provides `LocalContentColor`, because a
+`Text` that names no colour falls through to it and outside a Material `Surface`
+that is plain black — on the dark skin those titles were invisible. `NeoCard`
+provides it too, because `style = MaterialTheme.typography.titleMedium` replaces
+the provided `LocalTextStyle` outright and that style names no colour, which put
+cream text on a lime card.
+
+`Playback.attach` is called in `MainActivity.onCreate`, before anything is
+composed, and not from an effect inside the tree. `Library`'s flows are fields
+that `attach` replaces, so a screen reading one during the first composition
+would hold the empty placeholder for ever and Home would come up with no
+shelves on it.
 
 ## The five subsystems
 

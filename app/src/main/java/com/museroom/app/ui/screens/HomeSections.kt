@@ -4,12 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,22 +19,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.platform.LocalContext
-import com.museroom.app.net.AuthRepository
-import com.museroom.app.net.Friend
-import com.museroom.app.net.FriendsRepository
+import com.museroom.app.player.Library
 import com.museroom.app.player.LocalPlayer
 import com.museroom.app.player.Playback
-import com.museroom.app.player.Library
 import com.museroom.app.ui.Neo
-import com.museroom.app.ui.Refreshing
+import com.museroom.app.ui.kit.NeoChip
+import com.museroom.app.ui.kit.NeoIcon
+import com.museroom.app.ui.kit.NeoChip
+import com.museroom.app.ui.kit.NeoIcons
+import com.museroom.app.ui.kit.Shelf
 
 /**
  * Quick picks, held still.
@@ -72,8 +68,9 @@ private object Picks {
  * suggest, and an empty shelf with a title above it is worse than no shelf.
  */
 @Composable
-fun HomeSections(onOpenPlayer: () -> Unit, onOpenRooms: () -> Unit = {}) {
+fun HomeShelves(onOpenPlayer: () -> Unit) {
     val recent by Library.recent.collectAsStateWithLifecycle()
+    val playing by Playback.current.collectAsStateWithLifecycle()
     var picks by remember { mutableStateOf(Picks.tracks) }
     var refreshing by remember { mutableStateOf(false) }
 
@@ -97,30 +94,38 @@ fun HomeSections(onOpenPlayer: () -> Unit, onOpenRooms: () -> Unit = {}) {
         refreshing = false
     }
 
-    LiveRooms(onOpenRooms)
-
     if (recent.isEmpty()) return
 
     if (picks.isNotEmpty()) {
+        // Two things to do to the shelf, and they are different things: play
+        // the whole of it, or be given a different one. The design shows only
+        // the first, so the second is a small button rather than a second link.
         Shelf(
             title = "Quick picks",
-            action = "New set",
-            onAction = {
-                Picks.again()
-                refreshing = true
-            },
+            action = "Play all",
+            onAction = { Playback.play(picks, 0, from = "Quick picks") },
         )
         picks.take(4).forEachIndexed { i, track ->
             TrackRow(
                 track = track,
-                playing = false,
+                playing = track.id == playing?.id,
                 appearAfter = i,
                 onClick = { Playback.play(picks, i, from = "Quick picks") },
+                trailing = { RowMenu(track) },
             )
         }
+        Spacer(Modifier.height(8.dp))
+        NeoChip(
+            text = if (refreshing) "Finding" else "Another set",
+            selected = false,
+            onClick = {
+                Picks.again()
+                refreshing = true
+            },
+        )
     }
 
-    Shelf(title = "Listen again")
+    Shelf(title = "Listen again", action = "More", onAction = onOpenPlayer)
     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         items(recent, key = { it.id }) { track ->
             Column(
@@ -162,120 +167,23 @@ fun HomeSections(onOpenPlayer: () -> Unit, onOpenRooms: () -> Unit = {}) {
 }
 
 /**
- * Friends who are playing something right now.
+ * The three dots at the end of a row.
  *
- * A room is not a thing that exists on its own — it is a person with music on
- * and the door open — so this is a list of people rather than a list of rooms.
- * Tapping one opens their page, which is where joining has always lived.
- *
- * Nothing is drawn when nobody is listening, including when nobody is signed
- * in. A heading over an empty strip is a promise the screen cannot keep.
+ * Every list in the design ends its rows with them, and they all open the same
+ * sheet: this song, and the four things there are to do with one.
  */
 @Composable
-private fun LiveRooms(onOpenRooms: () -> Unit) {
-    val c = Neo.colors
-    val context = LocalContext.current
-    val session by remember { AuthRepository.get(context).session }
-        .collectAsStateWithLifecycle()
-    val repo = remember { FriendsRepository.get(context) }
-    var live by remember { mutableStateOf<List<Friend>>(emptyList()) }
-
-    Refreshing(session?.userId, everyMs = 20_000) {
-        if (session == null) {
-            live = emptyList()
-            return@Refreshing
-        }
-        repo.friends().onSuccess { all ->
-            live = all.filter { it.nowPlaying != null }
-        }
-    }
-
-    if (live.isEmpty()) return
-
-    Shelf(title = "Rooms live now", action = "All", onAction = onOpenRooms)
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(live, key = { it.profile.id }) { friend ->
-            val playing = friend.nowPlaying
-            Column(
-                Modifier
-                    .width(126.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { Person.show(friend.profile.id, friend.profile.handle) },
-            ) {
-                Text(
-                    "@" + friend.profile.handle,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    playing?.title.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 10.sp,
-                    color = c.ink.copy(alpha = 0.6f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        item {
-            Column(
-                Modifier
-                    .width(126.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onOpenRooms,
-                    ),
-            ) {
-                Text(
-                    "Host",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontSize = 12.sp,
-                    color = c.violet,
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "Start one",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 10.sp,
-                    color = c.ink.copy(alpha = 0.6f),
-                )
-            }
-        }
-    }
-}
-
-/** A section heading with an optional thing to do to the whole section. */
-@Composable
-private fun Shelf(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
-    val c = Neo.colors
-    Row(
-        Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, color = c.ink)
-        if (action != null && onAction != null) {
-            Text(
-                action.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.W900,
-                letterSpacing = 1.4.sp,
-                fontSize = 10.sp,
-                color = c.ink.copy(alpha = 0.55f),
-                modifier = Modifier
-                    .padding(bottom = 3.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onAction,
-                    ),
-            )
-        }
-    }
+fun RowMenu(track: LocalPlayer.Track) {
+    var open by remember { mutableStateOf(false) }
+    NeoIcon(
+        NeoIcons.Dots,
+        size = 20.dp,
+        color = Neo.colors.ink.copy(alpha = 0.45f),
+        weight = 3.4f,
+        modifier = Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+        ) { open = true },
+    )
+    if (open) TrackSheet(track, onDismiss = { open = false })
 }

@@ -44,7 +44,11 @@ import com.museroom.app.player.Playback
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.bangers
 import com.museroom.app.ui.kit.NeoIcon
+import com.museroom.app.ui.kit.DropTitle
+import com.museroom.app.ui.kit.Label
+import com.museroom.app.ui.kit.NeoChip
 import com.museroom.app.ui.kit.NeoIcons
+import com.museroom.app.ui.kit.NeoRound
 import com.museroom.app.ui.kit.hardShadow
 
 /**
@@ -76,7 +80,7 @@ private enum class Shelf(val label: String, val chip: Boolean = true) {
  */
 @Composable
 fun LibraryScreen(
-    onOpenPlayer: () -> Unit,
+    onOpenSearch: () -> Unit = {},
     onOpenPlaylist: (Long) -> Unit = {},
     onOpenAlbum: (String) -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
@@ -98,8 +102,26 @@ fun LibraryScreen(
         else -> songs
     }
 
+    var naming by remember { mutableStateOf(false) }
+    if (naming) {
+        NameDialog(
+            title = "New playlist",
+            onDismiss = { naming = false },
+            onDone = { Library.newPlaylist(it); naming = false },
+        )
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        TabBar(
+            left = { Crumb("Museroom") },
+            right = {
+                NeoRound(NeoIcons.Search, "Search", onOpenSearch, icon = 19.dp)
+                NeoRound(NeoIcons.Plus, "New playlist", { naming = true }, icon = 19.dp)
+            },
+        )
+
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Text("LIBRARY", style = bangers(34).copy(color = c.ink))
+        DropTitle("Library", size = 34, drop = c.violet)
         Spacer(Modifier.height(12.dp))
 
         // Five chips is more than fits, so the row scrolls rather than
@@ -118,7 +140,7 @@ fun LibraryScreen(
                     Shelf.Offline -> offline.size
                     Shelf.Liked -> liked.size
                 }
-                Chip(
+                NeoChip(
                     text = if (count > 0) "${option.label} $count" else option.label,
                     selected = shelf == option,
                     onClick = { shelf = option },
@@ -126,7 +148,31 @@ fun LibraryScreen(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        // What order the shelf is in, and what shape it is drawn as. Both are
+        // facts about the list rather than buttons, so they are set in the
+        // quiet uppercase the design uses for a line that only reports.
+        Row(
+            Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Label(
+                when (shelf) {
+                    Shelf.Offline -> "Kept on this phone"
+                    Shelf.Liked -> "Newest first"
+                    Shelf.Playlists -> "Recently added"
+                    else -> "Recently played"
+                },
+                color = c.ink,
+            )
+            Label(
+                if (shelf == Shelf.Playlists || shelf == Shelf.Albums ||
+                    shelf == Shelf.Artists
+                ) "Grid" else "List",
+                color = c.ink,
+            )
+        }
+
+        Spacer(Modifier.height(6.dp))
 
         // Liked is reached from a tile rather than a chip, so it is the one
         // shelf with nothing lit in the row above it. It says where it is.
@@ -281,10 +327,7 @@ fun LibraryScreen(
                 modifier = Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                ) {
-                    Playback.play(shown, 0, from = shelf.label)
-                    onOpenPlayer()
-                },
+                ) { Playback.play(shown, 0, from = shelf.label) },
             )
         }
 
@@ -305,6 +348,7 @@ fun LibraryScreen(
             }
             item { Spacer(Modifier.height(120.dp)) }
         }
+    }
     }
 }
 
@@ -491,34 +535,6 @@ private fun size(bytes: Long): String = when {
     else -> "$bytes B"
 }
 
-/** The kit's pill, as a control rather than a label. */
-@Composable
-private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val c = Neo.colors
-    val shape = RoundedCornerShape(percent = 50)
-    Box(
-        Modifier
-            .hardShadow(3.dp, c.ink, shape)
-            .clip(shape)
-            .background(if (selected) c.ink else c.card)
-            .border(2.5.dp, c.ink, shape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-    ) {
-        Text(
-            text.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.W900,
-            letterSpacing = 1.2.sp,
-            fontSize = 11.sp,
-            color = if (selected) c.paper else c.ink,
-        )
-    }
-}
 
 /**
  * The heart, which is the only way anything gets kept.
@@ -528,12 +544,39 @@ private fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
  * one control on a row that changes anything.
  */
 @Composable
-fun Heart(track: com.museroom.app.player.LocalPlayer.Track, size: Int = 22) {
+fun Heart(
+    track: com.museroom.app.player.LocalPlayer.Track,
+    size: Int = 22,
+    /**
+     * The player's form: a pink button rather than a bare glyph.
+     *
+     * On a list a heart is one of several small marks on a row and wants to be
+     * quiet. On the player it is the only thing beside the title, and the
+     * design draws it as a button because it is one.
+     */
+    framed: Boolean = false,
+) {
     val c = Neo.colors
     val liked by Library.likedFlow(track.id).collectAsStateWithLifecycle(false)
+    val shape = RoundedCornerShape(percent = 50)
     Box(
         Modifier
-            .size((size + 14).dp)
+            .size(if (framed) 48.dp else (size + 14).dp)
+            .then(
+                if (framed) {
+                    // Always pink, liked or not. The design draws it as a
+                    // button rather than a state, and a heart that only
+                    // appears once it has been pressed is a control nobody
+                    // finds. What changes is whether the glyph is filled.
+                    Modifier
+                        .hardShadow(4.dp, c.onAccent, shape)
+                        .clip(shape)
+                        .background(c.pink)
+                        .border(3.dp, c.onAccent, shape)
+                } else {
+                    Modifier
+                }
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -542,10 +585,10 @@ fun Heart(track: com.museroom.app.player.LocalPlayer.Track, size: Int = 22) {
     ) {
         NeoIcon(
             NeoIcons.Heart,
-            size = size.dp,
-            color = if (liked) c.pink else c.ink.copy(alpha = 0.45f),
-            fill = if (liked) c.pink else null,
-            weight = 2.4f,
+            size = if (framed) 24.dp else size.dp,
+            color = if (framed) c.onAccent else if (liked) c.pink else c.ink.copy(alpha = 0.45f),
+            fill = if (!liked) null else if (framed) c.onAccent else c.pink,
+            weight = 2.6f,
         )
     }
 }

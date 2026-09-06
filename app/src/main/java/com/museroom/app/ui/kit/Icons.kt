@@ -96,6 +96,14 @@ object NeoIcons {
     const val Sliders = "M6 4v4.4M6 13.6V20M12 4v9.4M12 18.6V20M18 4v1.4M18 10.6V20" +
         "M3.6 10.8h4.8M9.6 16h4.8M15.6 8h4.8"
 
+    /**
+     * A clock with an arrow going back round it, for what you have listened to.
+     *
+     * A plain clock would say "timer", which is a different button on the same
+     * bar. The arrow is the whole difference between the future and the past.
+     */
+    const val History = "M4 11a8 8 0 1 1 2.4 5.7M4 5.5V11h5.5M12 8v4.3l3 1.7"
+
     /** A bell, for following somebody. */
     const val Bell = "M12 3.6a5.6 5.6 0 0 1 5.6 5.6v3.4l1.7 3.2H4.7l1.7-3.2V9.2" +
         "A5.6 5.6 0 0 1 12 3.6M9.7 15.8a2.3 2.3 0 0 0 4.6 0"

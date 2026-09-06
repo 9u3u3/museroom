@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -31,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -64,6 +67,8 @@ import com.museroom.app.ui.kit.Label
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
+import com.museroom.app.ui.kit.NeoSheet
+import com.museroom.app.ui.kit.SheetTitle
 import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.NeoProgress
@@ -148,20 +153,6 @@ private fun saying(outcome: RequestOutcome, handle: String): String = when (outc
     RequestOutcome.Self -> "That is you."
 }
 
-/** A screen title, in the display face with a hard coloured drop. */
-@Composable
-fun ScreenTitle(text: String, drop: Color = Neo.colors.violet) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(text.uppercase(), style = bangers(32).copy(color = Neo.colors.ink))
-        Box(
-            Modifier
-                .size(width = 26.dp, height = 7.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(drop),
-        )
-    }
-}
-
 @Composable
 fun Note(text: String, modifier: Modifier = Modifier) = Text(
     text = text,
@@ -175,7 +166,17 @@ fun Note(text: String, modifier: Modifier = Modifier) = Text(
  * intended route; email exists so the app can be exercised without it.
  */
 @Composable
-fun SignInPanel(why: String) {
+fun SignInPanel(
+    why: String,
+    /**
+     * Whether to print the display-face heading.
+     *
+     * Off wherever the screen already has one. Two Bangers headings stacked is
+     * the page shouting twice, and the second one is never the one the person
+     * came for.
+     */
+    heading: Boolean = true,
+) {
     val context = LocalContext.current
     val c = Neo.colors
     val auth = remember { AuthRepository.get(context) }
@@ -187,16 +188,33 @@ fun SignInPanel(why: String) {
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
-    NeoCard(radius = 20.dp, shadow = 6.dp, padding = 20.dp) {
-        Text("Sign in to sync", style = MaterialTheme.typography.titleLarge, color = c.ink)
-        Spacer(Modifier.size(5.dp))
-        Note(why)
-        Spacer(Modifier.size(16.dp))
+    Column(Modifier.fillMaxWidth()) {
+        if (heading) {
+            // The title is tipped off true, which is the one liberty the kit
+            // takes and it takes it here because this is a page rather than a
+            // setting.
+            Box(Modifier.rotate(-2f).padding(bottom = 4.dp)) {
+                Text(
+                    "SIGN IN\nTO SYNC",
+                    style = bangers(38).copy(color = c.pink),
+                    modifier = Modifier.padding(start = 5.dp, top = 5.dp),
+                )
+                Text("SIGN IN\nTO SYNC", style = bangers(38).copy(color = c.ink))
+            }
+            Spacer(Modifier.size(14.dp))
+        }
+        Text(
+            why,
+            style = MaterialTheme.typography.bodyLarge,
+            color = c.ink.copy(alpha = 0.78f),
+        )
 
+        Spacer(Modifier.size(22.dp))
         NeoButton(
             text = "Continue with Google",
             tone = NeoTone.Paper,
             enabled = !busy,
+            leading = { GoogleG() },
             modifier = Modifier.fillMaxWidth(),
             onClick = {
                 busy = true
@@ -210,14 +228,39 @@ fun SignInPanel(why: String) {
             },
         )
 
-        Spacer(Modifier.size(16.dp))
-        Field(email, { email = it }, "Email")
-        Spacer(Modifier.size(10.dp))
-        Field(password, { password = it }, "Password", secret = true)
-        Spacer(Modifier.size(12.dp))
+        // The rule is the kit's own stroke weight, so the divider reads as an
+        // edge of the design rather than as a hairline borrowed from Material.
+        Spacer(Modifier.size(22.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(Modifier.weight(1f).height(3.dp).background(c.ink))
+            Text(
+                "OR",
+                style = TextStyle(
+                    fontFamily = com.museroom.app.ui.Archivo,
+                    fontWeight = FontWeight.W900,
+                    fontSize = 10.sp,
+                    letterSpacing = 2.sp,
+                    color = c.ink,
+                ),
+            )
+            Box(Modifier.weight(1f).height(3.dp).background(c.ink))
+        }
+        Spacer(Modifier.size(18.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            NeoButton("Sign in", small = true, enabled = !busy, onClick = {
+        Field(email, { email = it }, "Email")
+        Spacer(Modifier.size(12.dp))
+        Field(password, { password = it }, "Password", secret = true)
+
+        Spacer(Modifier.size(16.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            NeoButton("Sign in", enabled = !busy, onClick = {
                 busy = true; message = null
                 scope.launch {
                     auth.signInWithPassword(email, password)
@@ -226,21 +269,63 @@ fun SignInPanel(why: String) {
                     busy = false
                 }
             })
-            NeoButton("Create", small = true, tone = NeoTone.Paper, enabled = !busy, onClick = {
-                busy = true; message = null
-                scope.launch {
-                    auth.signUpWithPassword(email, password)
-                        .onSuccess { message = "Check your email, then sign in." }
-                        .onFailure { message = it.message }
-                    busy = false
-                }
-            })
+            // Underlined text rather than a second button: making an account is
+            // the rarer of the two and should not compete with signing in.
+            Text(
+                "CREATE ACCOUNT",
+                style = TextStyle(
+                    fontFamily = com.museroom.app.ui.Archivo,
+                    fontWeight = FontWeight.W900,
+                    fontSize = 12.sp,
+                    letterSpacing = 0.8.sp,
+                    color = c.ink,
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+                ),
+                modifier = Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = !busy,
+                ) {
+                    busy = true; message = null
+                    scope.launch {
+                        auth.signUpWithPassword(email, password)
+                            .onSuccess { message = "Check your email, then sign in." }
+                            .onFailure { message = it.message }
+                        busy = false
+                    }
+                },
+            )
         }
 
         message?.let {
-            Spacer(Modifier.size(10.dp))
+            Spacer(Modifier.size(12.dp))
             Text(it, style = MaterialTheme.typography.bodySmall, color = c.pink)
         }
+
+        Spacer(Modifier.size(16.dp))
+        Text(
+            "Google gives Museroom your email and name. Not your Gmail, contacts " +
+                "or anything else.",
+            style = MaterialTheme.typography.bodySmall,
+            color = c.ink.copy(alpha = 0.6f),
+        )
+    }
+}
+
+/** Google's four-colour G, drawn rather than shipped as an asset. */
+@Composable
+private fun GoogleG() {
+    val path = remember {
+        androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+            "M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1a6.2 6.2 0 0 1 0-12.4" +
+                "c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3 14.7 2 12 2a10 10 0 0 0 0 20" +
+                "c5.8 0 9.6-4 9.6-9.7 0-.7-.1-1.2-.2-1.7H12z",
+        ).toPath()
+    }
+    androidx.compose.foundation.Canvas(Modifier.size(19.dp)) {
+        val scale = size.minDimension / 24f
+        drawContext.transform.scale(scale, scale, androidx.compose.ui.geometry.Offset.Zero)
+        drawPath(path, Color(0xFFEA4335))
     }
 }
 
@@ -633,25 +718,36 @@ fun ConfirmDialog(
     onDismiss: () -> Unit,
     destructive: Boolean = false,
 ) {
-    val c = Neo.colors
-    AlertDialog(
+    // A sheet rather than a Material dialog. Everything else in the app rises
+    // from the bottom edge onto its own hard shadow, and one rounded grey box
+    // in the middle of the screen is the one place the design used to break.
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        containerColor = c.card,
-        title = { Text(title, style = bangers(24).copy(color = c.ink)) },
-        text = { Note(body) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    confirm,
-                    color = if (destructive) c.pink else c.ink,
-                    style = MaterialTheme.typography.labelLarge,
-                )
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        NeoSheet(onDismiss = onDismiss) {
+            SheetTitle(title)
+            Spacer(Modifier.size(6.dp))
+            Note(body)
+            Spacer(Modifier.size(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.weight(1f)) {
+                    NeoButton(
+                        text = confirm,
+                        tone = if (destructive) NeoTone.Pink else NeoTone.Lime,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onConfirm,
+                    )
+                }
+                Box(Modifier.weight(1f)) {
+                    NeoButton(
+                        text = "Keep",
+                        tone = NeoTone.Paper,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onDismiss,
+                    )
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("CANCEL", color = c.ink, style = MaterialTheme.typography.labelLarge)
-            }
-        },
-    )
+        }
+    }
 }

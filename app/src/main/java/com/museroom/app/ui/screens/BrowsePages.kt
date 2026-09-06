@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -30,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,11 +111,16 @@ fun AlbumScreen(browseId: String, onBack: () -> Unit, onOpenArtist: (String) -> 
                         Spacer(Modifier.height(5.dp))
                         Text(
                             listOf(found.kind, found.detail)
-                                .filter { it.isNotBlank() }.joinToString(" · "),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.W700,
-                            fontSize = 10.sp,
-                            color = c.ink.copy(alpha = 0.55f),
+                                .filter { it.isNotBlank() }.joinToString(" · ").uppercase(),
+                            style = androidx.compose.ui.text.TextStyle(
+                                fontFamily = com.museroom.app.ui.Archivo,
+                                fontWeight = FontWeight.W700,
+                                fontSize = 10.sp,
+                                letterSpacing = 0.9.sp,
+                                color = c.ink.copy(alpha = 0.55f),
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -156,6 +164,7 @@ fun AlbumScreen(browseId: String, onBack: () -> Unit, onOpenArtist: (String) -> 
                     },
                     subtitle = if (track.durationMs > 0) clockOf(track.durationMs) else " ",
                     number = i + 1,
+                    highlight = true,
                 )
             }
             item { Spacer(Modifier.height(120.dp)) }
@@ -181,23 +190,24 @@ fun ArtistScreen(browseId: String, onBack: () -> Unit, onOpenAlbum: (String) -> 
         looked = true
     }
 
-    PageFrame(title = "Artist", onBack = onBack) {
-        val found = artist
-        if (found == null) {
+    val found = artist
+    if (found == null) {
+        PageFrame(title = "Artist", onBack = onBack) {
             Note(if (looked) "That artist would not load." else "Looking…")
-            return@PageFrame
         }
-        val songs = remember(found) { Playback.tracksOf(found.songs) }
+        return
+    }
+    val songs = remember(found) { Playback.tracksOf(found.songs) }
 
-        LazyColumn(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
+        // The name is set into the banner rather than under it. A hard black
+        // display word on a colour field is the loudest thing the kit can do,
+        // and an artist page is the one place that is the point.
+        ArtistBanner(found.name, found.browseId, found.artworkUrl, onBack)
+
+        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             item {
-                Text(
-                    found.name.uppercase(),
-                    style = bangers(38).copy(color = c.ink),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(14.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -310,6 +320,68 @@ fun ArtistScreen(browseId: String, onBack: () -> Unit, onOpenAlbum: (String) -> 
 }
 
 /**
+ * The banner an artist page opens on.
+ *
+ * A picture when there is one, and the gradient the rest of the app gives an
+ * object with no artwork when there is not, so the page never opens on a grey
+ * hole. The name goes on top in cream over hard ink, which is the one place in
+ * the kit where the display face is allowed to be the largest thing on screen.
+ */
+@Composable
+private fun ArtistBanner(
+    name: String,
+    browseId: String,
+    artworkUrl: String?,
+    onBack: () -> Unit,
+) {
+    val c = Neo.colors
+    Box(Modifier.fillMaxWidth().height(236.dp)) {
+        TrackCover(
+            browseId,
+            artworkUrl,
+            Modifier.fillMaxSize(),
+            radius = 0.dp,
+            stroke = 0.dp,
+            dot = 12.dp,
+        )
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(c.ink),
+        )
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(start = 20.dp, top = 10.dp),
+        ) {
+            RoundIcon(NeoIcons.Back, "Back", onClick = onBack, diameter = 42.dp)
+        }
+        Box(
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 18.dp, end = 18.dp, bottom = 16.dp),
+        ) {
+            Text(
+                name.uppercase(),
+                style = bangers(46).copy(color = Color(0xFF14110D)),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.offset(x = 4.dp, y = 4.dp),
+            )
+            Text(
+                name.uppercase(),
+                style = bangers(46).copy(color = Color(0xFFFBF6EA)),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
  * The plus that puts a record on the shelf, or takes it off.
  *
  * It reads the database rather than remembering what it drew, so the same album
@@ -385,36 +457,14 @@ private fun KeepAll(tracks: List<com.museroom.app.player.LocalPlayer.Track>, wha
 /** Back, a name for where you are, and the room to be somewhere. */
 @Composable
 private fun PageFrame(title: String, onBack: () -> Unit, body: @Composable () -> Unit) {
-    val c = Neo.colors
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            RoundIcon(NeoIcons.Back, "Back", onClick = onBack, diameter = 42.dp)
-            Text(
-                title.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.W900,
-                letterSpacing = 1.6.sp,
-                fontSize = 10.sp,
-                color = c.ink.copy(alpha = 0.5f),
-            )
-        }
-        Box(Modifier.fillMaxSize()) { body() }
+    Column(Modifier.fillMaxSize()) {
+        PageBar(crumb = title, onBack = onBack)
+        Box(Modifier.fillMaxSize().padding(horizontal = 20.dp)) { body() }
     }
 }
 
 @Composable
-private fun Heading(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.headlineSmall,
-        color = Neo.colors.ink,
-        modifier = Modifier.padding(top = 20.dp, bottom = 6.dp),
-    )
-}
+private fun Heading(text: String) = com.museroom.app.ui.kit.Shelf(text)
 
 /**
  * Somebody else's playlist, which is a page rather than a list on this phone.

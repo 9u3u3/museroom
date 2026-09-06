@@ -1,6 +1,7 @@
 package com.museroom.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -102,7 +103,7 @@ fun PlaylistGrid(
                         .hardShadow(5.dp, c.onAccent, RoundedCornerShape(16.dp))
                         .clip(RoundedCornerShape(16.dp))
                         .background(c.lime)
-                        .padding(3.dp),
+                        .border(3.dp, c.onAccent, RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
                     NeoIcon(NeoIcons.Plus, size = 44.dp, color = c.onAccent, weight = 3f)
@@ -188,103 +189,91 @@ fun PlaylistScreen(id: Long, onBack: () -> Unit) {
         )
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Row(
-            Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            RoundIcon(NeoIcons.Back, "Back", onClick = onBack, diameter = 42.dp)
-            Text(
-                "PLAYLIST",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.W900,
-                letterSpacing = 1.6.sp,
-                fontSize = 10.sp,
-                color = c.ink.copy(alpha = 0.5f),
-                modifier = Modifier.weight(1f),
-            )
-            RoundIcon(
-                NeoIcons.Trash, "Delete playlist",
-                onClick = { Library.deletePlaylist(id); onBack() },
-                diameter = 42.dp, icon = 18.dp,
-            )
-        }
+    Column(Modifier.fillMaxSize()) {
+        PageBar(
+            crumb = "Playlist",
+            onBack = onBack,
+            action = {
+                RoundIcon(
+                    NeoIcons.Trash, "Delete playlist",
+                    onClick = { Library.deletePlaylist(id); onBack() },
+                    diameter = 42.dp, icon = 18.dp,
+                )
+            },
+        )
 
+        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         LazyColumn(Modifier.fillMaxSize()) {
             item {
-                // The cover beside the name rather than above it, the same way
-                // an album page is laid out, because a list that somebody made
-                // is the same kind of object as one a label put out.
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
+                // A playlist is something somebody made, so its header is a
+                // card sitting on the page rather than a masthead printed on
+                // it. That is the one thing that distinguishes it from an
+                // album, which is a record a label put out.
+                NeoCard(radius = 20.dp, shadow = 6.dp, padding = 16.dp) {
                     TrackCover(
                         "playlist-$id",
                         songs.firstOrNull { it.cover.isNotBlank() }?.cover,
-                        Modifier.size(118.dp),
-                        radius = 18.dp,
-                        shadow = 6.dp,
+                        Modifier.size(150.dp).align(Alignment.CenterHorizontally),
+                        radius = 16.dp,
+                        shadow = 5.dp,
                         stroke = 3.dp,
-                        dot = 11.dp,
+                        dot = 12.dp,
                     )
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.Bottom) {
-                        Text(
-                            list?.name.orEmpty(),
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontSize = 22.sp,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.clickable(
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        list?.name.orEmpty(),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontSize = 26.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                             ) { renaming = true },
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            listOf(
-                                "Yours",
-                                if (songs.size == 1) "1 track" else "${songs.size} tracks",
-                                length(songs.sumOf { it.durationMs }),
-                            ).filter { it.isNotBlank() }.joinToString(" · "),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.W700,
-                            fontSize = 10.sp,
-                            color = c.ink.copy(alpha = 0.55f),
-                        )
-                    }
-                }
-                if (songs.isNotEmpty()) {
-                    Spacer(Modifier.height(16.dp))
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        NeoButton(
-                            text = "Play",
-                            tone = NeoTone.Lime,
-                            onClick = { Playback.play(songs, 0, from = list?.name.orEmpty()) },
-                            modifier = Modifier.weight(1f),
-                        )
-                        RoundIcon(
-                            NeoIcons.Shuffle, "Shuffle this list",
-                            onClick = {
-                                Playback.play(songs.shuffled(), 0, from = list?.name.orEmpty())
-                            },
-                            diameter = 48.dp, icon = 19.dp, rest = 4.dp,
-                        )
-                        RoundIcon(
-                            NeoIcons.Download, "Keep this list on the phone",
-                            onClick = { Downloads.startAll(songs) },
-                            diameter = 48.dp, icon = 19.dp, rest = 4.dp,
-                        )
-                        RoundIcon(
-                            NeoIcons.Chevron, "Rename this list",
-                            onClick = { renaming = true },
-                            diameter = 48.dp, icon = 19.dp, rest = 4.dp,
-                        )
+                    )
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        listOf(
+                            "Yours",
+                            if (songs.size == 1) "1 track" else "${songs.size} tracks",
+                            length(songs.sumOf { it.durationMs }),
+                        ).filter { it.isNotBlank() }.joinToString(" · ").uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.W900,
+                        fontSize = 10.sp,
+                        letterSpacing = 1.2.sp,
+                        color = c.ink.copy(alpha = 0.55f),
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                    if (songs.isNotEmpty()) {
+                        Spacer(Modifier.height(14.dp))
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            NeoButton(
+                                text = "Play",
+                                tone = NeoTone.Lime,
+                                onClick = { Playback.play(songs, 0, from = list?.name.orEmpty()) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            RoundIcon(
+                                NeoIcons.Shuffle, "Shuffle this list",
+                                onClick = {
+                                    Playback.play(songs.shuffled(), 0, from = list?.name.orEmpty())
+                                },
+                                diameter = 54.dp, icon = 20.dp, rest = 4.dp,
+                            )
+                            RoundIcon(
+                                NeoIcons.Download, "Keep this list on the phone",
+                                onClick = { Downloads.startAll(songs) },
+                                diameter = 54.dp, icon = 20.dp, rest = 4.dp,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -341,6 +330,7 @@ fun PlaylistScreen(id: Long, onBack: () -> Unit) {
                 }
             }
             item { Spacer(Modifier.height(120.dp)) }
+        }
         }
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -101,7 +102,14 @@ fun NeoCard(
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(radius)
-    CompositionLocalProvider(LocalTextStyle provides LocalTextStyle.current.copy(color = content)) {
+    // Both, not one. A Text given `style = MaterialTheme.typography.titleMedium`
+    // replaces the provided text style outright, and that style names no
+    // colour — so it falls through to LocalContentColor instead. Providing only
+    // the text style left cream titles on a lime card.
+    CompositionLocalProvider(
+        LocalTextStyle provides LocalTextStyle.current.copy(color = content),
+        LocalContentColor provides content,
+    ) {
         Column(
             modifier = modifier
                 .fillMaxWidth()

@@ -36,7 +36,7 @@ import com.museroom.app.ui.kit.NeoTone
 import kotlinx.coroutines.launch
 
 @Composable
-fun FriendsScreen() {
+fun FriendsScreen(onOpenRoom: () -> Unit = {}) {
     val context = LocalContext.current
     val c = Neo.colors
     val auth = remember { AuthRepository.get(context) }
@@ -131,13 +131,11 @@ fun FriendsScreen() {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(bottom = 24.dp),
+            .padding(top = 12.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        ScreenTitle("Friends", drop = c.sky)
-
         if (session == null) {
-            SignInPanel("Sign in for a handle other people can find.")
+            SignInPanel("Sign in for a handle other people can find.", heading = false)
             return@Column
         }
 

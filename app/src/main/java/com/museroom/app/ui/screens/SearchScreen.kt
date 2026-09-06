@@ -57,6 +57,7 @@ import com.museroom.app.player.LocalPlayer
 import com.museroom.app.player.Playback
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.NeoIcon
+import com.museroom.app.ui.kit.NeoChip
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoPill
@@ -198,7 +199,7 @@ fun SearchScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 InnerTube.Filter.entries.forEach { option ->
-                    Filter(
+                    NeoChip(
                         text = if (option == InnerTube.Filter.Everything) "All" else option.name,
                         selected = filter == option,
                         onClick = { filter = option },
@@ -319,15 +320,7 @@ fun SearchScreen(
 /** A heading over one kind of answer. */
 @Composable
 private fun Shelf(text: String) {
-    Text(
-        text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.W900,
-        letterSpacing = 1.5.sp,
-        fontSize = 9.sp,
-        color = Neo.colors.ink.copy(alpha = 0.5f),
-        modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
-    )
+    com.museroom.app.ui.kit.Shelf(text)
 }
 
 /** The one answer YouTube thinks you meant, drawn larger than the rest. */
@@ -377,7 +370,15 @@ private fun TopCard(top: InnerTube.Top, onOpen: () -> Unit) {
                     )
                 }
             }
-            NeoIcon(NeoIcons.Play, size = 20.dp, color = c.ink, fill = c.ink, weight = 2f)
+            // A lime button rather than a bare glyph. This card exists so the
+            // commonest search is one tap, and a tap target has to look like
+            // one.
+            com.museroom.app.ui.kit.NeoButton(
+                text = "Open",
+                small = true,
+                tone = com.museroom.app.ui.kit.NeoTone.Lime,
+                onClick = onOpen,
+            )
         }
     }
 }
@@ -430,35 +431,7 @@ private fun Cards(
     }
 }
 
-/** A filter chip: pressed means only this kind of answer. */
-@Composable
-private fun Filter(text: String, selected: Boolean, onClick: () -> Unit) {
-    val c = Neo.colors
-    val shape = RoundedCornerShape(percent = 50)
-    Box(
-        Modifier
-            .hardShadow(3.dp, c.ink, shape)
-            .clip(shape)
-            .background(if (selected) c.ink else c.card)
-            .border(2.5.dp, c.ink, shape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-    ) {
-        Text(
-            text.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.W900,
-            letterSpacing = 1.2.sp,
-            fontSize = 10.sp,
-            color = if (selected) c.paper else c.ink,
-        )
-    }
-}
-
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun Recents(onPick: (String) -> Unit) {
     if (recents.isEmpty()) {
@@ -475,15 +448,12 @@ private fun Recents(onPick: (String) -> Unit) {
             color = c.ink.copy(alpha = 0.5f),
         )
         Spacer(Modifier.height(10.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             recents.forEach { text ->
-                NeoPill(
-                    text = text,
-                    modifier = Modifier.clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onPick(text) },
-                )
+                NeoChip(text, selected = false, onClick = { onPick(text) }, caps = false)
             }
         }
     }
@@ -531,24 +501,53 @@ fun TrackRow(
      */
     number: Int? = null,
     onOpenAlbum: ((String) -> Unit)? = null,
+    /**
+     * The playing row, drawn as a card rather than as a coloured line.
+     *
+     * On an album and in the queue it is the one row that is a different kind
+     * of thing from the rows around it — everything else is a song you could
+     * play, and this is the song playing — so the design gives it its own
+     * edges instead of a tint the eye has to hunt for.
+     */
+    highlight: Boolean = false,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val c = Neo.colors
+    val lit = highlight && playing
+    val shape = RoundedCornerShape(15.dp)
     Row(
         Modifier
             .fillMaxWidth()
             .riseIn(appearAfter)
+            .then(
+                if (lit) {
+                    Modifier
+                        .padding(vertical = 4.dp)
+                        .hardShadow(4.dp, c.onAccent, shape)
+                        .clip(shape)
+                        .background(c.lime)
+                        .border(3.dp, c.onAccent, shape)
+                } else {
+                    Modifier
+                }
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             )
-            .padding(vertical = 8.dp),
+            .padding(
+                horizontal = if (lit) 10.dp else 0.dp,
+                vertical = if (lit) 9.dp else 8.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        leading?.invoke()
+        val ink = if (lit) c.onAccent else c.ink
         if (number != null) {
             Box(Modifier.size(width = 26.dp, height = 46.dp), contentAlignment = Alignment.Center) {
-                MonoText("$number", size = 13, color = c.ink.copy(alpha = 0.45f))
+                MonoText("$number", size = 13, color = ink.copy(alpha = 0.5f))
             }
         } else {
             TrackCover(track.id, track.artworkUrl, Modifier.size(46.dp))
@@ -558,7 +557,7 @@ fun TrackRow(
                 track.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontSize = 14.sp,
-                color = if (playing) c.violet else c.ink,
+                color = if (lit) c.onAccent else if (playing) c.violet else c.ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -567,7 +566,7 @@ fun TrackRow(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     fontSize = 11.sp,
-                    color = c.ink.copy(alpha = 0.6f),
+                    color = ink.copy(alpha = 0.62f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -590,7 +589,7 @@ fun TrackRow(
         // Both, not one or the other. The bars say which row this is and the
         // heart is a thing to press, and hiding the control on the row somebody
         // is most likely to have an opinion about is exactly backwards.
-        if (playing) Bars()
+        if (playing) Bars(color = if (lit) c.onAccent else c.violet)
         trailing?.invoke()
     }
 }
