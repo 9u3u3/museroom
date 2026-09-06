@@ -355,9 +355,11 @@ Each step ends somewhere shippable. Nothing after step 4 blocks the rooms.
    Everything before this works signed out.
 9. **Lyrics**, then **Sound**: quality, cache size, normalisation, skip
    silence, sleep timer, equalizer.
-10. **Delete the old player.** `room.js`, `adblock.js`, `AwakeWebView`, the ad
-    store, the stray check, and the WebView half of `RoomPlayer`. Not before
-    step 4 has been on real phones for a release.
+10. ~~**Delete the old player.**~~ Done, and the plan was right to make it last.
+    `room.js`, `adblock.js`, `AwakeWebView`, the ad store and the WebView half
+    of `RoomPlayer` are gone. `strayed` and `ad` stayed in the snapshot as
+    fields that are never true, because the follow loop reads them and the loop
+    is not what changed. This is `4.0.0`.
 
 ## What this plan will not do
 

@@ -1,6 +1,6 @@
 {
-  "version_code": 38,
-  "version_name": "3.4.0",
+  "version_code": 40,
+  "version_name": "4.0.0",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "The version number goes backwards on purpose. The old numbers were counted rather than calculated, and claimed five breaking changes that never happened while hiding the three that did. Recalculated against the whole history, this is 3.4.0. Nothing about the app changed in this release; updates still work because they compare a build number, not the name."
+  "notes": "Museroom is a music player now. Search anything and it plays here, with a library, playlists, albums, artists, lyrics and a queue that keeps going on its own. Rooms work the same way they always did, except the hidden YouTube Music page they used to run on is gone, which is what makes this a 4."
 }

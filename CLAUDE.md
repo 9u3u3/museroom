@@ -345,9 +345,9 @@ broke, because `versionCode` is what decides an update and only ever climbs.
   looks like when a feature ships before it works.
 - **Minor** for a feature. The library and its database are 3.4.0.
 - **Major** for a breaking change: something people relied on works
-  differently or is gone. There have been three. `4.0.0` is the next one, and
-  it is spoken for: the release where the YouTube Music WebView stops being how
-  Museroom plays music, which needs rooms moved across too.
+  differently or is gone. There have been four. `4.0.0` is the release where
+  the YouTube Music WebView stopped being how Museroom plays music: rooms moved
+  onto our own player, and `room.js` and `adblock.js` went with the page.
 
 `versionCode` only ever goes up by one and is what the updater actually
 compares; the name is for people.
