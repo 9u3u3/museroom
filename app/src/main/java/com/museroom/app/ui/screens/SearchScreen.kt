@@ -183,6 +183,7 @@ fun SearchScreen(onClose: () -> Unit) {
                                 keyboard?.hide()
                                 Playback.play(results, i, from = "Search")
                             },
+                            trailing = { Heart(track, size = 20) },
                         )
                     }
                     item { Spacer(Modifier.height(120.dp)) }
@@ -283,6 +284,10 @@ fun TrackRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (playing) Bars() else trailing?.invoke()
+        // Both, not one or the other. The bars say which row this is and the
+        // heart is a thing to press, and hiding the control on the row somebody
+        // is most likely to have an opinion about is exactly backwards.
+        if (playing) Bars()
+        trailing?.invoke()
     }
 }

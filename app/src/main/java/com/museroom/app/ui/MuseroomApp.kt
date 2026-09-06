@@ -69,8 +69,8 @@ import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.halftone
 import com.museroom.app.ui.screens.BoardScreen
 import com.museroom.app.ui.screens.FeatureTour
-import com.museroom.app.ui.screens.FriendsScreen
-import com.museroom.app.ui.screens.NearbyScreen
+import com.museroom.app.ui.screens.LibraryScreen
+import com.museroom.app.ui.screens.RoomsScreen
 import com.museroom.app.ui.screens.MiniPlayer
 import com.museroom.app.ui.screens.NowScreen
 import com.museroom.app.ui.screens.PlayerScreen
@@ -85,10 +85,18 @@ import com.museroom.app.util.formatMinutes
 import java.time.LocalDate
 import java.time.ZoneId
 
+/**
+ * Five places, as the design has them.
+ *
+ * Friends and Nearby were never two ideas — both are people you could be
+ * listening with — so they are two chips of one Rooms tab, which is what freed
+ * the sticker Library needed. Nothing was removed; one of them stopped being a
+ * destination and became a filter.
+ */
 enum class Tab(val label: String, val icon: String) {
     Now("Home", NeoIcons.Home),
-    Friends("Friends", NeoIcons.Friends),
-    Nearby("Nearby", NeoIcons.Nearby),
+    Library("Library", NeoIcons.Library),
+    Rooms("Rooms", NeoIcons.Nearby),
     Board("Board", NeoIcons.Board),
     You("You", NeoIcons.You),
 }
@@ -169,8 +177,8 @@ fun MuseroomApp() {
                     requestsOpen -> RequestsScreen()
                     else -> when (tab) {
                         Tab.Now -> NowScreen(onOpenPlayer = { playerOpen = true })
-                        Tab.Friends -> FriendsScreen()
-                        Tab.Nearby -> NearbyScreen()
+                        Tab.Library -> LibraryScreen(onOpenPlayer = { playerOpen = true })
+                        Tab.Rooms -> RoomsScreen()
                         Tab.Board -> BoardScreen()
                         Tab.You -> YouScreen()
                     }

@@ -43,7 +43,7 @@ object Playback {
     fun attach(context: Context) {
         app = context.applicationContext
         LocalPlayer.attach(context)
-        Recent.attach(context)
+        Library.attach(context)
         watchForTheEnd()
     }
 
@@ -118,7 +118,7 @@ object Playback {
     private fun go(at: Int) {
         val track = _queue.value.getOrNull(at) ?: return
         _index.value = at
-        Recent.played(track)
+        Library.played(track)
         LocalPlayer.forgiveClients(track.id)
         LocalPlayer.cue(track)
         LocalPlayer.begin(0)

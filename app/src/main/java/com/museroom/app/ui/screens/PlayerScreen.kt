@@ -150,13 +150,17 @@ fun PlayerScreen(onClose: () -> Unit) {
 
         Spacer(Modifier.height(20.dp))
 
-        Text(
-            song.title,
-            style = MaterialTheme.typography.headlineLarge,
-            fontSize = 26.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                song.title,
+                style = MaterialTheme.typography.headlineLarge,
+                fontSize = 26.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Heart(song, size = 26)
+        }
         if (song.artist.isNotBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(

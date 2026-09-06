@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.player.LocalPlayer
 import com.museroom.app.player.Playback
-import com.museroom.app.player.Recent
+import com.museroom.app.player.Library
 import com.museroom.app.ui.Neo
 
 /**
@@ -44,7 +44,7 @@ import com.museroom.app.ui.Neo
  */
 @Composable
 fun HomeSections(onOpenPlayer: () -> Unit) {
-    val recent by Recent.tracks.collectAsStateWithLifecycle()
+    val recent by Library.recent.collectAsStateWithLifecycle()
     val seed = recent.firstOrNull()
     var picks by remember { mutableStateOf<List<LocalPlayer.Track>>(emptyList()) }
 

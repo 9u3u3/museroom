@@ -1,6 +1,6 @@
 {
-  "version_code": 36,
-  "version_name": "5.10.0",
+  "version_code": 37,
+  "version_name": "5.11.0",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Home has something on it. Quick picks are built from the last thing you played here, and Listen again is that shelf itself, so the app opens on music rather than on a search box. Both work without signing in to anything."
+  "notes": "There is a library. Tap the heart on anything to keep it, and everything you play here is remembered. The tabs are Home, Library, Rooms, Board and You now: Friends and Nearby became two chips of Rooms, since both answer the same question."
 }

@@ -4,17 +4,53 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [PlayEventEntity::class, ListeningSessionEntity::class],
-    version = 1,
+    entities = [PlayEventEntity::class, ListeningSessionEntity::class, LibrarySongEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class MuseroomDatabase : RoomDatabase() {
 
     abstract fun dao(): MuseroomDao
 
+    abstract fun library(): LibraryDao
+
     companion object {
+
+        /**
+         * Adds the library without touching what is already here.
+         *
+         * Destructive migration would be a line shorter and would throw away
+         * play events that have not been uploaded yet, which are minutes
+         * somebody listened to and would never get back.
+         */
+        private val TO_LIBRARY = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS library_songs (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        artist TEXT NOT NULL,
+                        album TEXT NOT NULL,
+                        durationMs INTEGER NOT NULL,
+                        cover TEXT NOT NULL,
+                        liked INTEGER NOT NULL DEFAULT 0,
+                        likedAt INTEGER NOT NULL DEFAULT 0,
+                        playedAt INTEGER NOT NULL DEFAULT 0,
+                        plays INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_library_songs_liked ON library_songs (liked)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_library_songs_playedAt ON library_songs (playedAt)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_library_songs_likedAt ON library_songs (likedAt)")
+            }
+        }
+
         @Volatile
         private var instance: MuseroomDatabase? = null
 
@@ -24,7 +60,7 @@ abstract class MuseroomDatabase : RoomDatabase() {
                     context.applicationContext,
                     MuseroomDatabase::class.java,
                     "museroom.db",
-                ).build().also { instance = it }
+                ).addMigrations(TO_LIBRARY).build().also { instance = it }
             }
     }
 }
