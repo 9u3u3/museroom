@@ -1,6 +1,7 @@
 package com.museroom.app
 
 import com.museroom.app.player.InnerTube
+import com.museroom.app.player.Lyrics
 import com.museroom.app.player.Streams
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -117,6 +118,47 @@ class PlayerStreamsTest {
     @Test
     fun `a search result knows where it came from`() {
         assertTrue(InnerTube.results(songs).first().artistId.startsWith("UC"))
+    }
+
+    // -------------------------------------------------------------- lyrics --
+
+    @Test
+    fun `timed lines are read with their moments`() {
+        val lines = Lyrics.parse("[00:31.13]one\n[01:05.5]two\n[02:00]three")
+        assertEquals(3, lines.size)
+        assertEquals(31_130L, lines[0].atMs)
+        // A single fraction digit is tenths, not thousandths.
+        assertEquals(65_500L, lines[1].atMs)
+        assertEquals(120_000L, lines[2].atMs)
+    }
+
+    @Test
+    fun `a repeated phrase is kept at each moment it is sung`() {
+        val lines = Lyrics.parse("[00:10.00][01:10.00]same")
+        assertEquals(2, lines.size)
+        assertEquals(listOf(10_000L, 70_000L), lines.map { it.atMs })
+    }
+
+    @Test
+    fun `an empty stamp is kept, because a solo has to hold the highlight still`() {
+        val lines = Lyrics.parse("[00:05.00]words\n[00:20.00]\n[00:40.00]more")
+        assertEquals(3, lines.size)
+        assertTrue(lines[1].text.isEmpty())
+    }
+
+    @Test
+    fun `lines without a stamp are not lines`() {
+        // The header a file starts with is not something anybody sings.
+        assertTrue(Lyrics.parse("[ar:Somebody]\nnot a lyric line").isEmpty())
+    }
+
+    @Test
+    fun `which line is being sung, including before the first one`() {
+        val lines = Lyrics.parse("[00:10.00]a\n[00:20.00]b\n[00:30.00]c")
+        assertEquals(-1, Lyrics.lineAt(lines, 0))
+        assertEquals(0, Lyrics.lineAt(lines, 10_000))
+        assertEquals(1, Lyrics.lineAt(lines, 25_000))
+        assertEquals(2, Lyrics.lineAt(lines, 999_000))
     }
 
     // ------------------------------------------------------------- the cache --

@@ -80,6 +80,7 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
 
     var showQueue by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
+    var reading by remember { mutableStateOf(false) }
 
     // The engine never polls, because nothing in it needs to know where it is
     // between events. A moving scrub bar does, so the screen showing one asks,
@@ -94,6 +95,10 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
     val song = track ?: return
     if (saving) {
         SaveToPlaylist(song, onDismiss = { saving = false })
+        return
+    }
+    if (reading) {
+        LyricsScreen(onClose = { reading = false })
         return
     }
 
@@ -233,7 +238,14 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
             horizontalArrangement = Arrangement.Center,
         ) {
             NeoButton(
-                text = "Save to playlist",
+                text = "Lyrics",
+                tone = NeoTone.Paper,
+                small = true,
+                onClick = { reading = true },
+            )
+            Spacer(Modifier.size(10.dp))
+            NeoButton(
+                text = "Save",
                 tone = NeoTone.Paper,
                 small = true,
                 onClick = { saving = true },

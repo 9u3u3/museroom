@@ -152,6 +152,11 @@ object Playback {
         }
     }
 
+    /** The words for a track, off the main thread. */
+    suspend fun lyrics(track: LocalPlayer.Track): Lyrics.Words? = withContext(Dispatchers.IO) {
+        runCatching { Lyrics.of(track) }.getOrNull()
+    }
+
     /** An album page, off the main thread, or null if it would not load. */
     suspend fun album(browseId: String): InnerTube.Album? = withContext(Dispatchers.IO) {
         runCatching { InnerTube.album(browseId) }.getOrNull()
