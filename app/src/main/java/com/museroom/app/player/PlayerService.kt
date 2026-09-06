@@ -6,8 +6,10 @@ import androidx.annotation.OptIn
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSessionService
 import com.museroom.app.MainActivity
+import com.museroom.app.R
 
 /**
  * The declaration that audio is the point.
@@ -36,6 +38,17 @@ class PlayerService : MediaSessionService() {
         super.onCreate()
         LocalPlayer.attach(this)
 
+        // A channel people can find and turn off by name. Media3 will happily
+        // ship one called "default_channel_id", which is what somebody sees in
+        // their notification settings when they go looking for what is making
+        // noise.
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this)
+                .setChannelId("playback")
+                .setChannelName(R.string.playback_channel)
+                .build(),
+        )
+
         // Tapping the notification should land in Museroom rather than start a
         // second copy of it, which is what the reorder flag is for.
         val open = PendingIntent.getActivity(
@@ -49,6 +62,16 @@ class PlayerService : MediaSessionService() {
         session = MediaSession.Builder(this, LocalPlayer.exo())
             .setSessionActivity(open)
             .build()
+            // Registering it is what makes the notification appear.
+            //
+            // A session handed back from onGetSession is added for you when
+            // something connects a controller to it, and nothing here ever
+            // does: Museroom drives the player directly. So the service knew it
+            // had a session only in the sense that it could produce one on
+            // request, and never watched the player, and never posted anything.
+            // Music played, the shade stayed empty, and no error was raised
+            // because nothing had gone wrong — nobody had asked.
+            .also { addSession(it) }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
