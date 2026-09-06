@@ -1,6 +1,6 @@
 {
-  "version_code": 30,
-  "version_name": "5.8",
+  "version_code": 31,
+  "version_name": "5.9.0",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "A room can now put everyone on the same clock, you included. Turn on Together and your music plays through Museroom instead of Spotify, so nobody is a few seconds ahead of anybody. Search, queue, skip and pause are yours from inside the app."
+  "notes": "Museroom plays music itself now. There is a search button on the top bar, and anything you find plays here rather than sending you to another app. A bar above the tabs shows what is on, and opening it gives you the full player with a scrub bar and a queue. Rooms still work exactly as before."
 }

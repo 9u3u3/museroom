@@ -167,6 +167,12 @@ fun PlayerScreen(onClose: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        // Said here as well as on the bar, because this is the screen somebody
+        // is looking at when they wonder why it went quiet.
+        if (snapshot.detail.isNotBlank() && !snapshot.playing) {
+            Spacer(Modifier.height(8.dp))
+            NeoPill(snapshot.detail, fill = c.pink, accent = true)
+        }
 
         Spacer(Modifier.height(18.dp))
 

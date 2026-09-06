@@ -101,11 +101,16 @@ fun MiniPlayer(onOpen: () -> Unit) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    // A stall says so. Silence with the artist's name under it
+                    // is the app claiming to be playing something it is not,
+                    // and there is nothing a listener can do about a problem
+                    // they have not been told about.
+                    val stalled = snapshot.detail.isNotBlank() && !snapshot.playing
                     Text(
-                        song.artist.ifBlank { snapshot.detail },
+                        if (stalled) snapshot.detail else song.artist,
                         style = MaterialTheme.typography.bodySmall,
                         fontSize = 10.sp,
-                        color = c.ink.copy(alpha = 0.6f),
+                        color = if (stalled) c.pink else c.ink.copy(alpha = 0.6f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
