@@ -2,6 +2,7 @@ package com.museroom.app
 
 import com.museroom.app.player.InnerTube
 import com.museroom.app.player.Lyrics
+import com.museroom.app.player.newOnes
 import com.museroom.app.player.Streams
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -159,6 +160,31 @@ class PlayerStreamsTest {
         assertEquals(0, Lyrics.lineAt(lines, 10_000))
         assertEquals(1, Lyrics.lineAt(lines, 25_000))
         assertEquals(2, Lyrics.lineAt(lines, 999_000))
+    }
+
+    // --------------------------------------------------------------- queue --
+
+    private fun t(id: String) = com.museroom.app.player.LocalPlayer.Track(id, "Song $id")
+
+    @Test
+    fun `a growing queue never repeats what is already in it`() {
+        val queue = listOf(t("a"), t("b"), t("c"))
+        val found = listOf(t("b"), t("d"), t("a"), t("e"))
+        assertEquals(listOf("d", "e"), newOnes(queue, found).map { it.id })
+    }
+
+    @Test
+    fun `a radio that repeats itself is not added twice`() {
+        assertEquals(listOf("x"), newOnes(emptyList(), listOf(t("x"), t("x"))).map { it.id })
+    }
+
+    @Test
+    fun `a queue stops growing rather than growing all afternoon`() {
+        val full = (1..200).map { t("song-$it") }
+        assertTrue(newOnes(full, listOf(t("new"))).isEmpty())
+        // And it fills only up to the line, not past it.
+        val nearly = (1..199).map { t("song-$it") }
+        assertEquals(1, newOnes(nearly, listOf(t("p"), t("q"), t("r"))).size)
     }
 
     // ------------------------------------------------------------- the cache --

@@ -34,6 +34,30 @@ import com.museroom.app.player.Library
 import com.museroom.app.ui.Neo
 
 /**
+ * Quick picks, held still.
+ *
+ * They were seeded from whatever was played last, which meant the shelf changed
+ * under somebody every time they pressed a song — including when they pressed a
+ * song *on the shelf*, so it rearranged itself as it was being used. A shelf
+ * that will not sit still is not a shelf.
+ *
+ * They are decided once and then left alone, and change when the app is opened
+ * again or when somebody asks for a new set. This lives outside the composable
+ * so that moving between tabs does not count as asking.
+ */
+private object Picks {
+    var seed: String? = null
+    var tracks: List<LocalPlayer.Track> = emptyList()
+    var looking = false
+
+    /** Forget them, so the next look decides again. */
+    fun again() {
+        seed = null
+        tracks = emptyList()
+    }
+}
+
+/**
  * The two shelves that make the app worth opening without typing.
  *
  * Both are built from what was played here rather than from an account, because
@@ -45,13 +69,27 @@ import com.museroom.app.ui.Neo
 @Composable
 fun HomeSections(onOpenPlayer: () -> Unit) {
     val recent by Library.recent.collectAsStateWithLifecycle()
-    val seed = recent.firstOrNull()
-    var picks by remember { mutableStateOf<List<LocalPlayer.Track>>(emptyList()) }
+    var picks by remember { mutableStateOf(Picks.tracks) }
+    var refreshing by remember { mutableStateOf(false) }
 
-    // Suggestions follow whatever was played last, so the shelf is different
-    // tomorrow without anybody maintaining it.
-    LaunchedEffect(seed?.id) {
-        picks = seed?.id?.let { Playback.radio(it) }.orEmpty()
+    // Decided once. The key is deliberately not the last track played: that is
+    // exactly the thing that must not move the shelf.
+    LaunchedEffect(refreshing, recent.isEmpty()) {
+        if (Picks.tracks.isNotEmpty() && !refreshing) {
+            picks = Picks.tracks
+            return@LaunchedEffect
+        }
+        val chosen = Picks.seed ?: recent.firstOrNull()?.id ?: return@LaunchedEffect
+        if (Picks.looking) return@LaunchedEffect
+        Picks.looking = true
+        val found = Playback.radio(chosen)
+        Picks.looking = false
+        if (found.isNotEmpty()) {
+            Picks.seed = chosen
+            Picks.tracks = found
+            picks = found
+        }
+        refreshing = false
     }
 
     if (recent.isEmpty()) return
@@ -59,10 +97,10 @@ fun HomeSections(onOpenPlayer: () -> Unit) {
     if (picks.isNotEmpty()) {
         Shelf(
             title = "Quick picks",
-            action = "Play all",
+            action = "New set",
             onAction = {
-                Playback.play(picks, 0, from = "Quick picks")
-                onOpenPlayer()
+                Picks.again()
+                refreshing = true
             },
         )
         picks.take(4).forEachIndexed { i, track ->

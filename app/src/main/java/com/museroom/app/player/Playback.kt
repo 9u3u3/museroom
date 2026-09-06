@@ -40,6 +40,15 @@ object Playback {
     private var app: Context? = null
     private var watching = false
 
+    /**
+     * Whether a radio is already being fetched to lengthen the queue.
+     *
+     * Without this, hitting the last two tracks while one fetch is in flight
+     * asks for a second radio and appends both, which is how a queue quietly
+     * doubles.
+     */
+    private var extending = false
+
     fun attach(context: Context) {
         app = context.applicationContext
         LocalPlayer.attach(context)
@@ -91,9 +100,50 @@ object Playback {
         }
     }
 
+    /**
+     * The next song, and there is always a next song.
+     *
+     * A queue used to be exactly what somebody pressed: the search results, or
+     * the album. Running off the end of it stopped the music, which is right
+     * for an album and wrong for everything else — nobody searches for one song
+     * meaning "and then silence". So when the end is near the queue grows a
+     * radio seeded from what is playing, the same way Home builds its
+     * suggestions.
+     */
     fun next() {
         val at = _index.value + 1
-        if (at in _queue.value.indices) go(at) else stop()
+        if (at in _queue.value.indices) {
+            go(at)
+            return
+        }
+        val seed = _queue.value.lastOrNull()
+        if (seed == null) {
+            stop()
+            return
+        }
+        scope.launch {
+            val more = grow(seed)
+            if (more.isEmpty()) stop() else go(at)
+        }
+    }
+
+    /**
+     * Puts more songs on the end, skipping any already in the queue.
+     *
+     * A radio seeded from a track usually starts with tracks around it, and
+     * some of those are already here. Playing the same song twice in five
+     * minutes is the kind of thing people notice and cannot explain.
+     */
+    private suspend fun grow(seed: LocalPlayer.Track): List<LocalPlayer.Track> {
+        if (extending) return emptyList()
+        extending = true
+        return try {
+            val more = newOnes(_queue.value, radio(seed.id))
+            if (more.isNotEmpty()) _queue.value = _queue.value + more
+            more
+        } finally {
+            extending = false
+        }
     }
 
     /**
@@ -127,6 +177,11 @@ object Playback {
 
     private fun go(at: Int) {
         val track = _queue.value.getOrNull(at) ?: return
+        // Reach for more before the end rather than at it, so the queue is
+        // never briefly empty while a radio is being fetched.
+        if (at >= _queue.value.size - 2) {
+            scope.launch { grow(_queue.value.last()) }
+        }
         _index.value = at
         Library.played(track)
         LocalPlayer.forgiveClients(track.id)
@@ -199,4 +254,34 @@ object Playback {
     suspend fun search(query: String): List<LocalPlayer.Track> = withContext(Dispatchers.IO) {
         runCatching { InnerTube.search(query).map(::asTrack) }.getOrDefault(emptyList())
     }
+}
+
+/** The longest a queue is allowed to get by growing itself. */
+private const val CEILING = 200
+
+/**
+ * What of [found] is worth adding to [queue].
+ *
+ * A radio seeded from a track usually opens with tracks around it, and some of
+ * those are already here; playing the same song twice in five minutes is the
+ * kind of thing people notice and cannot explain. The ceiling is the other
+ * half: a queue that grew every time it neared its end would grow all
+ * afternoon, and nobody is looking sixty songs ahead.
+ *
+ * A free function rather than a method, because [Playback] holds a main-thread
+ * scope and cannot be loaded at all off a device. Logic worth testing should
+ * not be locked inside something only a phone can construct.
+ */
+fun newOnes(
+    queue: List<LocalPlayer.Track>,
+    found: List<LocalPlayer.Track>,
+): List<LocalPlayer.Track> {
+    if (queue.size >= CEILING) return emptyList()
+    val had = queue.mapTo(HashSet()) { it.id }
+    val fresh = mutableListOf<LocalPlayer.Track>()
+    for (track in found) {
+        if (queue.size + fresh.size >= CEILING) break
+        if (had.add(track.id)) fresh += track
+    }
+    return fresh
 }

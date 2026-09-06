@@ -34,6 +34,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.museroom.app.ui.Neo
@@ -68,6 +70,10 @@ fun RoundIcon(
 
     Box(
         modifier
+            // The description was being taken and dropped. Every round button
+            // in the app is an icon with no text, so without this a screen
+            // reader is handed a page of unlabelled circles.
+            .semantics { this.contentDescription = contentDescription }
             .size(diameter)
             .offset(x = rest * drop, y = rest * drop)
             .hardShadow(rest * (1f - drop), stroke, shape)
