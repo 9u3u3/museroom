@@ -1,6 +1,6 @@
 {
-  "version_code": 32,
-  "version_name": "5.9.1",
+  "version_code": 33,
+  "version_name": "5.9.2",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Tracks play all the way through now. The last build stopped about a minute in, because the plain stream address YouTube hands out is a leftover that was never meant to be read to the end. Museroom asks properly for it now."
+  "notes": "A track that stops partway now asks somewhere else instead of giving up. YouTube hands out stream addresses through several different clients and some of them run out early, so Museroom stops using one the moment it does that, for the rest of the session. If a track still stops, the player now says where and which one failed."
 }

@@ -130,6 +130,27 @@ object LocalPlayer {
      */
     private val burned = ConcurrentHashMap<String, MutableSet<String>>()
 
+    /**
+     * Clients that stopped serving mid-track recently, whatever the track was.
+     *
+     * A client that runs out after a minute does it because of where this phone
+     * is asking from, not because of the song, so the next track would hit the
+     * same wall and spend its retries learning the same thing. Remembering it
+     * for a few minutes turns one bad track into one bad track rather than an
+     * afternoon of them. It is forgotten quickly, because the reason is usually
+     * temporary and permanently ruling a client out is how you end up with
+     * none.
+     */
+    private val unreliable = ConcurrentHashMap<String, Long>()
+
+    private const val UNRELIABLE_FOR_MS = 5 * 60 * 1000L
+
+    private fun avoidFor(videoId: String): Set<String> {
+        val now = System.currentTimeMillis()
+        unreliable.entries.removeIf { now - it.value > UNRELIABLE_FOR_MS }
+        return burned[videoId].orEmpty() + unreliable.keys
+    }
+
     // ------------------------------------------------------------------ setup --
 
     /** Called once, from the application. Cheap: nothing is built until asked. */
@@ -197,7 +218,7 @@ object LocalPlayer {
             val id = spec.key ?: return@Factory spec
             if (store.isCached(id, spec.position, 1)) return@Factory spec
 
-            val stream = Streams.resolve(id, quality, burned[id].orEmpty())
+            val stream = Streams.resolve(id, quality, avoidFor(id))
             val located = spec.withUri(Uri.parse(stream.url))
                 .withRequestHeaders(spec.httpRequestHeaders + stream.headers)
 
@@ -223,6 +244,9 @@ object LocalPlayer {
     /** A session's worth of listening, not a library. Downloads come later. */
     private const val CACHE_BYTES = 512L * 1024 * 1024
 
+    /** m:ss, for saying where something stopped. */
+    private fun clock(ms: Long): String = "%d:%02d".format(ms / 60_000, (ms / 1000) % 60)
+
     /** Used only when an address asks for bounded reads without saying how big. */
     private const val CHUNK_BYTES = 1L * 1024 * 1024
 
@@ -238,6 +262,7 @@ object LocalPlayer {
 
     fun cue(track: Track, positionMs: Long = 0) = onMain {
         retries = 0
+        stall = ""
         wanted = track.id
         _current.value = track
         val p = require()
@@ -339,6 +364,16 @@ object LocalPlayer {
      */
     private var retries = 0
 
+    /**
+     * Why the music stopped, kept until something plays again.
+     *
+     * Held apart from the snapshot because a snapshot is rebuilt from the
+     * player on every event, and an explanation that is overwritten a
+     * millisecond after it is set is an explanation nobody ever sees.
+     */
+    @Volatile
+    private var stall = ""
+
     private const val RETRIES = 4
     private const val TAG = "MuseroomPlayer"
 
@@ -346,7 +381,10 @@ object LocalPlayer {
         override fun onPlaybackStateChanged(state: Int) = tick()
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) retries = 0
+            if (isPlaying) {
+                retries = 0
+                stall = ""
+            }
             tick()
         }
         override fun onPlaybackParametersChanged(parameters: PlaybackParameters) = tick()
@@ -361,31 +399,43 @@ object LocalPlayer {
             val player = player
             if (id.isBlank() || player == null) return
 
-            // A URL that resolved cleanly and then stopped serving is the
-            // ordinary weather here, not a broken track. These links are signed,
-            // they expire, the edge that issued one stops answering for it, and
-            // a long track outlives its own address. So the answer is thrown
-            // away and asked for again, from where we had got to.
             val resumeAt = player.currentPosition.coerceAtLeast(0)
+
+            // Blame the client that issued this address, immediately.
+            //
+            // A stream that played for a minute and then stopped is not a bad
+            // moment on the network, it is an address that was only ever going
+            // to serve that much. Asking the same client again gets the same
+            // answer, so the one thing a retry must do is ask somebody else.
+            // Doing this only after several identical failures, which is what
+            // it used to do, meant four attempts at the same wall.
+            val failed = Streams.cached(id)?.client
+            if (failed != null) {
+                burned.getOrPut(id) { mutableSetOf() }.add(failed)
+                // Only once it has played something does a client count as
+                // having failed this way. One that never started is a different
+                // problem and should not cost the whole session a client.
+                if (resumeAt > 5_000) unreliable[failed] = System.currentTimeMillis()
+            }
             Streams.forget(id)
 
             if (retries < RETRIES) {
                 retries++
-                Log.w(TAG, "$id stalled at ${resumeAt}ms (${error.errorCodeName}), asking again")
+                Log.w(
+                    TAG,
+                    "$id stopped at ${resumeAt}ms on ${failed ?: "an unknown client"} " +
+                        "(${error.errorCodeName}); asking a different one",
+                )
                 player.seekTo(resumeAt)
                 player.prepare()
                 return
             }
 
-            // Out of patience. Blame the client that kept producing bad URLs so
-            // the next track is asked of somebody else, and say what happened
-            // rather than falling silent.
-            Streams.cached(id)?.client?.let { burned.getOrPut(id) { mutableSetOf() }.add(it) }
+            // Out of clients to try. Say which one gave up and where, because a
+            // stall somebody can describe is a stall that can be fixed.
             Log.w(TAG, "$id gave up after $RETRIES tries: ${error.errorCodeName}")
-            _snapshot.value = _snapshot.value.copy(
-                detail = "Could not keep this playing",
-                takenAt = System.currentTimeMillis(),
-            )
+            stall = "Stopped at ${clock(resumeAt)} on ${failed ?: "unknown"}"
+            tick()
         }
     }
 
@@ -414,11 +464,13 @@ object LocalPlayer {
             buffering = p.playbackState == Player.STATE_BUFFERING,
             ended = p.playbackState == Player.STATE_ENDED,
             rate = p.playbackParameters.speed.toDouble(),
-            detail = when (p.playbackState) {
-                Player.STATE_IDLE -> "nothing loaded"
-                Player.STATE_BUFFERING -> "buffering"
-                Player.STATE_ENDED -> "track finished"
-                else -> ""
+            detail = stall.ifBlank {
+                when (p.playbackState) {
+                    Player.STATE_IDLE -> "nothing loaded"
+                    Player.STATE_BUFFERING -> "buffering"
+                    Player.STATE_ENDED -> "track finished"
+                    else -> ""
+                }
             },
             takenAt = System.currentTimeMillis(),
         )
@@ -427,5 +479,11 @@ object LocalPlayer {
     /** Forgets which clients failed, so a track is given a clean try again. */
     fun forgiveClients(videoId: String) {
         burned.remove(videoId)
+    }
+
+    /** Gives every client another chance, for when the network has changed. */
+    fun forgiveEverything() {
+        burned.clear()
+        unreliable.clear()
     }
 }
