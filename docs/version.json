@@ -1,6 +1,6 @@
 {
-  "version_code": 37,
-  "version_name": "5.11.0",
+  "version_code": 38,
+  "version_name": "3.4.0",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "There is a library. Tap the heart on anything to keep it, and everything you play here is remembered. The tabs are Home, Library, Rooms, Board and You now: Friends and Nearby became two chips of Rooms, since both answer the same question."
+  "notes": "The version number goes backwards on purpose. The old numbers were counted rather than calculated, and claimed five breaking changes that never happened while hiding the three that did. Recalculated against the whole history, this is 3.4.0. Nothing about the app changed in this release; updates still work because they compare a build number, not the name."
 }

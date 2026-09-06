@@ -354,16 +354,19 @@ schema claims get verified out of band. The Supabase CLI is present at
 
 ## Releasing
 
-**Versions are `major.minor.patch` from 5.9.0 onwards.** Everything up to 5.8
-was two-part and is left alone; 5.8 is read as 5.8.0 when comparing.
+**Versions are `major.minor.patch`, and were recalculated at 3.4.0.** The
+numbers up to 5.11.0 were felt rather than derived; `plans/versioning.md` walks
+the whole history and shows the working. The name went backwards and nothing
+broke, because `versionCode` is what decides an update and only ever climbs.
 
-- **Patch** for a fix that adds nothing. 5.9.1 through 5.9.4 were four of these
-  in one morning, all of them repairing 5.9.0, which is what a patch chain
+- **Patch** for a fix that adds nothing. 3.2.1 through 3.2.4 were four of these
+  in one morning, all of them repairing 3.2.0, which is what a patch chain
   looks like when a feature ships before it works.
-- **Minor** for a feature. The player, its search and its screens are 5.10.0.
-- **Major** for a change in what the app fundamentally is. `6.0.0` is spoken
-  for and stays reserved: it is the release where the YouTube Music WebView
-  stops being how Museroom plays music, which needs rooms moved across too.
+- **Minor** for a feature. The library and its database are 3.4.0.
+- **Major** for a breaking change: something people relied on works
+  differently or is gone. There have been three. `4.0.0` is the next one, and
+  it is spoken for: the release where the YouTube Music WebView stops being how
+  Museroom plays music, which needs rooms moved across too.
 
 `versionCode` only ever goes up by one and is what the updater actually
 compares; the name is for people.
