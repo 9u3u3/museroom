@@ -218,7 +218,18 @@ object LocalPlayer {
             val id = spec.key ?: return@Factory spec
             if (store.isCached(id, spec.position, 1)) return@Factory spec
 
-            val stream = Streams.resolve(id, quality, avoidFor(id))
+            // Each attempt asks for a different size of file, not just a
+            // different client. A track that always dies at the same second is
+            // usually one particular encoding being wrong rather than the
+            // network being unlucky, and the surest way past a bad file is to
+            // ask for a different one.
+            val asking = when (retries) {
+                0 -> quality
+                1 -> Streams.Quality.Max
+                else -> Streams.Quality.Low
+            }
+            val stream = Streams.resolve(id, asking, avoidFor(id))
+            playing = stream
             val located = spec.withUri(Uri.parse(stream.url))
                 .withRequestHeaders(spec.httpRequestHeaders + stream.headers)
 
@@ -263,6 +274,7 @@ object LocalPlayer {
     fun cue(track: Track, positionMs: Long = 0) = onMain {
         retries = 0
         stall = ""
+        playing = null
         wanted = track.id
         _current.value = track
         val p = require()
@@ -374,6 +386,18 @@ object LocalPlayer {
     @Volatile
     private var stall = ""
 
+    /**
+     * The last address we were handed, kept here rather than looked up when
+     * something goes wrong.
+     *
+     * The cache is emptied as part of recovering, so by the time the third
+     * failure is being explained the entry naming the client is long gone.
+     * That is how a stall came to report "unknown", which is the one thing the
+     * message existed to avoid.
+     */
+    @Volatile
+    private var playing: Streams.Stream? = null
+
     private const val RETRIES = 4
     private const val TAG = "MuseroomPlayer"
 
@@ -409,7 +433,8 @@ object LocalPlayer {
             // answer, so the one thing a retry must do is ask somebody else.
             // Doing this only after several identical failures, which is what
             // it used to do, meant four attempts at the same wall.
-            val failed = Streams.cached(id)?.client
+            val was = playing
+            val failed = was?.client
             if (failed != null) {
                 burned.getOrPut(id) { mutableSetOf() }.add(failed)
                 // Only once it has played something does a client count as
@@ -434,7 +459,10 @@ object LocalPlayer {
             // Out of clients to try. Say which one gave up and where, because a
             // stall somebody can describe is a stall that can be fixed.
             Log.w(TAG, "$id gave up after $RETRIES tries: ${error.errorCodeName}")
-            stall = "Stopped at ${clock(resumeAt)} on ${failed ?: "unknown"}"
+            // Names the client and the exact file, because "it stopped" is not
+            // something anybody can act on and "it stopped on this encoding" is.
+            stall = "Stopped at ${clock(resumeAt)} · ${failed ?: "no client"}" +
+                (was?.itag?.let { " · itag $it" } ?: "")
             tick()
         }
     }

@@ -1,6 +1,6 @@
 {
-  "version_code": 33,
-  "version_name": "5.9.2",
+  "version_code": 34,
+  "version_name": "5.9.3",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "A track that stops partway now asks somewhere else instead of giving up. YouTube hands out stream addresses through several different clients and some of them run out early, so Museroom stops using one the moment it does that, for the rest of the session. If a track still stops, the player now says where and which one failed."
+  "notes": "A track that stops partway now tries a different encoding of the same song, not just a different route to the same one. If it still stops, the player names the client and the exact file that gave up instead of saying unknown."
 }
