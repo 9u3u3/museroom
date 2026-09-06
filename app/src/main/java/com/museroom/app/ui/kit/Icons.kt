@@ -71,6 +71,43 @@ object NeoIcons {
     const val Heart = "M12 20.4C12 20.4 3.2 14.1 3.2 8.9C3.2 6.1 5.4 4 8.1 4" +
         "C9.9 4 11.4 5 12 6.5C12.6 5 14.1 4 15.9 4C18.6 4 20.8 6.1 20.8 8.9" +
         "C20.8 14.1 12 20.4 12 20.4Z"
+
+    /**
+     * Keeping and timing, drawn to the same stroke as everything above.
+     *
+     * The download arrow points into a tray rather than at a disc, because a
+     * disc means "saved to a server" to about half the people who see it and
+     * the whole point of the button is that the file lands here.
+     */
+    const val Download = "M12 3.8v10.4M7.9 10.4 12 14.5l4.1-4.1" +
+        "M4.5 16.4v2.2a1.6 1.6 0 0 0 1.6 1.6h11.8a1.6 1.6 0 0 0 1.6-1.6v-2.2"
+    const val Timer = "M12 5.6a7.4 7.4 0 1 1 0 14.8 7.4 7.4 0 0 1 0-14.8" +
+        "M12 9.4V13l2.6 1.8M9.2 2.8h5.6"
+
+    /** Two columns of dots: the one shape that reads as "pick this up". */
+    const val Grip = "M9.2 7v.1M9.2 12v.1M9.2 17v.1M14.8 7v.1M14.8 12v.1M14.8 17v.1"
+
+    /** The repeat arrows with a one inside them, for repeating a single song. */
+    const val RepeatOne = "M7 5.5h9a4 4 0 0 1 4 4v1M17 18.5H8a4 4 0 0 1-4-4v-1" +
+        "M9.6 2.9 6.8 5.5l2.8 2.6M14.4 21.1l2.8-2.6-2.8-2.6" +
+        "M10.6 10.9 12.2 9.9v4.6"
+
+    /** Three faders, which is what an equalizer looks like on a shelf. */
+    const val Sliders = "M6 4v4.4M6 13.6V20M12 4v9.4M12 18.6V20M18 4v1.4M18 10.6V20" +
+        "M3.6 10.8h4.8M9.6 16h4.8M15.6 8h4.8"
+
+    /** A bell, for following somebody. */
+    const val Bell = "M12 3.6a5.6 5.6 0 0 1 5.6 5.6v3.4l1.7 3.2H4.7l1.7-3.2V9.2" +
+        "A5.6 5.6 0 0 1 12 3.6M9.7 15.8a2.3 2.3 0 0 0 4.6 0"
+
+    /** Lines of text with a note beside them, for words that go with music. */
+    const val Notes = "M4 6.5h9M4 11h9M4 15.5h6" +
+        "M17.5 18.4a2 2 0 1 1 0-4 2 2 0 0 1 0 4M19.5 16.4V5.6l3 .8"
+
+    /** A tower sending something out, for a radio built from one song. */
+    const val Radio = "M12 10.2a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6" +
+        "M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 15.8a5.4 5.4 0 0 0 0-7.6" +
+        "M11 15.4 9.4 20.5M13 15.4l1.6 5.1"
 }
 
 @Composable

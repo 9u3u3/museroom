@@ -2,6 +2,7 @@ package com.museroom.app.player
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.media.AudioManager
 import android.net.Uri
 import android.util.Log
 import android.os.Handler
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.OkHttpClient
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -111,6 +113,19 @@ object LocalPlayer {
     @Volatile
     var quality: Streams.Quality = Streams.Quality.High
 
+    /**
+     * How loud, from nothing to full.
+     *
+     * Held here as well as on the player because a fade can be in progress when
+     * the player is rebuilt, and coming back at whatever volume the fade had
+     * reached would leave the music silent with no way to say why.
+     */
+    @Volatile
+    private var volume: Float = 1f
+
+    @Volatile
+    private var skipSilence: Boolean = false
+
     private val main = Handler(Looper.getMainLooper())
 
     private var app: Context? = null
@@ -163,6 +178,26 @@ object LocalPlayer {
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .build()
 
+        // Ask for a session id rather than waiting to be told one.
+        //
+        // An equalizer attaches to an audio session, and the player's own is
+        // not settled until it has something to decode, which is after the
+        // point where somebody's saved settings should already be in force.
+        // Minting one here means the effects are bound before the first note
+        // and stay bound for the life of this player.
+        runCatching {
+            val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            // A device that cannot mint one says so with an error code, and
+            // handing that to the player as a session id is worse than letting
+            // it pick its own.
+            val minted = audio.generateAudioSessionId()
+            if (minted != AudioManager.ERROR) built.audioSessionId = minted
+        }
+        Effects.bind(built.audioSessionId)
+
+        built.skipSilenceEnabled = skipSilence
+        built.volume = volume
+
         built.addListener(watcher)
         player = built
         tick()
@@ -192,6 +227,16 @@ object LocalPlayer {
         return ResolvingDataSource.Factory(network) { spec ->
             val id = spec.key ?: return@Factory spec
 
+            // A song somebody kept is read off the disk and nothing else
+            // happens: no resolve, no client, no range rules. This is the
+            // difference the download was for, so it is checked before
+            // anything that could go to the network.
+            Downloads.localPath(id)?.let { path ->
+                playing = null
+                Effects.trackLoudness(null)
+                return@Factory spec.withUri(Uri.fromFile(File(path)))
+            }
+
             // The last attempt asks with nothing ruled out. Excluding clients is
             // how a retry finds a working one; carrying every exclusion into the
             // final try is how it ends up with none to ask, which is worse than
@@ -210,6 +255,7 @@ object LocalPlayer {
             }
             val stream = Streams.resolve(id, asking, exclude)
             playing = stream
+            Effects.trackLoudness(stream.loudnessDb)
             val located = spec.withUri(Uri.parse(stream.url))
                 .withRequestHeaders(spec.httpRequestHeaders + stream.headers)
 
@@ -312,6 +358,25 @@ object LocalPlayer {
         tick()
     }
 
+    /**
+     * Fades are drawn by whoever is fading; this only holds the number.
+     *
+     * Kept off the room's path entirely: a room decides what a phone is doing
+     * by the moment on a shared clock, and a volume ramp that ran on one phone
+     * and not another would be two people hearing different music at the same
+     * position.
+     */
+    fun setVolume(level: Float) = onMain {
+        volume = level.coerceIn(0f, 1f)
+        player?.volume = volume
+    }
+
+    /** Drops the long gaps some masters leave at the end of a track. */
+    fun setSkipSilence(enabled: Boolean) = onMain {
+        skipSilence = enabled
+        player?.skipSilenceEnabled = enabled
+    }
+
     fun stop() = onMain {
         wanted = ""
         _current.value = null
@@ -327,6 +392,7 @@ object LocalPlayer {
         player?.removeListener(watcher)
         player?.release()
         player = null
+        Effects.release()
         _snapshot.value = Snapshot()
     }
 

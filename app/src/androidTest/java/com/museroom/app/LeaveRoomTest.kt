@@ -106,13 +106,25 @@ class LeaveRoomTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
 
         FollowSession.start(context, NOBODY, "someone")
-        check(waitFor(90_000) { RoomPlayer.started }) { "the page never came up" }
-        check(waitFor(60_000) { RoomPlayer.snapshot.value.ready }) { "the player never appeared" }
+        check(waitFor(90_000) { RoomPlayer.started }) { "the player never came up" }
 
         val id = runBlocking { RoomPlayer.search("Passionfruit", "Drake") }
         checkNotNull(id) { "nothing came back for a track that certainly exists" }
         RoomPlayer.load(id, 0)
-        check(waitFor(60_000) { RoomPlayer.snapshot.value.playing }) { "it never started" }
+
+        // Loaded rather than playing, and the difference is the host.
+        //
+        // This waited for `playing`, and it could not have been reached since
+        // the player stopped being a WebView. The host here is nobody, and the
+        // follow loop pauses whenever there is no host row — correctly, that is
+        // what it is for — so a track this test starts by hand is stopped again
+        // within the second. Two things steering one player is the test's own
+        // doing, not a bug in either.
+        //
+        // What is left is still the state the Leave button has only ever been
+        // pressed in: a real track resolved and loaded into a real player, with
+        // the service holding a media session, and a rate correction standing.
+        check(waitFor(60_000) { RoomPlayer.snapshot.value.ready }) { "it never loaded" }
 
         // Held in step by speed, which is the state a correction leaves behind.
         RoomPlayer.setRate(1.04)

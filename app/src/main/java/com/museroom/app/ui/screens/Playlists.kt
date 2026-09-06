@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.museroom.app.data.PlaylistSummary
+import com.museroom.app.player.Downloads
 import com.museroom.app.player.Library
 import com.museroom.app.player.LocalPlayer
 import com.museroom.app.player.Playback
@@ -51,9 +53,18 @@ import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.ui.kit.hardShadow
 
-/** The grid of lists on the library's Playlists shelf. */
+/**
+ * The grid of lists on the library's Playlists shelf.
+ *
+ * [pinned] is for the lists nobody made — liked songs, and what is kept
+ * offline. They are handed in rather than built here because they belong to the
+ * library's idea of its shelves, not to playlists.
+ */
 @Composable
-fun PlaylistGrid(onOpen: (Long) -> Unit) {
+fun PlaylistGrid(
+    onOpen: (Long) -> Unit,
+    pinned: (androidx.compose.foundation.lazy.grid.LazyGridScope.() -> Unit)? = null,
+) {
     val c = Neo.colors
     val lists by Library.playlists.collectAsStateWithLifecycle()
     var naming by remember { mutableStateOf(false) }
@@ -72,6 +83,9 @@ fun PlaylistGrid(onOpen: (Long) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
+        // Their own cells rather than one shared item, so the standing lists
+        // sit in the grid's columns instead of stacked inside one square.
+        pinned?.invoke(this)
         item {
             // The way to make one sits with the ones you made, because that is
             // where somebody looks when they want another.
@@ -154,6 +168,17 @@ fun PlaylistScreen(id: Long, onBack: () -> Unit) {
     val playing by Playback.current.collectAsStateWithLifecycle()
     var renaming by remember { mutableStateOf(false) }
 
+    // The new order is written whole to the database on every step of a drag.
+    // A playlist is tens of rows rather than thousands, and the alternative is
+    // holding an order in memory that the database disagrees with.
+    val order = rememberReorder { was, now ->
+        val ids = songs.map { it.id }.toMutableList()
+        if (was in ids.indices && now in ids.indices) {
+            ids.add(now, ids.removeAt(was))
+            Library.reorderPlaylist(id, ids)
+        }
+    }
+
     if (renaming) {
         NameDialog(
             title = "Rename",
@@ -188,37 +213,81 @@ fun PlaylistScreen(id: Long, onBack: () -> Unit) {
 
         LazyColumn(Modifier.fillMaxSize()) {
             item {
-                NeoCard(radius = 20.dp, shadow = 6.dp, padding = 16.dp) {
-                    Text(
-                        list?.name.orEmpty(),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontSize = 24.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { renaming = true },
+                // The cover beside the name rather than above it, the same way
+                // an album page is laid out, because a list that somebody made
+                // is the same kind of object as one a label put out.
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    TrackCover(
+                        "playlist-$id",
+                        songs.firstOrNull { it.cover.isNotBlank() }?.cover,
+                        Modifier.size(118.dp),
+                        radius = 18.dp,
+                        shadow = 6.dp,
+                        stroke = 3.dp,
+                        dot = 11.dp,
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (songs.size == 1) "1 track" else "${songs.size} tracks",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.W700,
-                        fontSize = 10.sp,
-                        color = c.ink.copy(alpha = 0.55f),
-                    )
-                    if (songs.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.Bottom) {
+                        Text(
+                            list?.name.orEmpty(),
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontSize = 22.sp,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { renaming = true },
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            listOf(
+                                "Yours",
+                                if (songs.size == 1) "1 track" else "${songs.size} tracks",
+                                length(songs.sumOf { it.durationMs }),
+                            ).filter { it.isNotBlank() }.joinToString(" · "),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.W700,
+                            fontSize = 10.sp,
+                            color = c.ink.copy(alpha = 0.55f),
+                        )
+                    }
+                }
+                if (songs.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         NeoButton(
                             text = "Play",
                             tone = NeoTone.Lime,
                             onClick = { Playback.play(songs, 0, from = list?.name.orEmpty()) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.weight(1f),
+                        )
+                        RoundIcon(
+                            NeoIcons.Shuffle, "Shuffle this list",
+                            onClick = {
+                                Playback.play(songs.shuffled(), 0, from = list?.name.orEmpty())
+                            },
+                            diameter = 48.dp, icon = 19.dp, rest = 4.dp,
+                        )
+                        RoundIcon(
+                            NeoIcons.Download, "Keep this list on the phone",
+                            onClick = { Downloads.startAll(songs) },
+                            diameter = 48.dp, icon = 19.dp, rest = 4.dp,
+                        )
+                        RoundIcon(
+                            NeoIcons.Chevron, "Rename this list",
+                            onClick = { renaming = true },
+                            diameter = 48.dp, icon = 19.dp, rest = 4.dp,
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
             }
 
             if (songs.isEmpty()) {
@@ -228,23 +297,60 @@ fun PlaylistScreen(id: Long, onBack: () -> Unit) {
             }
 
             itemsIndexed(songs, key = { _, t -> t.id }) { i, track ->
-                TrackRow(
-                    track = track,
-                    playing = playing?.id == track.id,
-                    appearAfter = i,
-                    onClick = { Playback.play(songs, i, from = list?.name.orEmpty()) },
-                    trailing = {
-                        RoundIcon(
-                            NeoIcons.Close, "Remove",
-                            onClick = { Library.removeFromPlaylist(id, track.id) },
-                            diameter = 34.dp, icon = 14.dp, rest = 2.dp,
+                Row(
+                    Modifier.fillMaxWidth().reorderable(order, track.id),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .padding(end = 4.dp)
+                            .size(30.dp)
+                            .dragHandle(
+                                state = order,
+                                id = track.id,
+                                indexOf = { songs.indexOfFirst { it.id == track.id } },
+                                size = { songs.size },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        NeoIcon(
+                            NeoIcons.Grip,
+                            size = 18.dp,
+                            color = c.ink.copy(alpha = 0.4f),
+                            weight = 2.6f,
                         )
-                    },
-                )
+                    }
+                    Box(Modifier.weight(1f)) {
+                        TrackRow(
+                            track = track,
+                            playing = playing?.id == track.id,
+                            appearAfter = i,
+                            onClick = {
+                                val at = songs.indexOfFirst { it.id == track.id }
+                                if (at >= 0) Playback.play(songs, at, from = list?.name.orEmpty())
+                            },
+                            trailing = {
+                                RoundIcon(
+                                    NeoIcons.Close, "Remove",
+                                    onClick = { Library.removeFromPlaylist(id, track.id) },
+                                    diameter = 34.dp, icon = 14.dp, rest = 2.dp,
+                                )
+                            },
+                        )
+                    }
+                }
             }
             item { Spacer(Modifier.height(120.dp)) }
         }
     }
+}
+
+/** How long a list runs, as a person would say it. */
+private fun length(totalMs: Long): String {
+    val minutes = totalMs / 60_000
+    if (minutes <= 0) return ""
+    val hours = minutes / 60
+    return if (hours > 0) "${hours}h ${minutes % 60}m" else "${minutes}m"
 }
 
 /**
@@ -368,7 +474,7 @@ fun NameDialog(
 
 /** Everything behind goes dark and stops listening. */
 @Composable
-private fun Scrim(onDismiss: () -> Unit, body: @Composable () -> Unit) {
+fun Scrim(onDismiss: () -> Unit, body: @Composable () -> Unit) {
     Box(
         Modifier
             .fillMaxSize()

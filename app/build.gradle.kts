@@ -24,8 +24,8 @@ android {
         applicationId = "com.museroom.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 40
-        versionName = "4.0.0"
+        versionCode = 41
+        versionName = "4.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SUPABASE_URL", "\"${env("SUPABASE_URL")}\"")
@@ -83,6 +83,23 @@ android {
     }
 }
 
+/**
+ * Room writes the schema of every version into the repo.
+ *
+ * The migrations here are written by hand, and a hand-written migration that
+ * does not produce exactly the table Room expects fails at open time on
+ * somebody else's phone, with their library in it. Exporting the schemas is
+ * what lets a test build version three, migrate it, and check the result
+ * against what version four says it should be.
+ */
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+android {
+    sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -121,4 +138,5 @@ dependencies {
 
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.room.testing)
 }

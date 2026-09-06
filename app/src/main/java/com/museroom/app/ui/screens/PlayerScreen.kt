@@ -44,14 +44,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.museroom.app.net.AuthRepository
 import com.museroom.app.player.LocalPlayer
 import com.museroom.app.player.Playback
+import com.museroom.app.player.SleepTimer
+import com.museroom.app.sync.TogetherHost
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoIcons
@@ -64,16 +68,21 @@ import kotlinx.coroutines.delay
 /**
  * The track, full screen.
  *
- * Only the controls that do something are here. Lyrics, downloads and a sleep
- * timer belong on this surface and are not built, and a button that silently
- * does nothing is worse than a button that is missing — the same rule the
- * room's notification has followed since it was written.
+ * Every control here does something, which is the rule this surface has
+ * followed since it was written: a button that silently does nothing is worse
+ * than a button that is missing.
+ *
+ * The transport is five wide because shuffle and repeat belong beside the thing
+ * they change rather than three screens away in settings, and the tray under it
+ * is the four places this track can be taken: its words, the queue it sits in,
+ * a list to keep it in, and the clock that will stop it.
  */
 @Composable
 fun PlayerScreen(
     onClose: () -> Unit,
     onOpenArtist: (String) -> Unit = {},
     onOpenQueue: () -> Unit = {},
+    onStartedRoom: () -> Unit = {},
 ) {
     val c = Neo.colors
     val track by Playback.current.collectAsStateWithLifecycle()
@@ -81,9 +90,18 @@ fun PlayerScreen(
     val from by Playback.from.collectAsStateWithLifecycle()
     val queue by Playback.queue.collectAsStateWithLifecycle()
     val index by Playback.index.collectAsStateWithLifecycle()
+    val shuffle by Playback.shuffle.collectAsStateWithLifecycle()
+    val repeat by Playback.repeat.collectAsStateWithLifecycle()
+    val sleepEndsAt by SleepTimer.endsAt.collectAsStateWithLifecycle()
+    val sleepAfterTrack by SleepTimer.afterThisTrack.collectAsStateWithLifecycle()
+    val hosting by TogetherHost.on.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val signedIn by remember { AuthRepository.get(context).session }
+        .collectAsStateWithLifecycle()
 
     var saving by remember { mutableStateOf(false) }
     var reading by remember { mutableStateOf(false) }
+    var timing by remember { mutableStateOf(false) }
 
     // The engine never polls, because nothing in it needs to know where it is
     // between events. A moving scrub bar does, so the screen showing one asks,
@@ -211,50 +229,220 @@ fun PlayerScreen(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Shuffle and repeat sit on the ends rather than in a menu. They
+            // are states rather than actions, so they are drawn lit when they
+            // are on instead of announcing themselves only when pressed.
+            RoundIcon(
+                NeoIcons.Shuffle,
+                if (shuffle) "Shuffle, on" else "Shuffle, off",
+                onClick = { Playback.setShuffle(!shuffle) },
+                diameter = 44.dp, icon = 18.dp, rest = 3.dp,
+                fill = if (shuffle) c.lime else c.card,
+                stroke = if (shuffle) c.onAccent else c.ink,
+                content = if (shuffle) c.onAccent else c.ink,
+            )
+            Spacer(Modifier.size(12.dp))
             RoundIcon(
                 NeoIcons.Previous, "Previous",
                 onClick = { Playback.previous() },
                 diameter = 54.dp, icon = 22.dp, rest = 4.dp,
             )
-            Spacer(Modifier.size(18.dp))
+            Spacer(Modifier.size(14.dp))
             RoundIcon(
                 if (snapshot.playing) NeoIcons.Pause else NeoIcons.Play,
                 if (snapshot.playing) "Pause" else "Play",
                 onClick = { Playback.toggle() },
-                diameter = 78.dp, icon = 30.dp, rest = 5.dp, weight = 3.2f,
+                diameter = 76.dp, icon = 30.dp, rest = 5.dp, weight = 3.2f,
                 fill = c.lime, stroke = c.onAccent, content = c.onAccent,
             )
-            Spacer(Modifier.size(18.dp))
+            Spacer(Modifier.size(14.dp))
             RoundIcon(
                 NeoIcons.Next, "Next",
                 onClick = { Playback.next() },
                 diameter = 54.dp, icon = 22.dp, rest = 4.dp,
             )
+            Spacer(Modifier.size(12.dp))
+            val repeating = repeat != Playback.Repeat.Off
+            RoundIcon(
+                if (repeat == Playback.Repeat.One) NeoIcons.RepeatOne else NeoIcons.Repeat,
+                when (repeat) {
+                    Playback.Repeat.Off -> "Repeat, off"
+                    Playback.Repeat.All -> "Repeat the queue"
+                    Playback.Repeat.One -> "Repeat this song"
+                },
+                onClick = { Playback.cycleRepeat() },
+                diameter = 44.dp, icon = 18.dp, rest = 3.dp,
+                fill = if (repeating) c.lime else c.card,
+                stroke = if (repeating) c.onAccent else c.ink,
+                content = if (repeating) c.onAccent else c.ink,
+            )
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(18.dp))
+
+        // The four places this track can be taken.
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            NeoButton(
-                text = "Lyrics",
-                tone = NeoTone.Paper,
-                small = true,
-                onClick = { reading = true },
-            )
-            Spacer(Modifier.size(10.dp))
-            NeoButton(
-                text = "Save",
-                tone = NeoTone.Paper,
-                small = true,
-                onClick = { saving = true },
-            )
+            Tray(NeoIcons.Notes, "Lyrics", Modifier.weight(1f)) { reading = true }
+            Tray(NeoIcons.Queue, "Queue", Modifier.weight(1f), onClick = onOpenQueue)
+            Tray(NeoIcons.Plus, "Save", Modifier.weight(1f)) { saving = true }
+            Tray(
+                NeoIcons.Timer,
+                if (sleepAfterTrack || sleepEndsAt > 0) "Timer on" else "Timer",
+                Modifier.weight(1f),
+                lit = sleepAfterTrack || sleepEndsAt > 0,
+            ) { timing = true }
         }
 
         Spacer(Modifier.weight(1f))
-        Spacer(Modifier.height(24.dp))
+
+        // Starting a room from the player is the shortest path there is between
+        // hearing something and somebody else hearing it too.
+        NeoButton(
+            text = if (hosting) "Playing in your room" else "Start a room with this",
+            tone = if (hosting) NeoTone.Paper else NeoTone.Violet,
+            enabled = signedIn != null,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                val query = listOf(song.title, song.artist)
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ")
+                if (!hosting) TogetherHost.start(context)
+                TogetherHost.playNow(query)
+                onStartedRoom()
+            },
+        )
+        if (signedIn == null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Sign in on the You tab to start a room.",
+                style = MaterialTheme.typography.bodySmall,
+                fontSize = 11.sp,
+                color = c.ink.copy(alpha = 0.55f),
+            )
+        }
+
+        Spacer(Modifier.height(20.dp))
     }
+
+    if (timing) {
+        SleepSheet(onDismiss = { timing = false })
+    }
+}
+
+/** One square of the tray under the transport: an icon over a word. */
+@Composable
+private fun Tray(
+    path: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    lit: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val c = Neo.colors
+    val shape = RoundedCornerShape(14.dp)
+    Column(
+        modifier
+            .hardShadow(3.dp, c.ink, shape)
+            .clip(shape)
+            .background(if (lit) c.lime else c.card)
+            .border(3.dp, c.ink, shape)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(vertical = 11.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        com.museroom.app.ui.kit.NeoIcon(
+            path,
+            size = 19.dp,
+            color = if (lit) c.onAccent else c.ink,
+            weight = 2.6f,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.W900,
+            fontSize = 9.sp,
+            letterSpacing = 0.9.sp,
+            maxLines = 1,
+            color = if (lit) c.onAccent else c.ink,
+        )
+    }
+}
+
+/**
+ * The sleep timer, as a sheet over the player.
+ *
+ * On this screen rather than only in settings because somebody setting a sleep
+ * timer is already lying down with the music on, and making them find a
+ * settings page at that moment is making them get up.
+ */
+@Composable
+private fun SleepSheet(onDismiss: () -> Unit) {
+    val c = Neo.colors
+    val endsAt by SleepTimer.endsAt.collectAsStateWithLifecycle()
+    val afterTrack by SleepTimer.afterThisTrack.collectAsStateWithLifecycle()
+
+    Scrim(onDismiss) {
+        com.museroom.app.ui.kit.NeoCard(radius = 22.dp, shadow = 8.dp, padding = 20.dp) {
+        Text("SLEEP TIMER", style = com.museroom.app.ui.bangers(26).copy(color = c.ink))
+        Spacer(Modifier.height(8.dp))
+        Text(
+            when {
+                afterTrack -> "The music stops when this song ends."
+                endsAt > 0 -> "Stopping at " + timeOfDay(endsAt) + "."
+                else -> "Off. The music keeps going until you stop it."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            fontSize = 13.sp,
+            color = c.ink.copy(alpha = 0.7f),
+        )
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(15, 30, 45, 60).forEach { minutes ->
+                Box(Modifier.weight(1f)) {
+                    NeoButton(
+                        text = "${minutes}m",
+                        tone = NeoTone.Paper,
+                        small = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { SleepTimer.set(minutes); onDismiss() },
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        NeoButton(
+            text = "When this song ends",
+            tone = NeoTone.Lime,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { SleepTimer.afterTrack(); onDismiss() },
+        )
+        Spacer(Modifier.height(10.dp))
+        NeoButton(
+            text = "Turn it off",
+            tone = NeoTone.Pink,
+            small = true,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = { SleepTimer.cancel(); onDismiss() },
+        )
+        }
+    }
+}
+
+/** The wall clock, for saying when something will happen rather than in how long. */
+private fun timeOfDay(atMs: Long): String {
+    val calendar = java.util.Calendar.getInstance().apply { timeInMillis = atMs }
+    return "%d:%02d".format(
+        calendar.get(java.util.Calendar.HOUR_OF_DAY),
+        calendar.get(java.util.Calendar.MINUTE),
+    )
 }
 
 /**

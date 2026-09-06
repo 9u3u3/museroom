@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -64,6 +65,7 @@ import com.museroom.app.ui.kit.MonoText
 import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
+import com.museroom.app.util.NotificationAccess
 import com.museroom.app.ui.kit.NeoDot
 import com.museroom.app.ui.kit.NeoPill
 import com.museroom.app.ui.kit.NeoSwitch
@@ -217,6 +219,33 @@ fun YouScreen(onOpenSound: () -> Unit = {}) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ScreenTitle("You")
+
+        // Only when it is off. Somebody who granted it should never see this,
+        // and somebody who chose to get on without it needs one place to change
+        // their mind — the gate is not shown twice.
+        if (!NotificationAccess.isGranted(context)) {
+            NeoCard(radius = 16.dp, shadow = 4.dp, padding = 14.dp) {
+                Text(
+                    "Reading your other music apps",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = c.ink,
+                )
+                Spacer(Modifier.height(6.dp))
+                Note(
+                    "Off. Everything Museroom plays itself still works. What is " +
+                        "missing is what Spotify and YouTube Music are playing, " +
+                        "which is what friends see and what the minutes are " +
+                        "counted from.",
+                )
+                Spacer(Modifier.height(12.dp))
+                NeoButton(
+                    text = "Turn it on",
+                    tone = NeoTone.Lime,
+                    small = true,
+                    onClick = { NotificationAccess.openSettings(context) },
+                )
+            }
+        }
 
         // Sound has its own screen, and this is where somebody looks for it.
         NeoCard(radius = 16.dp, shadow = 4.dp, padding = 14.dp) {

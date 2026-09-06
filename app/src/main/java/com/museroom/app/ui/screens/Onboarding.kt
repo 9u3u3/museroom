@@ -31,17 +31,45 @@ import com.museroom.app.ui.kit.NeoButton
 import com.museroom.app.ui.kit.NeoCard
 import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
+import android.content.Context
 import android.os.Build
 import com.museroom.app.ui.kit.NeoTone
 import com.museroom.app.util.NotificationAccess
 
 /**
+ * Whether somebody has said they would rather get on without the permission.
+ *
+ * It used to be that Museroom without notification access could do nothing at
+ * all, so the gate was the app. Since the player landed, the opposite is true:
+ * search, the library, downloads, playlists and rooms all work with the switch
+ * off, and only reading what *other* apps play needs it. Holding a music player
+ * shut behind a permission it does not need is how somebody who cannot get past
+ * Android's restricted-setting dialog ends up with an app that does nothing.
+ */
+object AccessGate {
+
+    private const val PREFS = "museroom.access"
+    private const val KEY_SKIPPED = "skipped"
+
+    fun skipped(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_SKIPPED, false)
+
+    fun skip(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_SKIPPED, true).apply()
+    }
+}
+
+/**
  * The permission gate. It explains before it asks, because dropping someone cold
  * into Android's notification-access list loses them, and because the promise
  * about what is read has to be made before the permission, not after.
+ *
+ * It asks rather than insists. [onSkip] is the way past it, and what is lost by
+ * taking that way is said plainly rather than discovered later.
  */
 @Composable
-fun OnboardingScreen() {
+fun OnboardingScreen(onSkip: () -> Unit = {}) {
     val context = LocalContext.current
     val c = Neo.colors
 
@@ -121,6 +149,27 @@ fun OnboardingScreen() {
             text = "Allow access",
             onClick = { NotificationAccess.openSettings(context) },
             modifier = Modifier.fillMaxWidth(),
+        )
+
+        Spacer(Modifier.size(10.dp))
+
+        NeoButton(
+            text = "Not now",
+            tone = NeoTone.Paper,
+            onClick = {
+                AccessGate.skip(context)
+                onSkip()
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.size(8.dp))
+        Text(
+            "Everything Museroom plays itself works without this. What needs it " +
+                "is reading what your other music apps are playing, which is how " +
+                "friends see it and how those minutes get counted. You can turn " +
+                "it on later from the You tab.",
+            style = MaterialTheme.typography.bodySmall,
+            color = c.ink.copy(alpha = 0.7f),
         )
 
         // Android 13 and later hide this switch for apps installed outside an

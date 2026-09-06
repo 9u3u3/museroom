@@ -5,10 +5,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,7 +19,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -45,6 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.museroom.app.player.InnerTube
 import com.museroom.app.player.LocalPlayer
 import com.museroom.app.player.Playback
 import com.museroom.app.ui.Neo
@@ -64,18 +72,26 @@ private val recents = mutableListOf<String>()
  * Searching happens while you type rather than when you press a button, with
  * enough of a pause that a half-typed word is not a request. The alternative is
  * a screen where the most common action needs two hands.
+ *
+ * With no chip pressed the search comes back in shelves, with the one answer
+ * YouTube thinks you meant on top. That card matters more than it looks:
+ * somebody typing an artist's name wants the artist, and three of their songs
+ * above them is the thing it exists to stop.
  */
 @Composable
 fun SearchScreen(
     onClose: () -> Unit,
     onOpenArtist: (String) -> Unit = {},
     onOpenAlbum: (String) -> Unit = {},
+    onOpenPlaylist: (String) -> Unit = {},
 ) {
     val c = Neo.colors
     var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<LocalPlayer.Track>>(emptyList()) }
+    var filter by remember { mutableStateOf(InnerTube.Filter.Everything) }
+    var found by remember { mutableStateOf(InnerTube.Results()) }
     var looking by remember { mutableStateOf(false) }
     var asked by remember { mutableStateOf("") }
+    val results = remember(found) { Playback.tracksOf(found.songs + found.videos) }
 
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
@@ -84,26 +100,35 @@ fun SearchScreen(
     // The pause is the whole design of this. Long enough that typing a word is
     // one search rather than five, short enough that it never feels like
     // waiting for permission.
-    LaunchedEffect(query) {
+    LaunchedEffect(query, filter) {
         val text = query.trim()
         if (text.length < 2) {
-            results = emptyList()
+            found = InnerTube.Results()
             return@LaunchedEffect
         }
-        delay(420)
+        // No pause when the chip changed rather than the words: the query is
+        // already typed and the person is waiting on a decision they just made.
+        if (text != asked) delay(420)
         looking = true
-        val found = Playback.search(text)
-        if (found.isNotEmpty()) {
+        val answer = Playback.searchFor(text, filter)
+        if (!answer.empty) {
             recents.remove(text)
             recents.add(0, text)
             while (recents.size > 8) recents.removeAt(recents.lastIndex)
         }
-        results = found
+        found = answer
         asked = text
         looking = false
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+    // Its own status-bar inset, because this is the one screen drawn with the
+    // top bar hidden, and the top bar is where every other screen gets one.
+    Column(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp),
+    ) {
         Spacer(Modifier.height(6.dp))
 
         Row(
@@ -163,40 +188,274 @@ fun SearchScreen(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // The chips are only useful once there is something to filter, so they
+        // stay out of the way of an empty box.
+        if (query.trim().length >= 2) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                InnerTube.Filter.entries.forEach { option ->
+                    Filter(
+                        text = if (option == InnerTube.Filter.Everything) "All" else option.name,
+                        selected = filter == option,
+                        onClick = { filter = option },
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
 
         when {
-            looking && results.isEmpty() -> Hint("Looking…")
+            looking && found.empty -> Hint("Looking…")
 
-            results.isEmpty() && query.trim().length >= 2 && asked == query.trim() ->
+            found.empty && query.trim().length >= 2 && asked == query.trim() ->
                 Hint("Nothing for “${query.trim()}”.")
 
-            results.isEmpty() -> Recents(onPick = { query = it })
+            found.empty -> Recents(onPick = { query = it })
 
             else -> {
                 val playing by Playback.current.collectAsStateWithLifecycle()
+                // Turned into tracks out here rather than inside the list,
+                // because a lazy list's item blocks are not a place to remember
+                // anything: the scope they run in is not composable.
+                val songs = remember(found) { Playback.tracksOf(found.songs) }
+                val videos = remember(found) { Playback.tracksOf(found.videos) }
                 LazyColumn(Modifier.fillMaxSize()) {
-                    itemsIndexed(results, key = { _, t -> t.id }) { i, track ->
-                        TrackRow(
-                            track = track,
-                            playing = playing?.id == track.id,
-                            // Each row arrives a beat after the one above it, so
-                            // a page of results reads as a list being dealt out
-                            // rather than a block appearing.
-                            appearAfter = i,
-                            onClick = {
-                                keyboard?.hide()
-                                Playback.play(results, i, from = "Search")
-                            },
-                            trailing = { Heart(track, size = 20) },
-                            onOpenArtist = onOpenArtist,
-                            onOpenAlbum = onOpenAlbum,
-                        )
+                    found.top?.let { top ->
+                        item {
+                            Shelf("Top result · ${top.kind}")
+                            TopCard(
+                                top = top,
+                                onOpen = {
+                                    keyboard?.hide()
+                                    when {
+                                        top.browseId.startsWith("UC") -> onOpenArtist(top.browseId)
+                                        top.browseId.startsWith("VL") -> onOpenPlaylist(top.browseId)
+                                        top.browseId.isNotBlank() -> onOpenAlbum(top.browseId)
+                                        else -> {
+                                            val one = results.firstOrNull { it.id == top.videoId }
+                                                ?: LocalPlayer.Track(
+                                                    id = top.videoId,
+                                                    title = top.title,
+                                                    artist = top.subtitle,
+                                                    cover = top.artworkUrl,
+                                                )
+                                            Playback.play(listOf(one), 0, from = "Search")
+                                        }
+                                    }
+                                },
+                            )
+                        }
                     }
+
+                    if (found.songs.isNotEmpty()) {
+                        item { Shelf("Songs") }
+                        itemsIndexed(songs, key = { _, t -> t.id + "-s" }) { i, track ->
+                            TrackRow(
+                                track = track,
+                                playing = playing?.id == track.id,
+                                // Each row arrives a beat after the one above it,
+                                // so a page of results reads as a list being
+                                // dealt out rather than a block appearing.
+                                appearAfter = i,
+                                onClick = {
+                                    keyboard?.hide()
+                                    Playback.play(songs, i, from = "Search")
+                                },
+                                trailing = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Keep(track, size = 18)
+                                        Heart(track, size = 20)
+                                    }
+                                },
+                                onOpenArtist = onOpenArtist,
+                                onOpenAlbum = onOpenAlbum,
+                            )
+                        }
+                    }
+
+                    if (found.albums.isNotEmpty()) {
+                        item { Shelf("Albums") }
+                        item { Cards(found.albums, onOpen = onOpenAlbum) }
+                    }
+
+                    if (found.artists.isNotEmpty()) {
+                        item { Shelf("Artists") }
+                        item { Cards(found.artists, round = true, onOpen = onOpenArtist) }
+                    }
+
+                    if (found.playlists.isNotEmpty()) {
+                        item { Shelf("Playlists") }
+                        item { Cards(found.playlists, onOpen = onOpenPlaylist) }
+                    }
+
+                    if (found.videos.isNotEmpty()) {
+                        item { Shelf("Videos") }
+                        itemsIndexed(videos, key = { _, t -> t.id + "-v" }) { i, track ->
+                            TrackRow(
+                                track = track,
+                                playing = playing?.id == track.id,
+                                appearAfter = i,
+                                onClick = {
+                                    keyboard?.hide()
+                                    Playback.play(videos, i, from = "Search")
+                                },
+                                trailing = { Heart(track, size = 20) },
+                                onOpenArtist = onOpenArtist,
+                            )
+                        }
+                    }
+
                     item { Spacer(Modifier.height(120.dp)) }
                 }
             }
         }
+    }
+}
+
+/** A heading over one kind of answer. */
+@Composable
+private fun Shelf(text: String) {
+    Text(
+        text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.W900,
+        letterSpacing = 1.5.sp,
+        fontSize = 9.sp,
+        color = Neo.colors.ink.copy(alpha = 0.5f),
+        modifier = Modifier.padding(top = 14.dp, bottom = 6.dp),
+    )
+}
+
+/** The one answer YouTube thinks you meant, drawn larger than the rest. */
+@Composable
+private fun TopCard(top: InnerTube.Top, onOpen: () -> Unit) {
+    val c = Neo.colors
+    com.museroom.app.ui.kit.NeoCard(radius = 18.dp, shadow = 5.dp, padding = 12.dp) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onOpen,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            TrackCover(
+                top.browseId.ifBlank { top.videoId },
+                top.artworkUrl.ifBlank { null },
+                Modifier.size(74.dp),
+                // Round for a person, square for a record, which is the same
+                // shorthand the library shelves use.
+                radius = if (top.browseId.startsWith("UC")) 999.dp else 14.dp,
+                shadow = 4.dp,
+                stroke = 3.dp,
+                dot = 9.dp,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    top.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontSize = 19.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (top.subtitle.isNotBlank()) {
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        top.subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = c.ink.copy(alpha = 0.6f),
+                    )
+                }
+            }
+            NeoIcon(NeoIcons.Play, size = 20.dp, color = c.ink, fill = c.ink, weight = 2f)
+        }
+    }
+}
+
+/** A row of records or people, scrolled sideways. */
+@Composable
+private fun Cards(
+    cards: List<InnerTube.Card>,
+    round: Boolean = false,
+    onOpen: (String) -> Unit,
+) {
+    val c = Neo.colors
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        items(cards, key = { it.browseId }) { card ->
+            Column(
+                Modifier
+                    .width(118.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onOpen(card.browseId) },
+            ) {
+                TrackCover(
+                    card.browseId,
+                    card.artworkUrl.ifBlank { null },
+                    Modifier.fillMaxWidth().aspectRatio(1f),
+                    radius = if (round) 999.dp else 14.dp,
+                    shadow = 4.dp,
+                    stroke = 3.dp,
+                    dot = 11.dp,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    card.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 12.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    card.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 10.sp,
+                    color = c.ink.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** A filter chip: pressed means only this kind of answer. */
+@Composable
+private fun Filter(text: String, selected: Boolean, onClick: () -> Unit) {
+    val c = Neo.colors
+    val shape = RoundedCornerShape(percent = 50)
+    Box(
+        Modifier
+            .hardShadow(3.dp, c.ink, shape)
+            .clip(shape)
+            .background(if (selected) c.ink else c.card)
+            .border(2.5.dp, c.ink, shape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.W900,
+            letterSpacing = 1.2.sp,
+            fontSize = 10.sp,
+            color = if (selected) c.paper else c.ink,
+        )
     }
 }
 

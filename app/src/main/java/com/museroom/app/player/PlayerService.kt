@@ -36,7 +36,11 @@ class PlayerService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        LocalPlayer.attach(this)
+        // The whole engine rather than only the player, because this service is
+        // reachable without the app being on screen. A process rebuilt from a
+        // headphone button would otherwise stream a song whose file is already
+        // on the phone, and would not record that it was played.
+        Playback.attach(this)
 
         // A channel people can find and turn off by name. Media3 will happily
         // ship one called "default_channel_id", which is what somebody sees in

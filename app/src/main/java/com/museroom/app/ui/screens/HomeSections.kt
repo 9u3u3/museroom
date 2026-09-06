@@ -28,10 +28,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalContext
+import com.museroom.app.net.AuthRepository
+import com.museroom.app.net.Friend
+import com.museroom.app.net.FriendsRepository
 import com.museroom.app.player.LocalPlayer
 import com.museroom.app.player.Playback
 import com.museroom.app.player.Library
 import com.museroom.app.ui.Neo
+import com.museroom.app.ui.Refreshing
 
 /**
  * Quick picks, held still.
@@ -67,7 +72,7 @@ private object Picks {
  * suggest, and an empty shelf with a title above it is worse than no shelf.
  */
 @Composable
-fun HomeSections(onOpenPlayer: () -> Unit) {
+fun HomeSections(onOpenPlayer: () -> Unit, onOpenRooms: () -> Unit = {}) {
     val recent by Library.recent.collectAsStateWithLifecycle()
     var picks by remember { mutableStateOf(Picks.tracks) }
     var refreshing by remember { mutableStateOf(false) }
@@ -91,6 +96,8 @@ fun HomeSections(onOpenPlayer: () -> Unit) {
         }
         refreshing = false
     }
+
+    LiveRooms(onOpenRooms)
 
     if (recent.isEmpty()) return
 
@@ -148,6 +155,95 @@ fun HomeSections(onOpenPlayer: () -> Unit) {
                     color = Neo.colors.ink.copy(alpha = 0.6f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Friends who are playing something right now.
+ *
+ * A room is not a thing that exists on its own — it is a person with music on
+ * and the door open — so this is a list of people rather than a list of rooms.
+ * Tapping one opens their page, which is where joining has always lived.
+ *
+ * Nothing is drawn when nobody is listening, including when nobody is signed
+ * in. A heading over an empty strip is a promise the screen cannot keep.
+ */
+@Composable
+private fun LiveRooms(onOpenRooms: () -> Unit) {
+    val c = Neo.colors
+    val context = LocalContext.current
+    val session by remember { AuthRepository.get(context).session }
+        .collectAsStateWithLifecycle()
+    val repo = remember { FriendsRepository.get(context) }
+    var live by remember { mutableStateOf<List<Friend>>(emptyList()) }
+
+    Refreshing(session?.userId, everyMs = 20_000) {
+        if (session == null) {
+            live = emptyList()
+            return@Refreshing
+        }
+        repo.friends().onSuccess { all ->
+            live = all.filter { it.nowPlaying != null }
+        }
+    }
+
+    if (live.isEmpty()) return
+
+    Shelf(title = "Rooms live now", action = "All", onAction = onOpenRooms)
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(live, key = { it.profile.id }) { friend ->
+            val playing = friend.nowPlaying
+            Column(
+                Modifier
+                    .width(126.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { Person.show(friend.profile.id, friend.profile.handle) },
+            ) {
+                Text(
+                    "@" + friend.profile.handle,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    playing?.title.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 10.sp,
+                    color = c.ink.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        item {
+            Column(
+                Modifier
+                    .width(126.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onOpenRooms,
+                    ),
+            ) {
+                Text(
+                    "Host",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 12.sp,
+                    color = c.violet,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Start one",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 10.sp,
+                    color = c.ink.copy(alpha = 0.6f),
                 )
             }
         }

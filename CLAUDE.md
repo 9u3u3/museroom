@@ -84,14 +84,16 @@ until it is granted again.
 | `app/src/main/assets/` | `po_token.html` and `solver/`, run only to mint a bot token |
 | `supabase/migrations/` | Schema, RLS, security-definer RPCs, leaderboard roll-ups |
 | `design/` | Static HTML artboards for the design system (`node design/build.mjs`) |
-| `player/` | Museroom's own playback: the InnerTube client, stream resolution, ExoPlayer |
+| `player/` | Museroom's own playback: the InnerTube client, stream resolution, ExoPlayer, downloads, audio effects, the sleep timer |
 | `plans/` | Decisions taken before the code, in prose. Read before changing what they cover |
 | `docs/` | The website, the APK, and `version.json` |
 
-Five tabs: Now, Friends, Nearby, Board, You (`ui/MuseroomApp.kt`). `PersonCard`
-is drawn once above everything, because a name is tappable on five screens.
+Five tabs: Home, Library, Rooms, Board, You (`ui/MuseroomApp.kt`). Rooms is
+three chips — friends, nearby, requests — because all three are people you
+could be listening with. Search lives in the top bar. `PersonCard` is drawn
+once above everything, because a name is tappable on five screens.
 
-## The four subsystems
+## The five subsystems
 
 ### 1. Detection — what is playing
 
@@ -279,7 +281,49 @@ Together mode adds its own, all learned the same way:
   play now, queue, skip and pause exist for this reason. Do not land changes
   that take them away.
 
-### 4. Nearby
+### 4. Keeping things
+
+Three shelves and a set of files, added in 4.1.0 and all of them this phone's
+rather than an account's.
+
+- **Downloads (`player/Downloads.kt`) are the only cache Museroom has**, and
+  the rules around them come straight out of why `LocalPlayer` has none.
+  Bytes land in a `.part` file, the real name appears only on completion, and
+  the `downloads` row is written after the rename. Nothing half-finished is
+  ever handed to the player, because a partial file replayed on every attempt
+  is exactly what made a track stop at the same second for ever. One at a time,
+  because the download somebody is about to get on a train with is the first
+  one. `Streams.resolve` is never reached for a song that is already here:
+  `LocalPlayer`'s resolving data source checks `Downloads.localPath` first and
+  returns a `file://` URI. A sweep at startup deletes orphaned `.part` files
+  and drops rows whose file is gone, because both happen in the wild.
+- **Saved albums and followed artists keep a tile, never a track list.** An
+  album's contents are a page on YouTube's side that can gain a remaster or
+  lose a licence, so a copy taken the day it was saved would quietly go wrong.
+  What is worth keeping is that somebody wanted it.
+- **`player/Effects.kt` is Android's own audio effects**, bound to a session id
+  `LocalPlayer` mints itself rather than one the player settles on later, so an
+  equalizer is in force before the first note. Every call is wrapped: a device
+  is allowed to simply not have one. Normalisation uses the loudness figure the
+  recording ships with, boost only and capped, because hauling a very quiet
+  master up twenty decibels raises the room tone rather than the music.
+- **The crossfade is a fade, and the screen says so.** One player, so the
+  outgoing track goes quiet and the incoming one comes up from silence with no
+  overlap. It is off in a room, always: every phone there steers by one
+  position on one clock, and a ramp on one phone and not another is two people
+  hearing different music at the same moment. `Playback.roomIsDriving` is set
+  by `RoomPlayer.watch()` and cleared by `RoomPlayer.leave()`.
+- **The sleep timer stores a deadline, not a countdown**, so a phone that dozed
+  through most of the hour still wakes up knowing the hour is over. "End of
+  this track" is consumed by `Playback.next(automatic = true)` rather than by a
+  timer, and is spent once it fires.
+
+`plans/keeping-things.md` has the reasoning, including the two things that are
+drawn in `design/` and deliberately not built: **"Added by the room" on the
+queue**, which needs a song-request table and two signed-in phones to try, and
+**signing in to YouTube**. Do not build either without asking.
+
+### 5. Nearby
 
 `resolve_nearby` excludes anybody whose `following_user` is set and fresh:
 somebody in a room is not a room to join, and their phone reports the host's
@@ -304,7 +348,7 @@ defaulted to broadcast. Read it; never infer the mode from whether `starts_at`
 happens to be set, because a listener reading a half-written row would pick the
 wrong distance to hold and the wrong distance is heard.
 
-Tables: `profiles`, `play_events`, `listening_sessions`, `daily_listening`,
+Tables (Supabase): `profiles`, `play_events`, `listening_sessions`, `daily_listening`,
 `tracks`, `track_aliases`, `leaderboard_entries`, `friendships`, `now_playing`,
 `listen_requests`, `proximity_beacons`, `likes`, `blocks`, `reports`.
 
@@ -327,7 +371,17 @@ Security posture, which matters more than the shapes:
 - **PostgREST embed hints** are required where two foreign keys point at the
   same table, e.g. `profiles!likes_liker_fkey`.
 
-Migrations are plain SQL, timestamp-named, applied against the hosted project.
+**The phone's own database is Room, at version 4**, and its migrations are
+written by hand in `data/MuseroomDatabase.kt`. Destructive migration is
+rejected on purpose: it would throw away play events that have not been
+uploaded, which are minutes somebody listened to. Schemas are exported to
+`app/schemas/` and `MigrationTest` runs the real `MIGRATIONS` array over a real
+version-three database with rows in it — a hand-written migration that produces
+a table Room does not recognise fails on the phone of somebody who has had the
+app for months, never on a fresh install, so it has to be caught here.
+
+Supabase migrations are plain SQL, timestamp-named, applied against the hosted
+project.
 `psql` is not installed on this machine; **`python3` with `pg8000`** and
 `SUPABASE_DB_URL` from `.env.local` is the working route, and is also how
 schema claims get verified out of band. The Supabase CLI is present at
@@ -343,7 +397,8 @@ broke, because `versionCode` is what decides an update and only ever climbs.
 - **Patch** for a fix that adds nothing. 3.2.1 through 3.2.4 were four of these
   in one morning, all of them repairing 3.2.0, which is what a patch chain
   looks like when a feature ships before it works.
-- **Minor** for a feature. The library and its database are 3.4.0.
+- **Minor** for a feature. The library and its database are 3.4.0; 4.1.0, the shelves, the equalizer, the sleep timer,
+  shuffle and repeat, drag-to-reorder, and search filters.
 - **Major** for a breaking change: something people relied on works
   differently or is gone. There have been four. `4.0.0` is the release where
   the YouTube Music WebView stopped being how Museroom plays music: rooms moved

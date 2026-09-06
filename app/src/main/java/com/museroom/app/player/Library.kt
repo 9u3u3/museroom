@@ -1,7 +1,9 @@
 package com.museroom.app.player
 
 import android.content.Context
+import com.museroom.app.data.FollowedArtistEntity
 import com.museroom.app.data.LibrarySongEntity
+import com.museroom.app.data.SavedAlbumEntity
 import com.museroom.app.data.PlaylistEntity
 import com.museroom.app.data.PlaylistSongEntity
 import com.museroom.app.data.PlaylistSummary
@@ -10,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -33,6 +36,7 @@ object Library {
 
     private var dao: com.museroom.app.data.LibraryDao? = null
     private var lists: com.museroom.app.data.PlaylistDao? = null
+    private var shelves: com.museroom.app.data.ShelfDao? = null
 
     private val empty = kotlinx.coroutines.flow.MutableStateFlow<List<LocalPlayer.Track>>(emptyList())
 
@@ -59,6 +63,22 @@ object Library {
         kotlinx.coroutines.flow.MutableStateFlow(emptyList())
         private set
 
+    /** Records somebody put on the shelf, newest first. */
+    var albums: StateFlow<List<SavedAlbumEntity>> =
+        kotlinx.coroutines.flow.MutableStateFlow(emptyList())
+        private set
+
+    var artists: StateFlow<List<FollowedArtistEntity>> =
+        kotlinx.coroutines.flow.MutableStateFlow(emptyList())
+        private set
+
+    /** Songs whose bytes are here, which is the Offline shelf. */
+    var offline: StateFlow<List<LocalPlayer.Track>> = empty
+        private set
+
+    var offlineBytes: StateFlow<Long> = kotlinx.coroutines.flow.MutableStateFlow(0L)
+        private set
+
     fun attach(context: Context) {
         if (dao != null) return
         val library = MuseroomDatabase.get(context).library()
@@ -75,6 +95,68 @@ object Library {
         val playlistDao = MuseroomDatabase.get(context).playlists()
         lists = playlistDao
         playlists = playlistDao.summaries().stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+        val shelfDao = MuseroomDatabase.get(context).shelf()
+        shelves = shelfDao
+        albums = shelfDao.albums().stateIn(scope, SharingStarted.Eagerly, emptyList())
+        artists = shelfDao.artists().stateIn(scope, SharingStarted.Eagerly, emptyList())
+        offline = shelfDao.downloaded().map { it.map(::asTrack) }
+            .stateIn(scope, SharingStarted.Eagerly, emptyList())
+        offlineBytes = shelfDao.downloadedBytes().stateIn(scope, SharingStarted.Eagerly, 0L)
+    }
+
+    // -------------------------------------------------------------- shelves --
+
+    fun savedFlow(browseId: String): Flow<Boolean> =
+        shelves?.savedFlow(browseId) ?: kotlinx.coroutines.flow.flowOf(false)
+
+    fun followedFlow(browseId: String): Flow<Boolean> =
+        shelves?.followedFlow(browseId) ?: kotlinx.coroutines.flow.flowOf(false)
+
+    /**
+     * Puts a record on the shelf, or takes it off.
+     *
+     * Toggling on what the database currently says rather than on what the
+     * screen last drew, because the same album can be open on two screens at
+     * once and the button that is pressed second should not undo the first.
+     */
+    fun toggleSaved(album: InnerTube.Album) {
+        val dao = shelves ?: return
+        scope.launch {
+            if (dao.savedFlow(album.browseId).first()) {
+                dao.unsave(album.browseId)
+            } else {
+                dao.save(
+                    SavedAlbumEntity(
+                        browseId = album.browseId,
+                        title = album.title,
+                        artist = album.artist,
+                        artistId = album.artistId,
+                        cover = album.artworkUrl,
+                        detail = album.kind,
+                        savedAt = System.currentTimeMillis(),
+                    ),
+                )
+            }
+        }
+    }
+
+    fun toggleFollowed(artist: InnerTube.Artist) {
+        val dao = shelves ?: return
+        scope.launch {
+            if (dao.followedFlow(artist.browseId).first()) {
+                dao.unfollow(artist.browseId)
+            } else {
+                dao.follow(
+                    FollowedArtistEntity(
+                        browseId = artist.browseId,
+                        name = artist.name,
+                        cover = artist.artworkUrl,
+                        followedAt = System.currentTimeMillis(),
+                    ),
+                )
+            }
+        }
     }
 
     // ----------------------------------------------------------- playlists --
@@ -158,6 +240,12 @@ object Library {
     fun removeFromPlaylist(id: Long, songId: String) {
         val playlistDao = lists ?: return
         scope.launch { playlistDao.remove(id, songId) }
+    }
+
+    /** The order after a drag, written whole so no two rows share a position. */
+    fun reorderPlaylist(id: Long, songIds: List<String>) {
+        val playlistDao = lists ?: return
+        scope.launch { playlistDao.reorder(id, songIds) }
     }
 
     /** Notes that a track was played, which is a fact rather than a preference. */

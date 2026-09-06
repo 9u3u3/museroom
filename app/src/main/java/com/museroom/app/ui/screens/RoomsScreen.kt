@@ -29,25 +29,35 @@ import com.museroom.app.ui.kit.hardShadow
 /**
  * People you could be listening with, in one place.
  *
- * Friends and Nearby were separate tabs and were never separate ideas: one is
- * people you chose and the other is people who happen to be in the room, and
- * both answer the same question. Making them chips of one tab freed the fifth
- * sticker for the library, and neither screen lost anything in the move.
+ * Friends, Nearby and Requests were never three ideas: one is people you chose,
+ * one is people who happen to be in the room, and one is people asking. All
+ * three answer the same question. Making them chips of one tab freed the fifth
+ * sticker for the library, and no screen lost anything in the move.
  */
+private enum class Who { Friends, Nearby, Requests }
+
 @Composable
 fun RoomsScreen() {
-    var nearby by remember { mutableStateOf(false) }
+    var who by remember { mutableStateOf(Who.Friends) }
 
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.padding(start = 20.dp, end = 20.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Where("Friends", !nearby) { nearby = false }
-            Where("Nearby", nearby) { nearby = true }
+            Who.entries.forEach { option ->
+                Where(option.name, who == option) { who = option }
+            }
         }
         Box(Modifier.fillMaxSize()) {
-            if (nearby) NearbyScreen() else FriendsScreen()
+            when (who) {
+                Who.Friends -> FriendsScreen()
+                Who.Nearby -> NearbyScreen()
+                // The same screen the tray in the top bar opens. It is here as
+                // well because a request to listen is a person you could be
+                // listening with, which is what this tab is.
+                Who.Requests -> RequestsScreen()
+            }
         }
     }
 }

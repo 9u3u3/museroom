@@ -7,6 +7,7 @@ import android.os.SystemClock
 import com.museroom.app.player.Extraction
 import com.museroom.app.player.InnerTube
 import com.museroom.app.player.LocalPlayer
+import com.museroom.app.player.Playback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -150,6 +151,7 @@ object RoomPlayer {
     fun leave() {
         ticker?.cancel()
         ticker = null
+        Playback.roomIsDriving = false
         LocalPlayer.stop()
         publish()
     }
@@ -181,6 +183,12 @@ object RoomPlayer {
      * and stops it the moment it leaves.
      */
     private fun watch() {
+        // The queue's fades belong to somebody listening alone. In a room every
+        // phone is steering by one position on one clock, and a ramp that
+        // happened here and not there is two people hearing different music at
+        // the same moment. Full volume, immediately, for the same reason.
+        Playback.roomIsDriving = true
+        LocalPlayer.setVolume(1f)
         if (ticker?.isActive == true) return
         ticker = scope.launch {
             while (true) {

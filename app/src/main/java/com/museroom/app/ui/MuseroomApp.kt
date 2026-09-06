@@ -67,10 +67,12 @@ import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoDot
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.halftone
+import com.museroom.app.ui.screens.AccessGate
 import com.museroom.app.ui.screens.BoardScreen
 import com.museroom.app.ui.screens.FeatureTour
 import com.museroom.app.ui.screens.AlbumScreen
 import com.museroom.app.ui.screens.ArtistScreen
+import com.museroom.app.ui.screens.ListingScreen
 import com.museroom.app.ui.screens.LibraryScreen
 import com.museroom.app.ui.screens.PlaylistScreen
 import com.museroom.app.ui.screens.QueueScreen
@@ -103,6 +105,17 @@ sealed interface Browse {
     data class Album(val id: String) : Browse
     data class Artist(val id: String) : Browse
     data class Playlist(val id: Long) : Browse
+
+    /**
+     * Somebody else's playlist, which is a browse id rather than a row here.
+     *
+     * Kept apart from [Playlist] rather than folded into it with a nullable
+     * field. One is a list on this phone that can be renamed and reordered, the
+     * other is a page on YouTube's side that can only be played, and a screen
+     * that had to check which it was on every button would get it wrong once.
+     */
+    data class Listing(val id: String) : Browse
+
     data object Queue : Browse
     data object Sound : Browse
 }
@@ -118,6 +131,10 @@ enum class Tab(val label: String, val icon: String) {
 @Composable
 fun MuseroomApp() {
     val granted = rememberAccessGranted()
+    val appContext = LocalContext.current
+    // Asked once and remembered. Somebody who chose to get on without the
+    // permission should not be asked again every time they open the app.
+    var skipped by remember { mutableStateOf(AccessGate.skipped(appContext)) }
     var tab by remember { mutableStateOf(Tab.Now) }
 
     // Being let into somebody's room starts the music by itself, so the screen
@@ -165,8 +182,8 @@ fun MuseroomApp() {
             .background(c.paper)
             .halftone(c.ink, alpha = if (c.dark) 0.10f else 0.07f),
     ) {
-        if (!granted) {
-            OnboardingScreen()
+        if (!granted && !skipped) {
+            OnboardingScreen(onSkip = { skipped = true })
             return@Box
         }
 
@@ -215,17 +232,28 @@ fun MuseroomApp() {
                         onBack = { trail = trail.dropLast(1) },
                         onOpenAlbum = { trail = trail + Browse.Album(it) },
                     )
+                    here is Browse.Listing -> ListingScreen(
+                        browseId = here.id,
+                        onBack = { trail = trail.dropLast(1) },
+                        onOpenArtist = { trail = trail + Browse.Artist(it) },
+                    )
                     searchOpen -> SearchScreen(
                         onClose = { searchOpen = false },
                         onOpenArtist = { searchOpen = false; trail = listOf(Browse.Artist(it)) },
                         onOpenAlbum = { searchOpen = false; trail = listOf(Browse.Album(it)) },
+                        onOpenPlaylist = { searchOpen = false; trail = listOf(Browse.Listing(it)) },
                     )
                     requestsOpen -> RequestsScreen()
                     else -> when (tab) {
-                        Tab.Now -> NowScreen(onOpenPlayer = { playerOpen = true })
+                        Tab.Now -> NowScreen(
+                            onOpenPlayer = { playerOpen = true },
+                            onOpenRooms = { tab = Tab.Rooms },
+                        )
                         Tab.Library -> LibraryScreen(
                             onOpenPlayer = { playerOpen = true },
                             onOpenPlaylist = { trail = listOf(Browse.Playlist(it)) },
+                            onOpenAlbum = { trail = listOf(Browse.Album(it)) },
+                            onOpenArtist = { trail = listOf(Browse.Artist(it)) },
                         )
                         Tab.Rooms -> RoomsScreen()
                         Tab.Board -> BoardScreen()
@@ -260,6 +288,11 @@ fun MuseroomApp() {
                     onOpenQueue = {
                         playerOpen = false
                         trail = trail + Browse.Queue
+                    },
+                    onStartedRoom = {
+                        playerOpen = false
+                        tab = Tab.Rooms
+                        trail = emptyList()
                     },
                 )
                 }

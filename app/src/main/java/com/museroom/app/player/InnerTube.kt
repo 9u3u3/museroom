@@ -51,6 +51,61 @@ object InnerTube {
      */
     private const val SONGS_ONLY = "EgWKAQIIAWoKEAkQBRAKEAMQBA=="
 
+    /**
+     * The other tabs of YouTube Music's own search, as the site sends them.
+     *
+     * These are protobuf blobs rather than anything readable, which is why they
+     * are written out rather than built: they are what the site puts on the
+     * wire when you press one of its filter chips, and the endpoint accepts
+     * nothing else.
+     */
+    enum class Filter(val params: String?) {
+        /** Everything, in shelves, with a top result. What an empty box shows. */
+        Everything(null),
+        Songs(SONGS_ONLY),
+        Albums("EgWKAQIYAWoKEAkQChAFEAMQBA=="),
+        Artists("EgWKAQIgAWoKEAkQChAFEAMQBA=="),
+        Playlists("EgWKAQIoAWoKEAkQChAFEAMQBA=="),
+        Videos("EgWKAQIQAWoKEAkQChAFEAMQBA=="),
+    }
+
+    /**
+     * What one search came back with.
+     *
+     * Kept as separate lists rather than one list of a sealed type because the
+     * screen draws them under separate headings, and flattening them only to
+     * group them again is work that exists to be undone.
+     */
+    data class Results(
+        val top: Top? = null,
+        val songs: List<Found> = emptyList(),
+        val videos: List<Found> = emptyList(),
+        val albums: List<Card> = emptyList(),
+        val artists: List<Card> = emptyList(),
+        val playlists: List<Card> = emptyList(),
+    ) {
+        val empty: Boolean
+            get() = top == null && songs.isEmpty() && videos.isEmpty() &&
+                albums.isEmpty() && artists.isEmpty() && playlists.isEmpty()
+    }
+
+    /**
+     * The one answer YouTube thinks the search was really for.
+     *
+     * It has its own renderer because it is its own idea: a person typing an
+     * artist's name wants the artist, and burying that under three of their
+     * songs is the thing the card exists to stop.
+     */
+    data class Top(
+        val kind: String,
+        val title: String,
+        val subtitle: String,
+        val artworkUrl: String,
+        /** One of these two is set. Which one is what pressing it does. */
+        val browseId: String = "",
+        val videoId: String = "",
+    )
+
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonMedia = "application/json".toMediaType()
 
@@ -109,8 +164,26 @@ object InnerTube {
     )
 
     /** Songs matching a query, best first, or empty if the search found none. */
-    fun search(query: String, limit: Int = 20): List<Found> {
-        if (query.isBlank()) return emptyList()
+    fun search(query: String, limit: Int = 20): List<Found> =
+        results(ask(query, Filter.Songs), limit)
+
+    /** One search under one filter, read into whichever lists it filled. */
+    fun searchFor(query: String, filter: Filter, limit: Int = 20): Results {
+        val payload = ask(query, filter)
+        if (payload.isBlank()) return Results()
+        return when (filter) {
+            Filter.Everything -> everything(payload, limit)
+            Filter.Songs -> Results(songs = results(payload, limit))
+            Filter.Videos -> Results(videos = results(payload, limit))
+            Filter.Albums -> Results(albums = cards(payload, "ALBUM", limit))
+            Filter.Artists -> Results(artists = cards(payload, "ARTIST", limit))
+            Filter.Playlists -> Results(playlists = cards(payload, "PLAYLIST", limit))
+        }
+    }
+
+    /** One search request. Empty on anything other than an answer. */
+    private fun ask(query: String, filter: Filter): String {
+        if (query.isBlank()) return ""
         val body = buildJsonObject {
             putJsonObject("context") {
                 putJsonObject("client") {
@@ -121,7 +194,7 @@ object InnerTube {
                 }
             }
             put("query", query)
-            put("params", SONGS_ONLY)
+            filter.params?.let { put("params", it) }
         }
         val request = Request.Builder()
             .url(SEARCH)
@@ -129,11 +202,9 @@ object InnerTube {
             .header("Origin", "https://music.youtube.com")
             .post(body.toString().toRequestBody(jsonMedia))
             .build()
-        val text = http.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return emptyList()
-            response.body?.string().orEmpty()
+        return http.newCall(request).execute().use { response ->
+            if (response.isSuccessful) response.body?.string().orEmpty() else ""
         }
-        return results(text, limit)
     }
 
     /**
@@ -452,6 +523,238 @@ object InnerTube {
             )
         }
         return found
+    }
+
+    /**
+     * An unfiltered search, sorted by what each row turns out to be.
+     *
+     * The shelves are not read by their headings. Headings are localised, they
+     * move about between releases, and "Songs" and "Videos" are the same word
+     * in enough languages to be a bad key. What does not move is what a row
+     * carries: a video id means something playable, and a browse id whose page
+     * type is an album means an album. So every row is classified by its own
+     * endpoint and dropped in the right list.
+     */
+    fun everything(payload: String, limit: Int = 20): Results {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull()
+            ?: return Results()
+
+        val songs = mutableListOf<Found>()
+        val videos = mutableListOf<Found>()
+        val albums = mutableListOf<Card>()
+        val artists = mutableListOf<Card>()
+        val playlists = mutableListOf<Card>()
+        val seen = mutableSetOf<String>()
+
+        // Read before the rows, because the rows need it.
+        //
+        // When the top result is an artist, the songs directly under it are
+        // that artist's and their lines say so by leaving the name out — the
+        // card above has just said it. Those rows have no artist of their own
+        // to read, so this is where it comes from.
+        val top = topResult(root)
+        val whoseCard = top?.takeIf { it.kind == "Artist" }?.title.orEmpty()
+
+        walk(root) { item ->
+            val columns = item["flexColumns"]?.jsonArray
+            val lines = columns?.map { runsIn(it) }?.filter { it.isNotBlank() } ?: return@walk
+            val title = lines.firstOrNull()?.takeIf { it.isNotBlank() } ?: return@walk
+
+            // Everything after the title, however it was split up.
+            //
+            // An unfiltered search is not consistent about this. The same
+            // information arrives as one column with bullets in it on some
+            // rows and as three separate columns on others, and reading only
+            // the second column is how a song came to be by an artist called
+            // "3:22". Flattening both shapes into one list of pieces means the
+            // rest of this does not have to know which it got.
+            val parts = lines.drop(1)
+                .flatMap { it.split("•") }
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            val subtitle = lines.drop(1).joinToString(" • ")
+
+            val videoId = firstString(item, "videoId")
+            if (videoId != null) {
+                if (!seen.add("v:$videoId")) return@walk
+                // An unfiltered search labels every row with what it is, so
+                // the line reads "Song • Radiohead • OK Computer • 5:00" where
+                // a filtered one would start at the artist. Taking the label
+                // off is the difference between an artist named Radiohead and
+                // an artist named Song.
+                val said = withoutTheLabel(parts)
+
+                // The pieces that can be recognised for certain are taken out
+                // first, and whatever is left is words about the song.
+                //
+                // Position is no help here: the line runs artist, album,
+                // length, plays on one row and length, plays on the next,
+                // where the artist was left out because the card above named
+                // them. A length looks like a length and a play count says
+                // "plays", so both can be lifted out by what they are, and
+                // then the first thing remaining really is the artist.
+                val timed = said.firstNotNullOfOrNull { part ->
+                    clock(part).takeIf { it > 0 }
+                } ?: 0
+                val words = said.filterNot { part ->
+                    clock(part) > 0 || part.endsWith(" plays") || part.endsWith(" views")
+                }
+                val found = Found(
+                    id = videoId,
+                    title = title,
+                    artist = words.firstOrNull() ?: whoseCard,
+                    // An album only exists when there is something after the
+                    // artist. One word is who made it, not what it is on.
+                    album = if (words.size > 1) words.last() else "",
+                    durationMs = if (timed > 0) {
+                        timed
+                    } else {
+                        item["fixedColumns"]?.let(::runsIn)?.let(::clock) ?: 0
+                    },
+                    artworkUrl = biggestThumbnail(item),
+                    artistId = firstBrowseId(item, "ARTIST"),
+                    albumId = firstBrowseId(item, "ALBUM"),
+                )
+                // A view count where an album should be is how a music video
+                // announces itself. It is a different recording at a different
+                // length, so it belongs under its own heading.
+                val kind = parts.firstOrNull().orEmpty()
+                // A view count where an album should be, or a row that says so
+                // itself. Either way it is a different recording at a different
+                // length from the song of the same name.
+                if (kind == "Video" || said.any { it.endsWith(" views") }) {
+                    videos += found
+                } else {
+                    songs += found
+                }
+                return@walk
+            }
+
+            val album = firstBrowseId(item, "ALBUM")
+            val artist = firstBrowseId(item, "ARTIST")
+            val playlist = firstBrowseId(item, "PLAYLIST")
+            val card = { id: String ->
+                Card(id, title, subtitle, biggestThumbnail(item))
+            }
+            when {
+                album.isNotBlank() && seen.add("b:$album") -> albums += card(album)
+                artist.isNotBlank() && seen.add("b:$artist") -> artists += card(artist)
+                playlist.isNotBlank() && seen.add("b:$playlist") -> playlists += card(playlist)
+            }
+        }
+
+        return Results(
+            top = top,
+            songs = songs.take(limit),
+            videos = videos.take(limit),
+            albums = albums.take(limit),
+            artists = artists.take(limit),
+            playlists = playlists.take(limit),
+        )
+    }
+
+    /**
+     * The byline with its leading type word removed, when it has one.
+     *
+     * Matched against a list rather than by position, because a row whose
+     * artist happens to be one word would otherwise lose the artist. English
+     * only, which is safe here: every request goes out with `hl=en`.
+     */
+    private val LABELS = setOf("Song", "Video", "Album", "Single", "EP", "Playlist", "Artist")
+
+    private fun withoutTheLabel(parts: List<String>): List<String> =
+        if (parts.size > 1 && parts.first() in LABELS) parts.drop(1) else parts
+
+    /** The card YouTube puts above everything else, when it offered one. */
+    private fun topResult(root: JsonObject): Top? {
+        val card = firstObject(root, "musicCardShelfRenderer") ?: return null
+        val title = card["title"]?.let(::runsIn).orEmpty()
+        if (title.isBlank()) return null
+        val subtitle = card["subtitle"]?.let(::runsIn).orEmpty()
+        val kind = subtitle.split("•").firstOrNull()?.trim().orEmpty()
+        val videoId = firstString(card["onTap"], "videoId").orEmpty()
+        val browseId = listOf("ARTIST", "ALBUM", "PLAYLIST")
+            .firstNotNullOfOrNull { firstBrowseId(card, it).takeIf { id -> id.isNotBlank() } }
+            .orEmpty()
+        if (videoId.isBlank() && browseId.isBlank()) return null
+        return Top(
+            kind = kind.ifBlank { if (videoId.isNotBlank()) "Song" else "Result" },
+            title = title,
+            subtitle = subtitle.substringAfter("•", subtitle).trim(),
+            artworkUrl = biggestThumbnail(card),
+            browseId = browseId,
+            videoId = videoId,
+        )
+    }
+
+    /** Every row in a filtered search that leads to a page of the kind asked for. */
+    fun cards(payload: String, pageType: String, limit: Int = 20): List<Card> {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull()
+            ?: return emptyList()
+        val cards = mutableListOf<Card>()
+        val seen = mutableSetOf<String>()
+        walk(root) { item ->
+            if (cards.size >= limit) return@walk
+            val id = firstBrowseId(item, pageType)
+            if (id.isBlank() || !seen.add(id)) return@walk
+            val lines = item["flexColumns"]?.jsonArray?.map { runsIn(it) }?.filter { it.isNotBlank() }
+                ?: return@walk
+            val title = lines.firstOrNull() ?: return@walk
+            cards += Card(id, title, lines.getOrNull(1).orEmpty(), biggestThumbnail(item))
+        }
+        return cards
+    }
+
+    /**
+     * A playlist page.
+     *
+     * Reuses the album header, which YouTube Music draws with the same
+     * renderer, and differs in the one place that matters: on an album every
+     * track is by the artist in the header, and on a playlist the artist is
+     * whatever the row itself says. Reading it from the header there would
+     * label a hundred artists as whoever made the list.
+     */
+    fun playlist(browseId: String): Album? = playlistFrom(browseId, browse(browseId))
+
+    fun playlistFrom(browseId: String, payload: String): Album? {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull() ?: return null
+        val header = firstObject(root, "musicResponsiveHeaderRenderer")
+            ?: firstObject(root, "musicDetailHeaderRenderer")
+            ?: return null
+        val title = header["title"]?.let(::runsIn).orEmpty()
+        if (title.isBlank()) return null
+        val cover = enlarge(firstString(header["thumbnail"], "url").orEmpty())
+
+        val tracks = mutableListOf<Found>()
+        walkKey(root, "musicResponsiveListItemRenderer") { item ->
+            val id = firstString(item, "videoId") ?: return@walkKey
+            val columns = item["flexColumns"]?.jsonArray ?: return@walkKey
+            val name = columns.firstOrNull()?.let(::runsIn).orEmpty()
+            if (name.isBlank()) return@walkKey
+            val byline = columns.getOrNull(1)?.let(::runsIn).orEmpty()
+                .split("•").map { it.trim() }.filter { it.isNotEmpty() }
+            tracks += Found(
+                id = id,
+                title = name,
+                artist = byline.firstOrNull().orEmpty(),
+                album = byline.getOrNull(1).orEmpty(),
+                durationMs = item["fixedColumns"]?.let(::runsIn)?.let(::clock) ?: 0,
+                artworkUrl = biggestThumbnail(item).ifBlank { cover },
+                artistId = firstBrowseId(item, "ARTIST"),
+                albumId = firstBrowseId(item, "ALBUM"),
+            )
+        }
+
+        return Album(
+            browseId = browseId,
+            title = title,
+            artist = header["straplineTextOne"]?.let(::runsIn).orEmpty(),
+            artistId = "",
+            kind = header["subtitle"]?.let(::runsIn).orEmpty(),
+            detail = header["secondSubtitle"]?.let(::runsIn).orEmpty(),
+            artworkUrl = cover,
+            tracks = tracks,
+        )
     }
 
     /**

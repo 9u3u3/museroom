@@ -411,3 +411,17 @@ player cannot tell those apart, which is itself part of the argument for
 replacing it. Step 4 is where that stops being a guess: with a real player, the
 interval between the scheduled moment and first audio is a number we can log on
 each phone and compare.
+
+## Where this ended up
+
+Every step of the plan shipped, as 4.0.0, and `RoomPlayer` kept the surface it
+promised to keep: `FollowSession` and `TogetherHost` were not edited when the
+whole of YouTube Music was taken out from under them. `Snapshot.strayed` and
+`Snapshot.ad` are still fields and are now never true, because there is no page
+with a queue to stray onto and no advert to delete.
+
+The browsing screens the plan said would become possible are built, and 4.1.0
+finished them: downloads, the library shelves, the equalizer, the sleep timer,
+shuffle and repeat, dragging a queue into order, and search with filters and a
+top result. `plans/keeping-things.md` covers that release and, at the end, the
+two things still drawn in `design/` and not built.

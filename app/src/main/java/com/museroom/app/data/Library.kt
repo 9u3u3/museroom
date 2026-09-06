@@ -75,6 +75,35 @@ interface LibraryDao {
     @Upsert
     suspend fun put(song: LibrarySongEntity)
 
+    /**
+     * Files a song we have not played, without pretending we have.
+     *
+     * Liking something from a search result and downloading an album both need
+     * a row to hang off, and neither is a play. The same statement as [played]
+     * minus the two columns that mean somebody listened, because a download
+     * that added to your play count would be counting the wrong thing.
+     */
+    @Query(
+        """
+        INSERT INTO library_songs (id, title, artist, album, durationMs, cover, liked, likedAt, playedAt, plays)
+        VALUES (:id, :title, :artist, :album, :durationMs, :cover, 0, 0, 0, 0)
+        ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title,
+            artist = excluded.artist,
+            album = CASE WHEN excluded.album <> '' THEN excluded.album ELSE library_songs.album END,
+            durationMs = CASE WHEN excluded.durationMs > 0 THEN excluded.durationMs ELSE library_songs.durationMs END,
+            cover = CASE WHEN excluded.cover <> '' THEN excluded.cover ELSE library_songs.cover END
+        """,
+    )
+    suspend fun remember(
+        id: String,
+        title: String,
+        artist: String,
+        album: String,
+        durationMs: Long,
+        cover: String,
+    )
+
     @Query("UPDATE library_songs SET liked = :liked, likedAt = :at WHERE id = :id")
     suspend fun setLiked(id: String, liked: Boolean, at: Long)
 
@@ -200,4 +229,19 @@ interface PlaylistDao {
 
     @Query("DELETE FROM playlist_songs WHERE playlistId = :id AND songId = :songId")
     suspend fun remove(id: Long, songId: String)
+
+    @Query("UPDATE playlist_songs SET position = :position WHERE playlistId = :id AND songId = :songId")
+    suspend fun place(id: Long, songId: String, position: Int)
+
+    /**
+     * The order after somebody dragged a row, written as one transaction.
+     *
+     * Every position is rewritten rather than the two that moved, because the
+     * cheap version leaves gaps and duplicate positions, and a list that sorts
+     * by a column with ties is a list whose order changes when you look away.
+     */
+    @androidx.room.Transaction
+    suspend fun reorder(id: Long, songIds: List<String>) {
+        songIds.forEachIndexed { position, songId -> place(id, songId, position) }
+    }
 }

@@ -14,9 +14,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         LibrarySongEntity::class,
         PlaylistEntity::class,
         PlaylistSongEntity::class,
+        SavedAlbumEntity::class,
+        FollowedArtistEntity::class,
+        DownloadEntity::class,
     ],
-    version = 3,
-    exportSchema = false,
+    version = 4,
+    exportSchema = true,
 )
 abstract class MuseroomDatabase : RoomDatabase() {
 
@@ -25,6 +28,8 @@ abstract class MuseroomDatabase : RoomDatabase() {
     abstract fun library(): LibraryDao
 
     abstract fun playlists(): PlaylistDao
+
+    abstract fun shelf(): ShelfDao
 
     companion object {
 
@@ -86,6 +91,56 @@ abstract class MuseroomDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Records, artists and downloads: three tables of "somebody chose
+         * this", added in one step because they arrived in one release.
+         */
+        private val TO_SHELVES = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS saved_albums (
+                        browseId TEXT NOT NULL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        artist TEXT NOT NULL,
+                        artistId TEXT NOT NULL,
+                        cover TEXT NOT NULL,
+                        detail TEXT NOT NULL,
+                        savedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS followed_artists (
+                        browseId TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        cover TEXT NOT NULL,
+                        followedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS downloads (
+                        songId TEXT NOT NULL PRIMARY KEY,
+                        bytes INTEGER NOT NULL,
+                        at INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        /**
+         * Every step, in order, in one place.
+         *
+         * Named rather than listed at the call site so that the migration test
+         * runs the same array the app does. A test that rebuilt the list would
+         * be testing a copy, and the copy is not what ships.
+         */
+        val MIGRATIONS: Array<Migration> = arrayOf(TO_LIBRARY, TO_PLAYLISTS, TO_SHELVES)
+
         @Volatile
         private var instance: MuseroomDatabase? = null
 
@@ -95,7 +150,7 @@ abstract class MuseroomDatabase : RoomDatabase() {
                     context.applicationContext,
                     MuseroomDatabase::class.java,
                     "museroom.db",
-                ).addMigrations(TO_LIBRARY, TO_PLAYLISTS).build().also { instance = it }
+                ).addMigrations(*MIGRATIONS).build().also { instance = it }
             }
     }
 }

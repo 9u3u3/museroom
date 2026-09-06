@@ -1,6 +1,7 @@
 package com.museroom.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,19 +31,18 @@ import com.museroom.app.player.Playback
 import com.museroom.app.ui.Neo
 import com.museroom.app.ui.kit.NeoAccentCard
 import com.museroom.app.ui.kit.NeoButton
+import com.museroom.app.ui.kit.NeoIcon
 import com.museroom.app.ui.kit.NeoIcons
 import com.museroom.app.ui.kit.NeoTone
 
 /**
  * What is coming, as a place rather than a drawer.
  *
- * The queue lived folded into the player, which was fine for a glance and
- * wrong for anything else: taking three songs out of a list you can only see
- * four of at a time is a chore. It has the screen now.
- *
- * There is no repeat button. Repeat is not built, and the room's rule about
- * buttons that silently do nothing applies here as much as it does in a
- * notification.
+ * The queue lived folded into the player, which was fine for a glance and wrong
+ * for anything else: taking three songs out of a list you can only see four of
+ * at a time is a chore. It has the screen now, and with it the two things a
+ * queue is actually for — deciding what order the rest goes in, and deciding
+ * whether there is a rest at all.
  */
 @Composable
 fun QueueScreen(onBack: () -> Unit) {
@@ -51,7 +51,10 @@ fun QueueScreen(onBack: () -> Unit) {
     val index by Playback.index.collectAsStateWithLifecycle()
     val from by Playback.from.collectAsStateWithLifecycle()
     val playing by Playback.current.collectAsStateWithLifecycle()
+    val shuffle by Playback.shuffle.collectAsStateWithLifecycle()
+    val repeat by Playback.repeat.collectAsStateWithLifecycle()
     var naming by remember { mutableStateOf(false) }
+    val order = rememberReorder { was, now -> Playback.move(was, now) }
 
     if (naming) {
         NameDialog(
@@ -99,15 +102,25 @@ fun QueueScreen(onBack: () -> Unit) {
             return@Column
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             NeoButton(
-                text = "Shuffle rest",
-                tone = NeoTone.Paper,
+                text = if (shuffle) "Shuffle on" else "Shuffle",
+                tone = if (shuffle) NeoTone.Lime else NeoTone.Paper,
                 small = true,
-                onClick = { Playback.shuffleRest() },
+                onClick = { Playback.setShuffle(!shuffle) },
             )
             NeoButton(
-                text = "Save as playlist",
+                text = when (repeat) {
+                    Playback.Repeat.Off -> "Repeat"
+                    Playback.Repeat.All -> "Repeat all"
+                    Playback.Repeat.One -> "Repeat one"
+                },
+                tone = if (repeat == Playback.Repeat.Off) NeoTone.Paper else NeoTone.Lime,
+                small = true,
+                onClick = { Playback.cycleRepeat() },
+            )
+            NeoButton(
+                text = "Save",
                 tone = NeoTone.Paper,
                 small = true,
                 onClick = { naming = true },
@@ -162,19 +175,61 @@ fun QueueScreen(onBack: () -> Unit) {
 
             val upcoming = queue.drop(index + 1)
             itemsIndexed(upcoming, key = { _, t -> t.id + "-q" }) { i, track ->
-                TrackRow(
-                    track = track,
-                    playing = playing?.id == track.id,
-                    appearAfter = i,
-                    onClick = { Playback.play(queue, index + 1 + i, from) },
-                    trailing = {
-                        RoundIcon(
-                            NeoIcons.Close, "Take out of the queue",
-                            onClick = { Playback.removeAt(index + 1 + i) },
-                            diameter = 34.dp, icon = 14.dp, rest = 2.dp,
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .reorderable(order, track.id),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // The grip is its own target and nothing else on the row
+                    // starts a drag, because the row is also a thing you tap to
+                    // play and a thing you scroll past.
+                    Box(
+                        Modifier
+                            .padding(end = 4.dp)
+                            .size(30.dp)
+                            .dragHandle(
+                                state = order,
+                                id = track.id,
+                                // Looked up rather than captured: a row that has
+                                // just been dragged past its neighbour is at a
+                                // different index from the one this row was
+                                // composed at, and moving it from the old one
+                                // would swap the wrong pair.
+                                indexOf = { queue.indexOfFirst { it.id == track.id } },
+                                size = { queue.size },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        NeoIcon(
+                            NeoIcons.Grip,
+                            size = 18.dp,
+                            color = c.ink.copy(alpha = 0.4f),
+                            weight = 2.6f,
                         )
-                    },
-                )
+                    }
+                    Box(Modifier.weight(1f)) {
+                        TrackRow(
+                            track = track,
+                            playing = playing?.id == track.id,
+                            appearAfter = i,
+                            onClick = {
+                                val at = queue.indexOfFirst { it.id == track.id }
+                                if (at >= 0) Playback.play(queue, at, from)
+                            },
+                            trailing = {
+                                RoundIcon(
+                                    NeoIcons.Close, "Take out of the queue",
+                                    onClick = {
+                                        val at = queue.indexOfFirst { it.id == track.id }
+                                        if (at >= 0) Playback.removeAt(at)
+                                    },
+                                    diameter = 34.dp, icon = 14.dp, rest = 2.dp,
+                                )
+                            },
+                        )
+                    }
+                }
             }
             item { Spacer(Modifier.height(120.dp)) }
         }

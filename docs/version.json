@@ -1,6 +1,6 @@
 {
-  "version_code": 40,
-  "version_name": "4.0.0",
+  "version_code": 41,
+  "version_name": "4.1.0",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Museroom is a music player now. Search anything and it plays here, with a library, playlists, albums, artists, lyrics and a queue that keeps going on its own. Rooms work the same way they always did, except the hidden YouTube Music page they used to run on is gone, which is what makes this a 4."
+  "notes": "Downloads: keep an album, a playlist or a song on the phone and it plays with the radio off. The library grows shelves for albums, artists, liked songs and what is offline. Shuffle and repeat sit on the player, the queue reorders by dragging, and search filters by songs, albums, artists, playlists or videos with the top result on top. Sound gets a real equalizer, volume levelling, skip silence, a fade between tracks and a sleep timer. And a song can start a room from the player."
 }
