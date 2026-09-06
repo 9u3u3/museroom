@@ -1,6 +1,6 @@
 {
-  "version_code": 31,
-  "version_name": "5.9.0",
+  "version_code": 32,
+  "version_name": "5.9.1",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "Museroom plays music itself now. There is a search button on the top bar, and anything you find plays here rather than sending you to another app. A bar above the tabs shows what is on, and opening it gives you the full player with a scrub bar and a queue. Rooms still work exactly as before."
+  "notes": "Tracks play all the way through now. The last build stopped about a minute in, because the plain stream address YouTube hands out is a leftover that was never meant to be read to the end. Museroom asks properly for it now."
 }
