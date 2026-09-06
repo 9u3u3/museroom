@@ -57,6 +57,29 @@ class PlayerStreamsTest {
         assertEquals(0L, InnerTube.clock(""))
     }
 
+    private val queue: String =
+        javaClass.classLoader!!.getResourceAsStream("radio-queue.json")!!
+            .bufferedReader().use { it.readText() }
+
+    @Test
+    fun `a radio queue reads as songs with artists and lengths`() {
+        val songs = InnerTube.queued(queue)
+        assertEquals(4, songs.size)
+        val first = songs.first()
+        assertEquals("nhys3nF4ZDU", first.id)
+        assertEquals("Reflections", first.title)
+        assertEquals("The Neighbourhood", first.artist)
+        assertEquals(245_000L, first.durationMs)
+    }
+
+    @Test
+    fun `a view count is not mistaken for an album`() {
+        // The second line of a queue entry is the album on a song and a view
+        // count on a video, and "4.3M views" is not a record.
+        val songs = InnerTube.queued(queue)
+        assertTrue(songs.none { it.album.contains("views") })
+    }
+
     // ------------------------------------------------------------- the cache --
 
     private fun stream(id: String, expiresAtMs: Long) = Streams.Stream(

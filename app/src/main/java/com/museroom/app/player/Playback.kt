@@ -43,6 +43,7 @@ object Playback {
     fun attach(context: Context) {
         app = context.applicationContext
         LocalPlayer.attach(context)
+        Recent.attach(context)
         watchForTheEnd()
     }
 
@@ -117,6 +118,7 @@ object Playback {
     private fun go(at: Int) {
         val track = _queue.value.getOrNull(at) ?: return
         _index.value = at
+        Recent.played(track)
         LocalPlayer.forgiveClients(track.id)
         LocalPlayer.cue(track)
         LocalPlayer.begin(0)
@@ -150,18 +152,22 @@ object Playback {
         }
     }
 
+    /** Songs that go with one you played, off the main thread. */
+    suspend fun radio(seedId: String): List<LocalPlayer.Track> = withContext(Dispatchers.IO) {
+        runCatching { InnerTube.radio(seedId).map(::asTrack) }.getOrDefault(emptyList())
+    }
+
+    private fun asTrack(found: InnerTube.Found) = LocalPlayer.Track(
+        id = found.id,
+        title = found.title,
+        artist = listOf(found.artist, found.album)
+            .filter(String::isNotBlank).joinToString(" · "),
+        durationMs = found.durationMs,
+        cover = found.artworkUrl,
+    )
+
     /** Searching, off the main thread, with a miss returning an empty list. */
     suspend fun search(query: String): List<LocalPlayer.Track> = withContext(Dispatchers.IO) {
-        runCatching {
-            InnerTube.search(query).map {
-                LocalPlayer.Track(
-                    id = it.id,
-                    title = it.title,
-                    artist = listOf(it.artist, it.album).filter(String::isNotBlank).joinToString(" · "),
-                    durationMs = it.durationMs,
-                    cover = it.artworkUrl,
-                )
-            }
-        }.getOrDefault(emptyList())
+        runCatching { InnerTube.search(query).map(::asTrack) }.getOrDefault(emptyList())
     }
 }

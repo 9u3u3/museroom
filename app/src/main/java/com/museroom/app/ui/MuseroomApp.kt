@@ -86,7 +86,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 enum class Tab(val label: String, val icon: String) {
-    Now("Now", NeoIcons.Now),
+    Now("Home", NeoIcons.Home),
     Friends("Friends", NeoIcons.Friends),
     Nearby("Nearby", NeoIcons.Nearby),
     Board("Board", NeoIcons.Board),
@@ -168,7 +168,7 @@ fun MuseroomApp() {
                     searchOpen -> SearchScreen(onClose = { searchOpen = false })
                     requestsOpen -> RequestsScreen()
                     else -> when (tab) {
-                        Tab.Now -> NowScreen()
+                        Tab.Now -> NowScreen(onOpenPlayer = { playerOpen = true })
                         Tab.Friends -> FriendsScreen()
                         Tab.Nearby -> NearbyScreen()
                         Tab.Board -> BoardScreen()

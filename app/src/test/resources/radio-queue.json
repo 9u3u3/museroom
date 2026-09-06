@@ -1,0 +1,396 @@
+{
+ "contents": {
+  "singleColumnMusicWatchNextResultsRenderer": {
+   "tabbedRenderer": {
+    "watchNextTabbedResultsRenderer": {
+     "tabs": [
+      {
+       "tabRenderer": {
+        "content": {
+         "musicQueueRenderer": {
+          "content": {
+           "playlistPanelRenderer": {
+            "contents": [
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "nhys3nF4ZDU",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Reflections"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "The Neighbourhood",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CNEHEMggGAAiEwjUjdDPhtmWAxUin9gFHelhFmTKAQReBDz_",
+                   "browseEndpoint": {
+                    "browseId": "UC1cnYMXqKdazz-gDPKaDFyg",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "Hard To Imagine The Neighbourhood Ever Changing",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CNEHEMggGAAiEwjUjdDPhtmWAxUin9gFHelhFmTKAQReBDz_",
+                   "browseEndpoint": {
+                    "browseId": "MPREb_edMvNe5E5s6",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "2018"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "4:05"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "4 minutes, 5 seconds"
+                 }
+                }
+               },
+               "thumbnail": {
+                "thumbnails": [
+                 {
+                  "url": "https://yt3.googleusercontent.com/odI3_zmQX1_ovQSm0P_MFpK5Y6RtczVXZhInX1oQ0-F3a6Q2r5_mLYC3XG7FwzKR2LScUrOHTmNH30XR=w60-h60-l90-rj",
+                  "width": 60,
+                  "height": 60
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/odI3_zmQX1_ovQSm0P_MFpK5Y6RtczVXZhInX1oQ0-F3a6Q2r5_mLYC3XG7FwzKR2LScUrOHTmNH30XR=w120-h120-l90-rj",
+                  "width": 120,
+                  "height": 120
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/odI3_zmQX1_ovQSm0P_MFpK5Y6RtczVXZhInX1oQ0-F3a6Q2r5_mLYC3XG7FwzKR2LScUrOHTmNH30XR=w180-h180-l90-rj",
+                  "width": 180,
+                  "height": 180
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/odI3_zmQX1_ovQSm0P_MFpK5Y6RtczVXZhInX1oQ0-F3a6Q2r5_mLYC3XG7FwzKR2LScUrOHTmNH30XR=w226-h226-l90-rj",
+                  "width": 226,
+                  "height": 226
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/odI3_zmQX1_ovQSm0P_MFpK5Y6RtczVXZhInX1oQ0-F3a6Q2r5_mLYC3XG7FwzKR2LScUrOHTmNH30XR=w302-h302-l90-rj",
+                  "width": 302,
+                  "height": 302
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/odI3_zmQX1_ovQSm0P_MFpK5Y6RtczVXZhInX1oQ0-F3a6Q2r5_mLYC3XG7FwzKR2LScUrOHTmNH30XR=w544-h544-l90-rj",
+                  "width": 544,
+                  "height": 544
+                 }
+                ]
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "AkXdmOfc0mc",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Sweater Weather"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "The Neighbourhood",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CMAHEMggGAEiEwjUjdDPhtmWAxUin9gFHelhFmTKAQReBDz_",
+                   "browseEndpoint": {
+                    "browseId": "UC1cnYMXqKdazz-gDPKaDFyg",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "4.3M views"
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "40K likes"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "4:00"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "4 minutes"
+                 }
+                }
+               },
+               "thumbnail": {
+                "thumbnails": [
+                 {
+                  "url": "https://i.ytimg.com/vi/AkXdmOfc0mc/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3lhviYNfc6Ry6obB0KSniQPQWTL2w",
+                  "width": 400,
+                  "height": 225
+                 },
+                 {
+                  "url": "https://i.ytimg.com/vi/AkXdmOfc0mc/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3m9W5SD_4XcshRK6oyGsMa7MxHxtQ",
+                  "width": 800,
+                  "height": 450
+                 },
+                 {
+                  "url": "https://i.ytimg.com/vi/AkXdmOfc0mc/hq720.jpg?sqp=-oaymwEKCNUGEN8DIABIWg&rs=AMzJL3kn925OBXPk0o6ga19GfwlVHsAJCw",
+                  "width": 853,
+                  "height": 479
+                 }
+                ]
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "BI9HQCzpDgQ",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Earrings"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Malcolm Todd",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CK0HEMggGAIiEwjUjdDPhtmWAxUin9gFHelhFmTKAQReBDz_",
+                   "browseEndpoint": {
+                    "browseId": "UCRLE_fwmN2CQw1vuWPwo6eA",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "Sweet Boy",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CK0HEMggGAIiEwjUjdDPhtmWAxUin9gFHelhFmTKAQReBDz_",
+                   "browseEndpoint": {
+                    "browseId": "MPREb_4RjNy3EUid9",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "2024"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "2:32"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "2 minutes, 32 seconds"
+                 }
+                }
+               },
+               "thumbnail": {
+                "thumbnails": [
+                 {
+                  "url": "https://yt3.googleusercontent.com/sm9gz2XQFzc-Gp7qsQzIJGuIsowoyVI43ki4048evRTzCi8IN2FcTyv42YttCDRH-93amTRkG05hqnOK=w60-h60-l90-rj",
+                  "width": 60,
+                  "height": 60
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/sm9gz2XQFzc-Gp7qsQzIJGuIsowoyVI43ki4048evRTzCi8IN2FcTyv42YttCDRH-93amTRkG05hqnOK=w120-h120-l90-rj",
+                  "width": 120,
+                  "height": 120
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/sm9gz2XQFzc-Gp7qsQzIJGuIsowoyVI43ki4048evRTzCi8IN2FcTyv42YttCDRH-93amTRkG05hqnOK=w180-h180-l90-rj",
+                  "width": 180,
+                  "height": 180
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/sm9gz2XQFzc-Gp7qsQzIJGuIsowoyVI43ki4048evRTzCi8IN2FcTyv42YttCDRH-93amTRkG05hqnOK=w226-h226-l90-rj",
+                  "width": 226,
+                  "height": 226
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/sm9gz2XQFzc-Gp7qsQzIJGuIsowoyVI43ki4048evRTzCi8IN2FcTyv42YttCDRH-93amTRkG05hqnOK=w302-h302-l90-rj",
+                  "width": 302,
+                  "height": 302
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/sm9gz2XQFzc-Gp7qsQzIJGuIsowoyVI43ki4048evRTzCi8IN2FcTyv42YttCDRH-93amTRkG05hqnOK=w544-h544-l90-rj",
+                  "width": 544,
+                  "height": 544
+                 }
+                ]
+               }
+              }
+             },
+             {
+              "playlistPanelVideoRenderer": {
+               "videoId": "UnuEzP1rDLY",
+               "title": {
+                "runs": [
+                 {
+                  "text": "Babydoll"
+                 }
+                ]
+               },
+               "longBylineText": {
+                "runs": [
+                 {
+                  "text": "Dominic Fike",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CJoHEMggGAMiEwjUjdDPhtmWAxUin9gFHelhFmTKAQReBDz_",
+                   "browseEndpoint": {
+                    "browseId": "UCsWqHrJvOU_uukQCU92VEvw",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "Don't Forget About Me, Demos",
+                  "navigationEndpoint": {
+                   "clickTrackingParams": "CJoHEMggGAMiEwjUjdDPhtmWAxUin9gFHelhFmTKAQReBDz_",
+                   "browseEndpoint": {
+                    "browseId": "MPREb_O1mDTD4RiuA",
+                    "browseEndpointContextSupportedConfigs": {
+                     "browseEndpointContextMusicConfig": {
+                      "pageType": "MUSIC_PAGE_TYPE_ALBUM"
+                     }
+                    }
+                   }
+                  }
+                 },
+                 {
+                  "text": " \u2022 "
+                 },
+                 {
+                  "text": "2018"
+                 }
+                ]
+               },
+               "lengthText": {
+                "runs": [
+                 {
+                  "text": "1:38"
+                 }
+                ],
+                "accessibility": {
+                 "accessibilityData": {
+                  "label": "1 minute, 38 seconds"
+                 }
+                }
+               },
+               "thumbnail": {
+                "thumbnails": [
+                 {
+                  "url": "https://yt3.googleusercontent.com/whp_-mcgsovG5T-EAeunhXn5cOeOI0aW0mj3KM7hq9Sv0WcofRjqZGa8hivnG68fEaNvmn6J3g6r6Lc=w60-h60-l90-rj",
+                  "width": 60,
+                  "height": 60
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/whp_-mcgsovG5T-EAeunhXn5cOeOI0aW0mj3KM7hq9Sv0WcofRjqZGa8hivnG68fEaNvmn6J3g6r6Lc=w120-h120-l90-rj",
+                  "width": 120,
+                  "height": 120
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/whp_-mcgsovG5T-EAeunhXn5cOeOI0aW0mj3KM7hq9Sv0WcofRjqZGa8hivnG68fEaNvmn6J3g6r6Lc=w180-h180-l90-rj",
+                  "width": 180,
+                  "height": 180
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/whp_-mcgsovG5T-EAeunhXn5cOeOI0aW0mj3KM7hq9Sv0WcofRjqZGa8hivnG68fEaNvmn6J3g6r6Lc=w226-h226-l90-rj",
+                  "width": 226,
+                  "height": 226
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/whp_-mcgsovG5T-EAeunhXn5cOeOI0aW0mj3KM7hq9Sv0WcofRjqZGa8hivnG68fEaNvmn6J3g6r6Lc=w302-h302-l90-rj",
+                  "width": 302,
+                  "height": 302
+                 },
+                 {
+                  "url": "https://yt3.googleusercontent.com/whp_-mcgsovG5T-EAeunhXn5cOeOI0aW0mj3KM7hq9Sv0WcofRjqZGa8hivnG68fEaNvmn6J3g6r6Lc=w544-h544-l90-rj",
+                  "width": 544,
+                  "height": 544
+                 }
+                ]
+               }
+              }
+             }
+            ]
+           }
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

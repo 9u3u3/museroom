@@ -81,7 +81,7 @@ import java.time.ZoneId
 private val FOLDED_HEIGHT = 108.dp
 
 @Composable
-fun NowScreen() {
+fun NowScreen(onOpenPlayer: () -> Unit = {}) {
     val context = LocalContext.current
     val c = Neo.colors
     val density = LocalDensity.current
@@ -186,6 +186,10 @@ fun NowScreen() {
                 SignInPanel("Your listening stays on this phone until you sign in.")
             }
 
+            // What to play, under everything about what is playing. A room is
+            // happening now and today's minutes are a fact; a shelf is an
+            // invitation, and an invitation goes last.
+            HomeSections(onOpenPlayer = onOpenPlayer)
         }
 
             if (active != null) {

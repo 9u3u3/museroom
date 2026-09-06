@@ -1,6 +1,6 @@
 {
-  "version_code": 35,
-  "version_name": "5.9.4",
+  "version_code": 36,
+  "version_name": "5.10.0",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "A track that broke once no longer breaks the same way for ever. Museroom was keeping the part of a failed song it had managed to fetch, replaying exactly that much on every later attempt, then stopping in precisely the same place. That store is gone until downloads arrive, so every play is a fresh one."
+  "notes": "Home has something on it. Quick picks are built from the last thing you played here, and Listen again is that shelf itself, so the app opens on music rather than on a search box. Both work without signing in to anything."
 }

@@ -354,12 +354,19 @@ schema claims get verified out of band. The Supabase CLI is present at
 
 ## Releasing
 
-**Versions are `a.b.c` from 5.9.0 onwards.** Everything up to 5.8 was two-part
-and is left alone; 5.8 is read as 5.8.0 when comparing. Patch for a fix that
-changes no behaviour anyone asked for, minor for a feature, major for a change
-in what the app fundamentally is. `6.0.0` is spoken for: it is the release where
-the YouTube Music WebView stops being how Museroom plays music. `versionCode`
-still only ever goes up by one, and it is what the updater actually compares.
+**Versions are `major.minor.patch` from 5.9.0 onwards.** Everything up to 5.8
+was two-part and is left alone; 5.8 is read as 5.8.0 when comparing.
+
+- **Patch** for a fix that adds nothing. 5.9.1 through 5.9.4 were four of these
+  in one morning, all of them repairing 5.9.0, which is what a patch chain
+  looks like when a feature ships before it works.
+- **Minor** for a feature. The player, its search and its screens are 5.10.0.
+- **Major** for a change in what the app fundamentally is. `6.0.0` is spoken
+  for and stays reserved: it is the release where the YouTube Music WebView
+  stops being how Museroom plays music, which needs rooms moved across too.
+
+`versionCode` only ever goes up by one and is what the updater actually
+compares; the name is for people.
 
 1. Bump `versionCode` and `versionName` in `app/build.gradle.kts`.
 2. `./gradlew :app:assembleRelease` (signs with `keystore/museroom-release.jks`,

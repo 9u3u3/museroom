@@ -38,6 +38,7 @@ object InnerTube {
             "(KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
 
     private const val SEARCH = "https://music.youtube.com/youtubei/v1/search?prettyPrint=false"
+    private const val NEXT = "https://music.youtube.com/youtubei/v1/next?prettyPrint=false"
 
     /**
      * YouTube Music's "songs" filter, as the site itself sends it.
@@ -102,6 +103,87 @@ object InnerTube {
     }
 
     /**
+     * Fifty songs that go with this one.
+     *
+     * YouTube will build a radio around any track, and it will do it without an
+     * account, which is the whole reason this is here. Museroom knows what you
+     * actually played because it has been counting minutes since long before it
+     * could play anything, so it can seed a set of suggestions from that rather
+     * than showing an empty shelf to anybody who has not signed in to YouTube.
+     */
+    fun radio(seedId: String, limit: Int = 25): List<Found> {
+        if (seedId.isBlank()) return emptyList()
+        val body = buildJsonObject {
+            putJsonObject("context") {
+                putJsonObject("client") {
+                    put("clientName", CLIENT)
+                    put("clientVersion", CLIENT_VERSION)
+                    put("hl", "en")
+                    put("gl", "US")
+                }
+            }
+            put("videoId", seedId)
+            // The prefix is what turns "play this" into "play things like this".
+            put("playlistId", "RDAMVM$seedId")
+            put("isAudioOnly", true)
+        }
+        val request = Request.Builder()
+            .url(NEXT)
+            .header("User-Agent", USER_AGENT)
+            .header("Origin", "https://music.youtube.com")
+            .post(body.toString().toRequestBody(jsonMedia))
+            .build()
+        val text = http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return emptyList()
+            response.body?.string().orEmpty()
+        }
+        // The seed itself comes back first. It is the song they just heard, so
+        // showing it as a suggestion would be a strange thing to do.
+        return queued(text, limit + 1).filterNot { it.id == seedId }.take(limit)
+    }
+
+    /** The songs in a queue response, in the order the radio put them. */
+    fun queued(payload: String, limit: Int = 25): List<Found> {
+        val root = runCatching { json.parseToJsonElement(payload).jsonObject }.getOrNull()
+            ?: return emptyList()
+        val found = mutableListOf<Found>()
+        walkQueue(root) { item ->
+            if (found.size >= limit) return@walkQueue
+            val id = runCatching { item["videoId"]!!.jsonPrimitive.content }.getOrNull()
+                ?: return@walkQueue
+            val title = item["title"]?.let(::runsIn).orEmpty()
+            if (title.isBlank()) return@walkQueue
+            val byline = item["longBylineText"]?.let(::runsIn).orEmpty()
+                .split("•").map { it.trim() }.filter { it.isNotEmpty() }
+            found += Found(
+                id = id,
+                title = title,
+                artist = byline.firstOrNull().orEmpty(),
+                // The second line is the album on a song and a view count on a
+                // video, and a number of views is not an album.
+                album = byline.getOrNull(1)?.takeUnless { it.contains(" views") }.orEmpty(),
+                durationMs = item["lengthText"]?.let(::runsIn)?.let(::clock) ?: 0,
+                artworkUrl = biggestThumbnail(item),
+            )
+        }
+        return found
+    }
+
+    private fun walkQueue(
+        element: kotlinx.serialization.json.JsonElement,
+        onItem: (JsonObject) -> Unit,
+    ) {
+        when (element) {
+            is JsonObject -> for ((key, value) in element) {
+                if (key == "playlistPanelVideoRenderer" && value is JsonObject) onItem(value)
+                else walkQueue(value, onItem)
+            }
+            is kotlinx.serialization.json.JsonArray -> element.forEach { walkQueue(it, onItem) }
+            else -> Unit
+        }
+    }
+
+    /**
      * Reads the search response by hunting for the one renderer that matters
      * rather than by describing the whole tree.
      *
@@ -143,7 +225,7 @@ object InnerTube {
      * Largest rather than first: the same renderer offers the sleeve at several
      * sizes, and the small one is visibly soft behind a full-width player.
      */
-    private fun biggestThumbnail(item: JsonObject): String {
+    fun biggestThumbnail(item: JsonObject): String {
         var best = ""
         var area = 0
         fun visit(e: kotlinx.serialization.json.JsonElement) {
@@ -210,7 +292,7 @@ object InnerTube {
     }
 
     /** Everything a renderer's runs say, joined, wherever they are nested. */
-    private fun runsIn(element: kotlinx.serialization.json.JsonElement): String {
+    fun runsIn(element: kotlinx.serialization.json.JsonElement): String {
         val out = StringBuilder()
         fun visit(e: kotlinx.serialization.json.JsonElement) {
             when (e) {

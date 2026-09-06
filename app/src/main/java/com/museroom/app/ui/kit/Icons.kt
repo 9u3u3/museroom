@@ -23,6 +23,7 @@ import com.museroom.app.ui.Neo
  */
 object NeoIcons {
     const val Now = "M4 14v-4M8.5 18V6M13 15V9M17.5 20V4M21.5 13v-2"
+    const val Home = "M3.5 10.5 12 3.5l8.5 7M5.5 9.6V20h13V9.6M9.8 20v-5.4h4.4V20"
     const val Tally = "M4.5 20V9M9.5 20V4.5M14.5 20v-8M19.5 20v-4.5M3 20h18"
     const val Friends =
         "M9 4.6a3.4 3.4 0 1 1 0 6.8 3.4 3.4 0 0 1 0-6.8M2.5 20c0-3.3 2.9-5.4 6.5-5.4s6.5 2.1 6.5 5.4" +
