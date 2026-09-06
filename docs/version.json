@@ -1,6 +1,6 @@
 {
-  "version_code": 34,
-  "version_name": "5.9.3",
+  "version_code": 35,
+  "version_name": "5.9.4",
   "url": "https://9u3u3.github.io/museroom/",
-  "notes": "A track that stops partway now tries a different encoding of the same song, not just a different route to the same one. If it still stops, the player names the client and the exact file that gave up instead of saying unknown."
+  "notes": "A track that broke once no longer breaks the same way for ever. Museroom was keeping the part of a failed song it had managed to fetch, replaying exactly that much on every later attempt, then stopping in precisely the same place. That store is gone until downloads arrive, so every play is a fresh one."
 }

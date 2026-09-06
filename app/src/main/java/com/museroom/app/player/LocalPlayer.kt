@@ -14,14 +14,10 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.ResolvingDataSource
-import androidx.media3.datasource.cache.CacheDataSource
-import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
-import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -29,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.OkHttpClient
-import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -109,7 +104,6 @@ object LocalPlayer {
 
     private var app: Context? = null
     private var player: ExoPlayer? = null
-    private var cache: SimpleCache? = null
 
     /**
      * The track we mean to be on.
@@ -129,27 +123,6 @@ object LocalPlayer {
      * next attempt is told to ask somebody else.
      */
     private val burned = ConcurrentHashMap<String, MutableSet<String>>()
-
-    /**
-     * Clients that stopped serving mid-track recently, whatever the track was.
-     *
-     * A client that runs out after a minute does it because of where this phone
-     * is asking from, not because of the song, so the next track would hit the
-     * same wall and spend its retries learning the same thing. Remembering it
-     * for a few minutes turns one bad track into one bad track rather than an
-     * afternoon of them. It is forgotten quickly, because the reason is usually
-     * temporary and permanently ruling a client out is how you end up with
-     * none.
-     */
-    private val unreliable = ConcurrentHashMap<String, Long>()
-
-    private const val UNRELIABLE_FOR_MS = 5 * 60 * 1000L
-
-    private fun avoidFor(videoId: String): Set<String> {
-        val now = System.currentTimeMillis()
-        unreliable.entries.removeIf { now - it.value > UNRELIABLE_FOR_MS }
-        return burned[videoId].orEmpty() + unreliable.keys
-    }
 
     // ------------------------------------------------------------------ setup --
 
@@ -188,35 +161,31 @@ object LocalPlayer {
     /**
      * The stack the bytes come through.
      *
-     * A resolving source on top so ExoPlayer can be handed video ids and only
-     * pay for a lookup at the moment it needs bytes, a disk cache under it so a
-     * track heard twice is fetched once, and OkHttp at the bottom because the
-     * rest of the app already speaks it.
+     * There is no disk cache here, and its absence is deliberate rather than
+     * unfinished. Caching earns its place when there are downloads to keep; what
+     * it was doing meanwhile was remembering the first part of any track that
+     * failed, and replaying exactly that much on every later attempt before
+     * stopping in precisely the same place. A song that broke once broke for
+     * ever, at the same second, which looks like the song being cursed and is
+     * really the app reading its own notes back. Media3 will not release a
+     * resource the player still holds, so evicting it at the right moment is not
+     * something a caller can arrange. It comes back with downloads, where the
+     * lifetime of a cached file is a decision somebody made on purpose.
      */
     private fun dataSources(context: Context): DataSource.Factory {
-        val evictor = LeastRecentlyUsedCacheEvictor(CACHE_BYTES)
-        val store = cache ?: SimpleCache(
-            File(context.cacheDir, "player"),
-            evictor,
-            StandaloneDatabaseProvider(context),
-        ).also { cache = it }
-
         val network = DefaultDataSource.Factory(
             context,
-            OkHttpDataSource.Factory(
-                OkHttpClient.Builder().build(),
-            ),
+            OkHttpDataSource.Factory(OkHttpClient.Builder().build()),
         )
 
-        val cached = CacheDataSource.Factory()
-            .setCache(store)
-            .setUpstreamDataSourceFactory(network)
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-
-        return ResolvingDataSource.Factory(cached) { spec ->
-            // Already in the cache: no lookup, no network, nothing to resolve.
+        return ResolvingDataSource.Factory(network) { spec ->
             val id = spec.key ?: return@Factory spec
-            if (store.isCached(id, spec.position, 1)) return@Factory spec
+
+            // The last attempt asks with nothing ruled out. Excluding clients is
+            // how a retry finds a working one; carrying every exclusion into the
+            // final try is how it ends up with none to ask, which is worse than
+            // asking one that failed before.
+            val exclude = if (retries >= RETRIES - 1) emptySet() else burned[id].orEmpty()
 
             // Each attempt asks for a different size of file, not just a
             // different client. A track that always dies at the same second is
@@ -228,7 +197,7 @@ object LocalPlayer {
                 1 -> Streams.Quality.Max
                 else -> Streams.Quality.Low
             }
-            val stream = Streams.resolve(id, asking, avoidFor(id))
+            val stream = Streams.resolve(id, asking, exclude)
             playing = stream
             val located = spec.withUri(Uri.parse(stream.url))
                 .withRequestHeaders(spec.httpRequestHeaders + stream.headers)
@@ -251,9 +220,6 @@ object LocalPlayer {
             located.subrange(0, asked)
         }
     }
-
-    /** A session's worth of listening, not a library. Downloads come later. */
-    private const val CACHE_BYTES = 512L * 1024 * 1024
 
     /** m:ss, for saying where something stopped. */
     private fun clock(ms: Long): String = "%d:%02d".format(ms / 60_000, (ms / 1000) % 60)
@@ -350,8 +316,6 @@ object LocalPlayer {
         player?.removeListener(watcher)
         player?.release()
         player = null
-        cache?.release()
-        cache = null
         _snapshot.value = Snapshot()
     }
 
@@ -425,6 +389,13 @@ object LocalPlayer {
 
             val resumeAt = player.currentPosition.coerceAtLeast(0)
 
+            // Throw away what was fetched before asking again.
+            //
+            // A retry may come back with a different encoding of the song, and
+            // half of one file followed by half of another is not a song. Worse,
+            // leaving it there means the next attempt replays to the same byte
+            // and stops in the same place, for ever.
+
             // Blame the client that issued this address, immediately.
             //
             // A stream that played for a minute and then stopped is not a bad
@@ -435,13 +406,7 @@ object LocalPlayer {
             // it used to do, meant four attempts at the same wall.
             val was = playing
             val failed = was?.client
-            if (failed != null) {
-                burned.getOrPut(id) { mutableSetOf() }.add(failed)
-                // Only once it has played something does a client count as
-                // having failed this way. One that never started is a different
-                // problem and should not cost the whole session a client.
-                if (resumeAt > 5_000) unreliable[failed] = System.currentTimeMillis()
-            }
+            if (failed != null) burned.getOrPut(id) { mutableSetOf() }.add(failed)
             Streams.forget(id)
 
             if (retries < RETRIES) {
@@ -504,14 +469,8 @@ object LocalPlayer {
         )
     }
 
-    /** Forgets which clients failed, so a track is given a clean try again. */
+    /** Forgets which clients failed, so a track gets a clean try again. */
     fun forgiveClients(videoId: String) {
         burned.remove(videoId)
-    }
-
-    /** Gives every client another chance, for when the network has changed. */
-    fun forgiveEverything() {
-        burned.clear()
-        unreliable.clear()
     }
 }
