@@ -88,6 +88,19 @@ object Library {
         }
     }
 
+    /** A whole queue, kept in the order it was in. */
+    fun newPlaylistFrom(name: String, tracks: List<LocalPlayer.Track>) {
+        val playlistDao = lists ?: return
+        if (tracks.isEmpty()) return
+        val clean = name.trim().ifBlank { "New playlist" }
+        scope.launch {
+            val id = playlistDao.create(
+                PlaylistEntity(name = clean, createdAt = System.currentTimeMillis()),
+            )
+            tracks.forEach { addToPlaylist(id, it) }
+        }
+    }
+
     fun renamePlaylist(id: Long, name: String) {
         val playlistDao = lists ?: return
         val clean = name.trim()

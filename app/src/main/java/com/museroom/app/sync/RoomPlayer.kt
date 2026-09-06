@@ -3,56 +3,52 @@ package com.museroom.app.sync
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
-import android.view.View
-import android.view.ViewGroup
-import android.webkit.ConsoleMessage
-import android.webkit.WebChromeClient
-import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.webkit.WebViewCompat
-import androidx.webkit.WebViewFeature
-import com.museroom.app.BuildConfig
-import kotlinx.coroutines.CompletableDeferred
+import com.museroom.app.player.Extraction
+import com.museroom.app.player.InnerTube
+import com.museroom.app.player.LocalPlayer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONObject
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * Museroom's own music player.
+ * The room's hand on the player.
  *
- * A joiner does not open YouTube Music and does not see it. Museroom holds the
- * YouTube Music web player in a WebView the size of one pixel and drives it
- * from here, so following a friend is Museroom playing music, with Museroom's
- * artwork and Museroom's controls, and nothing to tap through.
+ * This used to hold the whole of YouTube Music in a hidden WebView and drive it
+ * through JavaScript. It does not any more: Museroom has a player of its own,
+ * and this is the thin layer that lets the room drive it without knowing that
+ * anything changed. The surface is deliberately the one the room already spoke
+ * to — cue, begin, seek, rate, a snapshot — because every invariant in
+ * `FollowSession` and `TogetherHost` is written against it, and a surface that
+ * holds means the room did not have to be rewritten to move house.
  *
- * The WebView belongs to the application rather than to a screen, because
- * music that stops when you change tabs is not music. It is attached to
- * whichever activity is up so that the system keeps rendering it; audio is the
- * only output that matters, and a single pixel is enough to earn it.
+ * Three of the room's oldest problems are gone rather than improved.
+ *
+ * There is no page queue to stray onto, so `strayed` is always false and the
+ * check that guarded against playing a song nobody chose has nothing left to
+ * guard. There are no ad breaks to survive, so `ad` is always false and
+ * `adblock.js` is dead. And a position is a direct question to the player
+ * rather than a number a page shouted a moment ago across a bridge, so the
+ * tolerances that were sized partly to absorb that noise are now sized only for
+ * the network.
  */
 @SuppressLint("StaticFieldLeak")
 object RoomPlayer {
 
-    /** Player states, as YouTube numbers them. */
-    private const val PLAYING = 1
-    private const val BUFFERING = 3
-    private const val ENDED = 0
-
-    private const val HOME = "https://music.youtube.com/"
-
-    /** YouTube Music's "songs only" search filter, so we never match a video. */
-    private const val SONGS_ONLY = "EgWKAQIIAWoKEAkQBRAKEAMQBA=="
-
+    /**
+     * Where the player is, in the shape the room already reads.
+     *
+     * [strayed] and [ad] survive as fields and are never true. They are left
+     * here because the follow loop reads them and the loop is not what changed;
+     * deleting them would mean editing the room to say the same thing.
+     */
     data class Snapshot(
         val ready: Boolean = false,
         val videoId: String = "",
@@ -63,371 +59,163 @@ object RoomPlayer {
         val durationMs: Long = 0,
         val state: Int = -1,
         val ad: Boolean = false,
-        /** How fast it is playing, so a correction can be seen to have landed. */
         val rate: Double = 1.0,
-        /**
-         * The page started something of its own and was stopped for it. Said
-         * out loud so the room can tell "nothing is playing yet" from "the
-         * page tried to play the wrong song".
-         */
         val strayed: Boolean = false,
-        /** What the player is doing, in one line, for when it is doing nothing. */
         val detail: String = "",
-        /** When this was taken, so a stale reading is recognisable as one. */
         val takenAt: Long = 0,
     ) {
         val playing: Boolean get() = state == PLAYING
         val buffering: Boolean get() = state == BUFFERING
-
-        /**
-         * The track ran out on its own.
-         *
-         * Only a host reads this. A listener never has to: their next track is
-         * whatever the host says it is. A host has nobody to be told by, so the
-         * end of a song is the moment they have to notice for themselves.
-         */
         val ended: Boolean get() = state == ENDED
         val onWantedTrack: Boolean get() = wanted.isNotBlank() && videoId == wanted
     }
 
+    /** The numbers the room's code already speaks, kept as they were. */
+    private const val PLAYING = 1
+    private const val BUFFERING = 3
+    private const val ENDED = 0
+    private const val IDLE = -1
+
     private val _snapshot = MutableStateFlow(Snapshot())
     val snapshot: StateFlow<Snapshot> = _snapshot.asStateFlow()
 
-    private val main = Handler(Looper.getMainLooper())
-    private var web: WebView? = null
-    private var booted = false
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    /** The id the room asked for, which survives a page navigation. */
-    @Volatile private var wantedId: String = ""
+    @Volatile
     private var appContext: Context? = null
 
-    private val pending = ConcurrentHashMap<String, CompletableDeferred<String?>>()
-    private val tokens = AtomicLong(0)
+    @Volatile
+    private var booted = false
 
-    /** Whether the page has ever finished loading in this process. */
+    private var ticker: Job? = null
+
+    /** True once there is a player to talk to, which is now immediate. */
     val started: Boolean get() = booted
 
-    /** The application context, once anything has handed us one. */
     val context: Context? get() = appContext
 
-    // ---- lifecycle -------------------------------------------------------
-
     /**
-     * Gives the player a window to live in. Safe to call repeatedly; the
-     * WebView itself is created once and survives the activity being recreated,
-     * because a rotation is not a reason for the music to stop.
+     * Nothing to hang on a window any more.
      *
-     * Full size, and underneath everything. It was one pixel to begin with,
-     * which is tidier and does not work: a video player given a viewport that
-     * small can decline to start, and the failure is silence rather than an
-     * error. Museroom's own screen is opaque and sits on top, so the page is
-     * laid out properly and still never seen.
+     * The WebView had to be attached to whichever activity was up, because
+     * Chromium suspends media in a window nobody can see. A player that is not
+     * a page has no window and no such problem, so these two stay only because
+     * `MainActivity` calls them.
      */
-    fun attach(activity: Activity) = onMain {
-        appContext = activity.applicationContext
-        val view = create(activity.applicationContext)
-        (view.parent as? ViewGroup)?.removeView(view)
-        val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return@onMain
-        content.addView(
-            view,
-            0,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            ),
-        )
+    fun attach(activity: Activity) {
+        prime(activity)
     }
 
-    fun detach() = onMain {
-        val view = web ?: return@onMain
-        (view.parent as? ViewGroup)?.removeView(view)
-    }
+    fun detach() = Unit
 
-    /**
-     * A WebView that does not notice its window going away.
-     *
-     * Chromium suspends media the moment the window holding it stops being
-     * visible, which is the right reflex for a video somebody has navigated
-     * away from and the wrong one for a player nobody was ever looking at.
-     * Museroom's room is audio that happens to be rendered by a browser, and
-     * putting the phone in a pocket must not stop it.
-     */
-    private class AwakeWebView(context: Context) : WebView(context) {
-        override fun onWindowVisibilityChanged(visibility: Int) {
-            super.onWindowVisibilityChanged(View.VISIBLE)
-        }
-    }
-
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun create(context: Context): WebView {
-        web?.let { return it }
-        val view = AwakeWebView(context)
-        view.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            // The listener's tap on "listen with them" is the gesture. Asking
-            // for another one inside a WebView they cannot see is asking for
-            // silence.
-            mediaPlaybackRequiresUserGesture = false
-            // Google refuses to sign people in to a browser that announces
-            // itself as embedded, and the marker for that is "; wv".
-            userAgentString = userAgentString.replace("; wv", "")
-        }
-        CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(view, true)
-        view.addJavascriptInterface(Bridge(), "MuseroomBridge")
-        if (BuildConfig.DEBUG) {
-            // The page is invisible, so without this a failure inside it is a
-            // silence rather than a message.
-            view.webChromeClient = object : WebChromeClient() {
-                override fun onConsoleMessage(message: ConsoleMessage): Boolean {
-                    Log.d("RoomPlayer", "${message.message()} @${message.lineNumber()}")
-                    return true
-                }
-            }
-        }
-        blockAds(view)
-        view.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(v: WebView, url: String?, favicon: android.graphics.Bitmap?) {
-                if (!documentStartSupported) asset(v, "adblock.js")
-            }
-
-            override fun onPageFinished(v: WebView, url: String) {
-                booted = true
-                asset(v, "room.js")
-                // A navigation starts the page's script over with nothing
-                // wanted, which would leave it unable to tell its own queue
-                // from the room's music for the whole of the first track.
-                wantedId.takeIf { it.isNotBlank() }?.let {
-                    v.evaluateJavascript(
-                        "window.__museroom && window.__museroom.expect(${it.quoted()})",
-                        null,
-                    )
-                }
-            }
-        }
-        web = view
-        return view
-    }
-
-    /**
-     * Ad breaks, dealt with before the page can arrange one.
-     *
-     * The listener is the only one who would hear it. The host never pauses,
-     * so an ad here is a stretch of time with nothing to stay in step with,
-     * and the room is broken for as long as it runs. It has to be the page's
-     * own scripts that never see the ad slots, which means running first, and
-     * a document-start script is the only hook that reliably does.
-     */
-    private fun blockAds(view: WebView) {
-        if (!documentStartSupported) return
-        runCatching {
-            val script = read(view.context, "adblock.js") ?: return
-            WebViewCompat.addDocumentStartJavaScript(
-                view,
-                script,
-                setOf("https://music.youtube.com", "https://www.youtube.com"),
-            )
-        }
-    }
-
-    private val documentStartSupported: Boolean
-        get() = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
-
-    private fun asset(view: WebView, name: String) {
-        val script = read(view.context, name) ?: return
-        view.evaluateJavascript(script, null)
-    }
-
-    private fun read(context: Context, name: String): String? = runCatching {
-        context.assets.open(name).bufferedReader().use { it.readText() }
-    }.getOrNull()
-
-    // ---- playback --------------------------------------------------------
-
-    /**
-     * Play a track from a given moment.
-     *
-     * Two routes, and which one runs matters. Once the page is up, handing the
-     * player an id moves it without a page load, which is fast enough to keep
-     * a track change feeling instant. Before that there is nothing to hand an
-     * id to, so the first track arrives as a navigation.
-     */
-    fun load(videoId: String, startMs: Long) = onMain {
-        val view = web ?: return@onMain
-        // Held here as well as in the page, because a navigation wipes the
-        // page's copy and the guard against a strayed player depends on it.
-        wantedId = videoId
-        val startSeconds = (startMs.coerceAtLeast(0L) / 1000.0)
-        if (!booted) {
-            view.loadUrl(watchUrl(videoId, startSeconds))
-            return@onMain
-        }
-        view.evaluateJavascript(
-            "window.__museroom && window.__museroom.load(${videoId.quoted()}, $startSeconds)",
-        ) { result ->
-            // A false here means the page is loaded but the player is not the
-            // object we expect any more. Falling back to a navigation is slow
-            // and correct, which beats fast and silent.
-            if (result == "false") {
-                view.loadUrl(watchUrl(videoId, startSeconds))
-            }
-        }
-    }
-
-    /**
-     * Fetch a track and hold it, silent, for the moment the room begins it.
-     *
-     * The id is remembered exactly as [load] remembers it, so the guard
-     * against the page playing something of its own choosing covers a track
-     * that is waiting as well as one that is running.
-     */
-    fun cue(videoId: String, startMs: Long) = onMain {
-        wantedId = videoId
-        js("window.__museroom.cue(${videoId.quoted()}, ${startMs / 1000.0})")
-    }
-
-    /** The shared moment. */
-    fun begin(positionMs: Long) = js("window.__museroom.begin(${positionMs / 1000.0})")
-
-    fun seekTo(positionMs: Long) = js("window.__museroom.seek(${positionMs / 1000.0})")
-
-    fun play() = js("window.__museroom.play()")
-
-    /**
-     * Walk a small gap off rather than jumping it.
-     *
-     * A seek is heard; a few per cent of speed is not. Kept as a fire-and-
-     * forget call because the next snapshot says whether it worked, and
-     * nothing here should ever wait on the page.
-     */
-    fun setRate(rate: Double) = js("window.__museroom.rate($rate)")
-
-    fun pause() = js("window.__museroom.pause()")
-
-    /** Stop following: silence the player and forget what it was aiming at. */
-    fun leave() {
-        wantedId = ""
-        js("window.__museroom.leave()")
-        _snapshot.value = Snapshot(ready = _snapshot.value.ready)
-    }
-
-    /** Remembers an application context, so the player can be woken later. */
     fun prime(context: Context) {
         if (appContext == null) appContext = context.applicationContext
+        LocalPlayer.attach(context)
+        Extraction.attach(context)
+        booted = true
+        publish()
     }
 
-    /** Waits for the page to be up, within reason. */
-    private suspend fun awaitReady(timeoutMs: Long = 25_000): Boolean {
-        if (booted) return true
-        warmUp()
-        val deadline = SystemClock.elapsedRealtime() + timeoutMs
-        while (!booted && SystemClock.elapsedRealtime() < deadline) {
-            kotlinx.coroutines.delay(300)
-        }
-        return booted
+    /** Nothing to warm: there is no page to load before it can be asked. */
+    fun warmUp() = Unit
+
+    // ----------------------------------------------------------- driving --
+
+    /** Fetch and play, which is what a listener joining partway through wants. */
+    fun load(videoId: String, startMs: Long) {
+        LocalPlayer.cue(LocalPlayer.Track(videoId), startMs)
+        LocalPlayer.play()
+        watch()
     }
 
-    private fun watchUrl(videoId: String, startSeconds: Double): String =
-        "${HOME}watch?v=$videoId&t=${startSeconds.toInt()}"
+    /** Fetch and hold, for a start everybody has agreed on. */
+    fun cue(videoId: String, startMs: Long) {
+        LocalPlayer.cue(LocalPlayer.Track(videoId), startMs)
+        watch()
+    }
+
+    fun begin(positionMs: Long) {
+        LocalPlayer.begin(positionMs)
+        watch()
+    }
+
+    fun seekTo(positionMs: Long) = LocalPlayer.seekTo(positionMs)
+
+    fun play() = LocalPlayer.play()
+
+    fun pause() = LocalPlayer.pause()
+
+    fun setRate(rate: Double) = LocalPlayer.setRate(rate)
+
+    fun leave() {
+        ticker?.cancel()
+        ticker = null
+        LocalPlayer.stop()
+        publish()
+    }
 
     /**
-     * Opens the page without playing anything.
+     * A video id for a song, by name.
      *
-     * Worth doing the moment somebody asks to listen along rather than when
-     * they are let in, because a cold page costs several seconds and those
-     * seconds would otherwise be spent with the host already singing.
+     * Used to mean asking a signed-in page to search itself. It is now the same
+     * search the rest of the app uses, with the songs filter on, which matters
+     * more here than anywhere: a music video is a different recording at a
+     * different length, and a room where everybody has a different length is a
+     * room the follow loop spends its life correcting.
      */
-    fun warmUp() = onMain {
-        val context = appContext ?: return@onMain
-        val view = create(context)
-        if (!booted && view.url == null) view.loadUrl(HOME)
-    }
-
-    // ---- resolving a title ----------------------------------------------
-
-    /**
-     * A video id for this song, found by the page's own search.
-     *
-     * This is the piece that makes following work without an API key: the
-     * search runs inside a signed-in YouTube Music, so it returns the song
-     * rather than a cover of it, and costs nothing.
-     */
-    suspend fun search(title: String, artist: String): String? {
-        // Waiting, rather than failing. The first thing a room does is ask what
-        // to play, and at that moment the page has had a second or two to
-        // exist. Answering "no" then is answering the wrong question.
-        if (!awaitReady()) return null
+    suspend fun search(title: String, artist: String): String? = withContext(Dispatchers.IO) {
         val query = listOf(title, artist).filter { it.isNotBlank() }.joinToString(" ")
-        if (query.isBlank()) return null
-
-        val token = "t${tokens.incrementAndGet()}"
-        val waiting = CompletableDeferred<String?>()
-        pending[token] = waiting
-        js(
-            "window.__museroom.search(${token.quoted()}, ${query.quoted()}, ${SONGS_ONLY.quoted()})",
-        )
-        val found = withTimeoutOrNull(12_000) { waiting.await() }
-        pending.remove(token)
-        return found?.takeIf { it.isNotBlank() }
+        runCatching { InnerTube.search(query, limit = 1).firstOrNull()?.id }.getOrNull()
     }
+
+    // ---------------------------------------------------------- watching --
 
     /**
-     * Runs an expression in the page and hands back what it evaluated to.
+     * Asks the player where it is, while a room is running.
      *
-     * Exists for the tests. Nothing about a listening room is a documented
-     * interface, so the only way to know the page still behaves is to ask it.
+     * The engine keeps no timer of its own and answers events rather than
+     * shouting, which is right for a screen that can ask when it needs to. A
+     * room is the one caller that genuinely needs a fresh position on its own
+     * schedule, because the whole job is comparing this phone's position with
+     * somebody else's several times a second. So the room brings its own tick,
+     * and stops it the moment it leaves.
      */
-    suspend fun evaluate(expression: String): String? {
-        if (!booted) return null
-        val answer = CompletableDeferred<String?>()
-        onMain {
-            val view = web
-            if (view == null) answer.complete(null)
-            else view.evaluateJavascript(expression) { answer.complete(it) }
-        }
-        return withTimeoutOrNull(10_000) { answer.await() }
-    }
-
-    // ---- plumbing --------------------------------------------------------
-
-    private class Bridge {
-        @JavascriptInterface
-        fun state(json: String) {
-            val o = runCatching { JSONObject(json) }.getOrNull() ?: return
-            _snapshot.value = Snapshot(
-                ready = o.optBoolean("ready"),
-                videoId = o.optString("videoId"),
-                wanted = o.optString("wanted"),
-                title = o.optString("title"),
-                author = o.optString("author"),
-                positionMs = o.optLong("positionMs"),
-                durationMs = o.optLong("durationMs"),
-                state = o.optInt("state", -1),
-                ad = o.optBoolean("ad"),
-                rate = o.optDouble("rate", 1.0),
-                strayed = o.optBoolean("strayed"),
-                detail = o.optString("detail"),
-                takenAt = SystemClock.elapsedRealtime(),
-            )
-        }
-
-        @JavascriptInterface
-        fun resolved(token: String, videoId: String) {
-            pending.remove(token)?.complete(videoId.takeIf { it.isNotBlank() })
+    private fun watch() {
+        if (ticker?.isActive == true) return
+        ticker = scope.launch {
+            while (true) {
+                LocalPlayer.tick()
+                publish()
+                delay(TICK_MS)
+            }
         }
     }
 
-    private fun js(expression: String) = onMain {
-        val view = web ?: return@onMain
-        if (!booted) return@onMain
-        view.evaluateJavascript("window.__museroom && $expression", null)
-    }
+    private const val TICK_MS = 200L
 
-    private fun onMain(block: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) block() else main.post(block)
+    private fun publish() {
+        val inner = LocalPlayer.snapshot.value
+        val track = LocalPlayer.current.value
+        _snapshot.value = Snapshot(
+            ready = inner.ready,
+            videoId = inner.videoId,
+            wanted = inner.wanted,
+            title = track?.title.orEmpty(),
+            author = track?.artist.orEmpty(),
+            positionMs = inner.positionMs,
+            durationMs = inner.durationMs,
+            state = when {
+                inner.ended -> ENDED
+                inner.playing -> PLAYING
+                inner.buffering -> BUFFERING
+                else -> IDLE
+            },
+            // Never true, and kept so the room does not have to be told.
+            ad = false,
+            strayed = false,
+            rate = inner.rate,
+            detail = inner.detail,
+            takenAt = inner.takenAtElapsed.takeIf { it > 0 } ?: SystemClock.elapsedRealtime(),
+        )
     }
 }
-
-/** JSON string quoting, so a song called `O'Neil "live"` cannot break a call. */
-private fun String.quoted(): String = JSONObject.quote(this)

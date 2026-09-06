@@ -66,6 +66,12 @@ object LocalPlayer {
         /** Said out loud, because a stall with no reason reads as a bug. */
         val detail: String = "",
         val takenAt: Long = 0,
+        /**
+         * The same moment on the clock that does not move when the phone's
+         * does. A room compares readings against elapsed time, and a wall clock
+         * that jumps forward an hour would look like an hour of music.
+         */
+        val takenAtElapsed: Long = 0,
     ) {
         val onWantedTrack: Boolean get() = wanted.isNotBlank() && videoId == wanted
     }
@@ -471,6 +477,7 @@ object LocalPlayer {
                 }
             },
             takenAt = System.currentTimeMillis(),
+            takenAtElapsed = android.os.SystemClock.elapsedRealtime(),
         )
     }
 

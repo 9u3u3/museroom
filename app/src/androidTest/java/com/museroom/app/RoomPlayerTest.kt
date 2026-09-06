@@ -53,45 +53,33 @@ class RoomPlayerTest {
     }
 
     /**
-     * Ad breaks are the one interruption a room cannot absorb: the host never
-     * pauses, so while an ad runs there is no shared moment to hold. Both
-     * routes ad slots arrive by are checked, because closing one is no use.
+     * Ad breaks were the one interruption a room could not absorb: the host
+     * never pauses, so while an ad ran there was no shared moment to hold. The
+     * defence used to be deleting ad slots out of a web page before its own
+     * scripts could read them. There is no page now, and no slots, so what is
+     * checked is that the room is told so rather than left guessing.
      */
     @Test
-    fun theAdSlotsNeverReachThePlayer() {
+    fun thereIsNoAdvertAndNothingToStrayOnto() {
         scenario = ActivityScenario.launch(MainActivity::class.java)
         RoomPlayer.warmUp()
         assertTrue(
-            "The YouTube Music page never finished loading.",
-            waitFor(90_000) { RoomPlayer.started },
+            "The player was never ready to talk to.",
+            waitFor(30_000) { RoomPlayer.started },
         )
 
-        assertEquals(
-            "The document-start script never ran on the page.",
-            "true",
-            runBlocking { RoomPlayer.evaluate("window.__museroomAdblock === true") },
+        val videoId = runBlocking { RoomPlayer.search("Blinding Lights", "The Weeknd") }
+        assertTrue("Search found nothing to play.", !videoId.isNullOrBlank())
+        RoomPlayer.load(videoId!!, START_MS)
+        assertTrue(
+            "It never started playing.",
+            waitFor(60_000) { RoomPlayer.snapshot.value.playing },
         )
-        assertEquals(
-            "Ad fields survived being parsed from the network.",
-            "true",
-            runBlocking {
-                RoomPlayer.evaluate(
-                    "(function(){var o=JSON.parse('{\"adPlacements\":[1],\"adSlots\":[2],\"playerAds\":[3]}');" +
-                        "return o.adPlacements===undefined&&o.adSlots===undefined&&o.playerAds===undefined;})()",
-                )
-            },
-        )
-        assertEquals(
-            "Ad fields baked into the page survived.",
-            "true",
-            runBlocking {
-                RoomPlayer.evaluate(
-                    "window.ytInitialPlayerResponse === undefined || " +
-                        "(window.ytInitialPlayerResponse.adPlacements === undefined && " +
-                        "window.ytInitialPlayerResponse.adSlots === undefined)",
-                )
-            },
-        )
+
+        val snapshot = RoomPlayer.snapshot.value
+        assertTrue("An advert was reported by a player that cannot serve one.", !snapshot.ad)
+        assertTrue("A stray was reported by a player with no queue of its own.", !snapshot.strayed)
+        assertTrue("It played something other than what was asked for.", snapshot.onWantedTrack)
     }
 
     @Test
@@ -100,22 +88,21 @@ class RoomPlayerTest {
         RoomPlayer.warmUp()
 
         assertTrue(
-            "The YouTube Music page never finished loading.",
-            waitFor(90_000) { RoomPlayer.started },
+            "The player was never ready to talk to.",
+            waitFor(30_000) { RoomPlayer.started },
         )
-        assertTrue(
-            "Museroom's script never found the player.",
-            waitFor(60_000) { RoomPlayer.snapshot.value.ready },
-        )
+        // Nothing is "ready" before anything is loaded any more. Readiness used
+        // to mean a script had found a player inside a page; it now means this
+        // player has something to play, which cannot be true before it is asked
+        // for something.
 
-        // Search, through the page's own signed-in transport rather than an
-        // API key. Retried because the page answers only once it is settled.
+        // Search. No page and no key: the same request the rest of the app makes.
         var found: String? = null
         val deadline = SystemClock.elapsedRealtime() + 90_000
         while (found == null && SystemClock.elapsedRealtime() < deadline) {
             found = runBlocking { RoomPlayer.search("Blinding Lights", "The Weeknd") }
         }
-        assertNotNull("The page's search named no recording.", found)
+        assertNotNull("The search named no recording.", found)
         val videoId = found!!
 
         RoomPlayer.load(videoId, START_MS)

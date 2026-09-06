@@ -73,6 +73,8 @@ import com.museroom.app.ui.screens.AlbumScreen
 import com.museroom.app.ui.screens.ArtistScreen
 import com.museroom.app.ui.screens.LibraryScreen
 import com.museroom.app.ui.screens.PlaylistScreen
+import com.museroom.app.ui.screens.QueueScreen
+import com.museroom.app.ui.screens.SoundScreen
 import com.museroom.app.ui.screens.RoomsScreen
 import com.museroom.app.ui.screens.MiniPlayer
 import com.museroom.app.ui.screens.NowScreen
@@ -101,6 +103,8 @@ sealed interface Browse {
     data class Album(val id: String) : Browse
     data class Artist(val id: String) : Browse
     data class Playlist(val id: Long) : Browse
+    data object Queue : Browse
+    data object Sound : Browse
 }
 
 enum class Tab(val label: String, val icon: String) {
@@ -200,6 +204,8 @@ fun MuseroomApp() {
                         onBack = { trail = trail.dropLast(1) },
                         onOpenArtist = { trail = trail + Browse.Artist(it) },
                     )
+                    here is Browse.Queue -> QueueScreen(onBack = { trail = trail.dropLast(1) })
+                    here is Browse.Sound -> SoundScreen(onBack = { trail = trail.dropLast(1) })
                     here is Browse.Playlist -> PlaylistScreen(
                         id = here.id,
                         onBack = { trail = trail.dropLast(1) },
@@ -223,7 +229,7 @@ fun MuseroomApp() {
                         )
                         Tab.Rooms -> RoomsScreen()
                         Tab.Board -> BoardScreen()
-                        Tab.You -> YouScreen()
+                        Tab.You -> YouScreen(onOpenSound = { trail = listOf(Browse.Sound) })
                     }
                 }
             }
@@ -250,6 +256,10 @@ fun MuseroomApp() {
                         playerOpen = false
                         searchOpen = false
                         trail = listOf(Browse.Artist(it))
+                    },
+                    onOpenQueue = {
+                        playerOpen = false
+                        trail = trail + Browse.Queue
                     },
                 )
                 }

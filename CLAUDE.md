@@ -48,8 +48,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell cmd notification allow_listener \
   com.museroom.app/com.museroom.app.listener.MediaListenerService
 
-./gradlew :app:testDebugUnitTest          # ~96 JVM tests
-node app/src/test/js/stray.mjs            # 22 checks over the page script's logic
+./gradlew :app:testDebugUnitTest          # ~149 JVM tests
 ./gradlew :app:connectedDebugAndroidTest  # 19 tests; needs a device and network
 ```
 
@@ -82,7 +81,7 @@ until it is granted again.
 | `proximity/` | BLE advertising and scanning |
 | `notify/` | Notification channels and their actions |
 | `ui/` | Compose screens plus the comic/neobrutalist kit |
-| `app/src/main/assets/` | `room.js` and `adblock.js`, injected into the hidden WebView |
+| `app/src/main/assets/` | `po_token.html` and `solver/`, run only to mint a bot token |
 | `supabase/migrations/` | Schema, RLS, security-definer RPCs, leaderboard roll-ups |
 | `design/` | Static HTML artboards for the design system (`node design/build.mjs`) |
 | `player/` | Museroom's own playback: the InnerTube client, stream resolution, ExoPlayer |
@@ -163,19 +162,17 @@ be able to hold a room silent.
 
 Pieces:
 
-- **`sync/RoomPlayer.kt`** — owns the WebView. `search`, `load`, `seekTo`,
-  `play`, `setRate`, and a `Snapshot` flow. `wantedId` survives page
-  navigation and is re-stated in `onPageFinished`.
-- **`app/src/main/assets/room.js`** — the page's hand on the player. Caches
-  the player, the `<video>` element and the ad store rather than
-  re-querying a page the size of YouTube Music several times a second.
-  Reports on `timeupdate`/`play`/`pause`/`seeked`/`ended`/`ratechange`, with
-  a one-second interval only as a net.
-- **`app/src/main/assets/adblock.js`** — registered with
-  `WebViewCompat.addDocumentStartJavaScript`, so it runs **before** the page's
-  own scripts. Deletes `playerAds`, `adPlacements` and `adSlots` from both the
-  network-parsed response and the baked-in one. An ad break only ever happens
-  to one person in a room, so it does not merely annoy, it breaks the feature.
+- **`sync/RoomPlayer.kt`** — a thin adapter over `player/LocalPlayer.kt`,
+  keeping the surface the room already spoke to: `search`, `cue`, `load`,
+  `begin`, `seekTo`, `play`, `setRate`, and a `Snapshot` flow. It used to hold
+  the whole of YouTube Music in a hidden WebView; it does not any more, and
+  `FollowSession` and `TogetherHost` did not change when it stopped.
+  `Snapshot.strayed` and `Snapshot.ad` are still fields and are never true,
+  because the loop reads them and the loop is not what changed.
+- **The room brings its own tick.** `LocalPlayer` keeps no timer and answers
+  events, which suits a screen that can ask when it needs to. A room is the one
+  caller that needs a fresh position on its own schedule, so `RoomPlayer` polls
+  at 200 ms while a room runs and stops the moment it leaves.
 - **`sync/FollowSession.kt`** — the loop that holds the joiner in step.
 - **`sync/RoomService.kt`** — a foreground service (`mediaPlayback`) with a
   platform `MediaSession` and a `MediaStyle` notification.
@@ -238,10 +235,11 @@ Invariants that were each learned from a real bug. Do not undo them:
   seek; below it, nudge playback rate up to ±5% with `preservesPitch`, aiming
   to close the gap over about five seconds. Seeks are rate limited
   (`MIN_CORRECTION_GAP_MS`), and during the cooldown the rate still leans.
-- **Never play a song nobody chose.** When a track ends, the page hands itself
-  back its own queue and starts whatever it fancies. `room.js` pauses anything
-  whose id is not `wanted` and flags `strayed`. This is the check that has to
-  be right; the ad-store flag is only ever used to *explain* a stall.
+- **Never play a song nobody chose.** This used to need enforcing: when a
+  track ended the page handed itself back its own queue and started whatever it
+  fancied, so `room.js` had to stop anything whose id was not `wanted`. Our own
+  player has no queue of its own and no opinion, so the danger is gone rather
+  than guarded. `strayed` remains in the snapshot and is never true.
 - **A paused host is not projected.** `hostPosition` refuses to extrapolate
   when the host is stopped, and `obeyImmediately` acts on the Realtime push
   for both pause and resume. Resuming seeks as well, which is free because the
@@ -253,23 +251,6 @@ Invariants that were each learned from a real bug. Do not undo them:
   including starts that came from the Leave and Like buttons. The `foreground`
   flag in `RoomService.onStartCommand` guarantees it. Button intents use
   `PendingIntent.getForegroundService` on O+.
-- **The WebView is full size and underneath everything, not one pixel.** A
-  video player given a viewport that small can decline to start, and the
-  failure is silence rather than an error. Museroom's own screen is opaque and
-  sits on top, so the page is laid out properly and still never seen. (The
-  header comment in `room.js` still says one pixel; it is stale.)
-- **Chromium suspends WebView media when the window is invisible.** Worked
-  around by `AwakeWebView.onWindowVisibilityChanged`. Measured, not assumed.
-- **Swiping out of recents ends the room.** The window the player lives in is
-  destroyed and Chromium will not keep audio without one, so `onTaskRemoved`
-  stops rather than leaving a notification over silence. This is a platform
-  limit, not a bug to chase.
-- **The joiner's notification has no transport controls.** Pause, skip and
-  scrub belong to the host. Only Like and Leave. A *together host's*
-  notification does get Pause, Skip and Stop, because there the buttons are
-  real: their music is coming out of Museroom, so Museroom is the only thing
-  that can stop it.
-
 Together mode adds its own, all learned the same way:
 
 - **The mode is read, never inferred.** `FollowSession.lagFor` is the only

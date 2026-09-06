@@ -82,7 +82,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-fun YouScreen() {
+fun YouScreen(onOpenSound: () -> Unit = {}) {
     val context = LocalContext.current
     val c = Neo.colors
     val scope = rememberCoroutineScope()
@@ -217,6 +217,26 @@ fun YouScreen() {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ScreenTitle("You")
+
+        // Sound has its own screen, and this is where somebody looks for it.
+        NeoCard(radius = 16.dp, shadow = 4.dp, padding = 14.dp) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Sound", style = MaterialTheme.typography.titleLarge, color = c.ink)
+                    Note("Streaming quality, and what Museroom remembers.")
+                }
+                NeoButton(
+                    text = "Open",
+                    tone = NeoTone.Paper,
+                    small = true,
+                    onClick = onOpenSound,
+                )
+            }
+        }
 
         // Private mode sits first, because an off switch nobody can find is not one.
         NeoAccentCard(fill = c.pink, radius = 18.dp, shadow = 6.dp) {

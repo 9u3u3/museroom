@@ -44,6 +44,7 @@ object Playback {
         app = context.applicationContext
         LocalPlayer.attach(context)
         Library.attach(context)
+        Sound.attach(context)
         watchForTheEnd()
     }
 
@@ -59,6 +60,15 @@ object Playback {
         _queue.value = tracks
         _from.value = from
         go(at.coerceIn(tracks.indices))
+    }
+
+    /** Puts the rest of the queue in a different order, keeping this song. */
+    fun shuffleRest() {
+        val list = _queue.value
+        val at = _index.value
+        if (at < 0 || list.size < 3) return
+        val played = list.take(at + 1)
+        _queue.value = played + list.drop(at + 1).shuffled()
     }
 
     /** Adds to the end without disturbing what is playing. */

@@ -70,7 +70,11 @@ import kotlinx.coroutines.delay
  * room's notification has followed since it was written.
  */
 @Composable
-fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
+fun PlayerScreen(
+    onClose: () -> Unit,
+    onOpenArtist: (String) -> Unit = {},
+    onOpenQueue: () -> Unit = {},
+) {
     val c = Neo.colors
     val track by Playback.current.collectAsStateWithLifecycle()
     val snapshot by Playback.snapshot.collectAsStateWithLifecycle()
@@ -78,7 +82,6 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
     val queue by Playback.queue.collectAsStateWithLifecycle()
     val index by Playback.index.collectAsStateWithLifecycle()
 
-    var showQueue by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var reading by remember { mutableStateOf(false) }
 
@@ -133,12 +136,9 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
             }
             RoundIcon(
                 NeoIcons.Queue,
-                if (showQueue) "Hide queue" else "Show queue",
-                onClick = { showQueue = !showQueue },
+                "Queue",
+                onClick = onOpenQueue,
                 diameter = 42.dp,
-                fill = if (showQueue) c.lime else c.card,
-                stroke = if (showQueue) c.onAccent else c.ink,
-                content = if (showQueue) c.onAccent else c.ink,
             )
         }
 
@@ -250,45 +250,6 @@ fun PlayerScreen(onClose: () -> Unit, onOpenArtist: (String) -> Unit = {}) {
                 small = true,
                 onClick = { saving = true },
             )
-        }
-
-        AnimatedVisibility(
-            visible = showQueue,
-            enter = fadeIn(tween(180)) + expandVertically(tween(220)),
-            exit = fadeOut(tween(140)) + shrinkVertically(tween(200)),
-        ) {
-            Column {
-                Spacer(Modifier.height(18.dp))
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        "UP NEXT",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.W900,
-                        letterSpacing = 1.6.sp,
-                        fontSize = 9.sp,
-                        color = c.ink.copy(alpha = 0.5f),
-                    )
-                    NeoPill("${(queue.size - index - 1).coerceAtLeast(0)} left")
-                }
-                Spacer(Modifier.height(4.dp))
-                LazyColumn(Modifier.heightIn(max = 240.dp)) {
-                    itemsIndexed(
-                        queue.drop(index + 1),
-                        key = { _, t -> t.id + "-next" },
-                    ) { i, upcoming ->
-                        TrackRow(
-                            track = upcoming,
-                            playing = false,
-                            appearAfter = i,
-                            onClick = { Playback.play(queue, index + 1 + i, from) },
-                        )
-                    }
-                }
-            }
         }
 
         Spacer(Modifier.weight(1f))

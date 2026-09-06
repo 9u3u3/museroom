@@ -324,7 +324,7 @@ fun SaveToPlaylist(track: LocalPlayer.Track, onDismiss: () -> Unit) {
 
 /** A name, typed. Used for making a list and for changing its mind. */
 @Composable
-private fun NameDialog(
+fun NameDialog(
     title: String,
     initial: String = "",
     onDismiss: () -> Unit,
